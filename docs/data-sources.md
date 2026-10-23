@@ -241,7 +241,10 @@ Use small fixtures under `tests/fixtures/` and document them:
 |---|---|---|---|---|---|
 | tests/fixtures/synthetic/cloudflare-1010-access-denied-synthetic.json | Synthetic | N/A | Synthetic | Offline classification tests for Cloudflare 1010-style access denial | Minimal fields only (`status`, `Content-Type`, body text) |
 | tests/fixtures/synthetic/summary-page-dom-synthetic.html | Synthetic | N/A | Synthetic | Offline parser tests for identity, stats, equipment rel namespaces, specializations, navigation links, and recent activity | Synthetic content modeled on observed structure; safe to commit |
+| tests/fixtures/synthetic/talents-page-dom-synthetic.html | Synthetic | N/A | Synthetic | Offline parser tests for spec tabs, talent trees, selected talents, malformed ranks, glyph blocks, and tree-total validation | Minimal two-spec structure with glyphs and mixed selected/unselected talents; safe to commit |
 | local-captures/aikka-onyxia-summary-dom.html | Manual local capture (ignored) | User-provided local file | Onyxia rendered DOM | Offline structural investigation only | Raw capture remains git-ignored pending reuse/licensing decision |
+| local-captures/aikka-onyxia-talents-spec1-dom.html | Manual local capture (ignored) | User-provided local file | Onyxia rendered DOM | Offline talents structure investigation; substantively identical to spec2 | Raw capture remains git-ignored; offline parser verified against both without live requests |
+| local-captures/aikka-onyxia-talents-spec2-dom.html | Manual local capture (ignored) | User-provided local file | Onyxia rendered DOM | Offline talents structure investigation; substantively identical to spec1 | Raw capture remains git-ignored; offline parser verified against both without live requests |
 
 Do not commit full browser sessions, cookies, tokens, IP addresses, or unnecessarily large captures. Check whether source terms allow committing captured content; if not, use permitted minimal excerpts or labeled synthetic equivalents. Fixtures must preserve the structures necessary for their tests.
 
@@ -285,17 +288,46 @@ Limitations: Capture may include JavaScript-generated elements; full talents/gly
 Implementation consequence: Added offline summary-capture parser mode that preserves raw namespaces and reports ambiguity instead of guessing slot names.
 ```
 
+```text
+Finding ID: armory-onyxia-aikka-talents-offline-parse-2026-10-23
+Observed UTC: Local offline inspection time (capture timestamp not embedded as source last-update)
+Character / realm / source: Aikka / Onyxia / local rendered-DOM captures of talents page
+Question: How are multiple talent specs, selected talents, glyphs, and spec-to-glyph associations represented in the rendered DOM? Is active in-game spec explicit?
+Method and request count: Offline text parsing of two local-captures/aikka-onyxia-talents-spec1-dom.html and local-captures/aikka-onyxia-talents-spec2-dom.html; zero network requests per capture. Parser initially used regex-based extraction but was refactored to use stdlib HTMLParser for structural robustness. Final implementation uses HTMLParser for spec containers, talent trees, and talent nodes; HTMLParser also used for spec tabs and glyph blocks with unordered CSS-class handling. Parser validates talent-rank text format (X/Y), preserves raw_rank_text for all nodes, retains malformed nodes with error markers, and detects missing structural elements (tree-info, talent-points divs, spec tabs without matching containers). Tree-total validation compares sum(points_spent) against reported_total; validation becomes indeterminate if any talent has a parse error or if tree-info is missing.
+Result: Both captures are substantively identical across all specs, trees, and individual talent allocations. Specs are keyed by `data-spec` attributes (0=Discipline, 1=Holy). Each spec container holds three talent trees (Discipline, Holy, Shadow) with individual talent nodes. Selected ranks are represented as text (e.g., "5/5" means 5 points spent out of 5 maximum). Source spell IDs are extracted from `href` attributes.
+
+Talent point allocations verified by comparing (source_spell_id, points_spent, points_max) tuples. **All tree totals MATCH reported values:**
+
+| Spec | Tree | Node count | Selected nodes | Sum(points_spent) | Reported total | Validation |
+|---|---|---|---|---|---|---|
+| 0 (Discipline) | Discipline | 28 | 22 | 57 | 57 | ✓ MATCH |
+| 0 (Discipline) | Holy | 27 | 5 | 14 | 14 | ✓ MATCH |
+| 0 (Discipline) | Shadow | 27 | 0 | 0 | 0 | ✓ MATCH |
+| 1 (Holy) | Discipline | 28 | 7 | 18 | 18 | ✓ MATCH |
+| 1 (Holy) | Holy | 27 | 19 | 53 | 53 | ✓ MATCH |
+| 1 (Holy) | Shadow | 27 | 0 | 0 | 0 | ✓ MATCH |
+
+Both Discipline and Holy trees have identical available talent nodes across specs (28 nodes each; each tree in each spec has all talents available). However, each spec has different selected talent allocations: Spec 0 (Discipline focus) allocates 57+14+0=71 total points; Spec 1 (Holy focus) allocates 18+53+0=71 total points. Both specializations use all 71 available talent points.
+
+Glyphs are organized by spec in separate blocks (major/minor categories) with spell IDs and names. Spec 0: 3 major + 2 minor; Spec 1: 3 major + 3 minor. Active in-game spec is NOT explicit in rendered DOM; tab UI selection state and display visibility do not indicate in-game active spec.
+
+Evidence / fixture: local-captures/aikka-onyxia-talents-spec1-dom.html (ignored), local-captures/aikka-onyxia-talents-spec2-dom.html (ignored), tests/fixtures/synthetic/talents-page-dom-synthetic.html, talents_parser.py offline diagnostic output.
+Limitations: Rendered DOM only; JavaScript-generated or lazy-loaded elements may not be present. Talent effect text (selected-rank bonuses, etc.) is not embedded in these captures. Glyph effect descriptions are absent from these captures (future investigation needed).
+Implementation consequence: Added offline talents-capture parser (talents_parser.py) using stdlib HTMLParser for robust structural extraction. Parser extracts all specs regardless of visibility, preserves source spell IDs with raw href attributes, reports active-spec as "unknown_not_determined_from_capture", validates tree totals by comparing sum(points_spent) to reported_total (validation is indeterminate if any talent has rank_parse_error or tree-info is missing). Parser handles four edge cases: (1) talent anchors without talent-points divs are retained with null ranks and error marker; (2) trees without tree-info divs have null reported_total and indeterminate validation; (3) spec tabs without matching containers generate warnings; (4) glyph divs with reordered CSS classes (e.g., "major glyph" vs "glyph major") are correctly parsed. Handles malformed rank text (missing slash separator, out-of-range values) with error preservation. Distinguishes selected (points_spent > 0) vs. unselected (points_spent = 0) talents. 24 offline tests cover hidden/visible specs, rank validation, glyph associations, error cases, edge-case regression tests, and container boundary verification. All tree totals in both real captures MATCH reported values; both captures extract identically.
+```
+
 ## 14. Open questions
 
 1. Which required fields are exposed on each realm and character?
 2. Are ordinary HTTP requests sufficient?
-3. How are secondary specs, glyphs, and active-state flags represented?
+3. ~~How are secondary specs, glyphs, and active-state flags represented?~~ **PARTIALLY RESOLVED (Milestone 0):** Multiple talent specs are exposed via `data-spec` DOM attributes. Glyphs are associated with specs in separate blocks. Active in-game spec is NOT explicit in rendered DOM (tab selection and visibility state do not reliably indicate in-game active spec). Character-selection UI state and in-game active spec are distinct; the latter remains unknown from capture inspection alone.
 4. What are the real namespaces of gem and enchantment codes?
 5. Which external definitions are compatible, available, and permitted for intended use?
 6. How many requests are needed to enumerate PvE achievement/statistic categories?
 7. What portion of progression grouping and reputation relevance can be verified?
 8. What source limitations require a specification change?
 9. What allowed/manual capture workflow can provide inspectable character HTML evidence when direct probe access is blocked?
+10. Are talent effect text and glyph effect descriptions embedded in the rendered-DOM talent page, or are they loaded asynchronously/via tooltip service?
 
 ## 15. Milestone 0 completion checklist
 
