@@ -1,0 +1,11 @@
+{
+  "status": 403,
+  "headers": {
+    "Content-Type": "text/plain; charset=UTF-8"
+  },
+  "body_truncated": false,
+  "body_bytes_captured": 17,
+  "body_text": "error code: 1010\n",
+  "synthetic": true,
+  "synthetic_note": "Synthetic minimal fixture for Cloudflare 1010-style access-denied classification."
+}

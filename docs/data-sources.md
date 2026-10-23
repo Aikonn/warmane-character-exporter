@@ -2,6 +2,8 @@
 
 Status: investigation template — no source behavior verified here.
 
+Current Milestone 0 bootstrap note: local offline probe scaffolding and synthetic fixtures may be added before any live request. These local checks do not constitute source verification evidence.
+
 This document tracks where required data comes from, how identifiers are resolved, and what remains unavailable or uncertain. Read [specification.md](specification.md) before implementing collectors.
 
 ## 1. Investigation objective
@@ -20,7 +22,7 @@ The four character URLs below are user-supplied inputs. Previous assistant web-f
 
 | Test ID | Character | Realm | Input URL | Local retrieval status |
 |---|---|---|---|---|
-| onyxia-aikka | Aikka | Onyxia | https://armory.warmane.com/character/Aikka/Onyxia/summary | Not tested |
+| onyxia-aikka | Aikka | Onyxia | https://armory.warmane.com/character/Aikka/Onyxia/summary | Direct probe blocked (`403 error code: 1010`); offline rendered-DOM capture inspected (partial findings) |
 | icecrown-aikka | Aikka | Icecrown | https://armory.warmane.com/character/Aikka/Icecrown/profile | Not tested |
 | onyxia-bezduse | Bezduse | Onyxia | https://armory.warmane.com/character/Bezduse/Onyxia/summary | Not tested |
 | icecrown-bezduse | Bezduse | Icecrown | https://armory.warmane.com/character/Bezduse/Icecrown/summary | Not tested |
@@ -90,24 +92,24 @@ Update realm coverage separately. Where characters differ within one realm, name
 
 | Data group | Required investigation | Onyxia | Icecrown | Source / evidence / limitations |
 |---|---|---|---|---|
-| Identity | Name, realm, class, race, level, faction, guild, title | TBD | TBD | TBD |
-| Character sheet | Attributes, resources, combat/defensive values, labels and units | TBD | TBD | TBD |
-| Equipment | All ruleset slots, empties, equipped item identifiers | TBD | TBD | TBD |
+| Identity | Name, realm, class, race, level, faction, guild, title | Partial | TBD | Rendered-DOM capture contains name/guild/level-race-class-realm text; faction/title not observed in inspected capture |
+| Character sheet | Attributes, resources, combat/defensive values, labels and units | Partial | TBD | Rendered-DOM capture contains Melee/Ranged/Spell/Defense/Resistances sections with displayed values/units |
+| Equipment | All ruleset slots, empties, equipped item identifiers | Partial | TBD | Rendered-DOM capture contains item references and explicit Shirt/Tabard empty slots; many slot names are layout-position only |
 | Item definitions | Level, quality, type, requirements, stats, armor/weapon fields | TBD | TBD | TBD |
 | Item effects | Equip/use/proc text, restrictions, cooldowns | TBD | TBD | TBD |
 | Sockets | Colors, added sockets, socket-bonus text | TBD | TBD | TBD |
-| Gems | Raw codes, verified IDs, names, colors, quality, effects | TBD | TBD | TBD |
+| Gems | Raw codes, verified IDs, names, colors, quality, effects | Partial | TBD | Raw gem codes present in `rel` payloads and tooltip-script URLs; no definition verification from this offline capture alone |
 | Meta gems | Requirement text; source of activation state if any | TBD | TBD | TBD |
-| Enchantments | Raw codes, namespaces, resolved effect text | TBD | TBD | TBD |
+| Enchantments | Raw codes, namespaces, resolved effect text | Partial | TBD | Raw enchantment codes present in `rel` payloads and tooltip-script URLs; no definition verification from this offline capture alone |
 | Sets | Membership, thresholds, bonus descriptions | TBD | TBD | TBD |
-| Primary spec | Tree totals, selected talents/ranks, effect text | TBD | TBD | TBD |
-| Secondary spec | Presence, talents/ranks, source order/identifier | TBD | TBD | TBD |
-| Active spec | Explicit active-state evidence | TBD | TBD | TBD |
-| Glyphs | Identifiers, effects, categories, association with each spec | TBD | TBD | TBD |
+| Primary spec | Tree totals, selected talents/ranks, effect text | Partial | TBD | Rendered-DOM capture contains specialization summary totals only (for one spec entry), not talent-by-talent selections |
+| Secondary spec | Presence, talents/ranks, source order/identifier | Partial | TBD | Rendered-DOM capture shows two specialization summary entries; detail pages not captured |
+| Active spec | Explicit active-state evidence | Not exposed in capture | TBD | No explicit active-spec marker observed in inspected rendered-DOM capture |
+| Glyphs | Identifiers, effects, categories, association with each spec | Not exposed in capture | TBD | No glyph records found in this capture; this is not evidence that the character has no glyphs |
 | Professions | Names and skill levels | TBD | TBD | TBD |
 | Reputation | Standing/progress and verified PvE relevance | TBD | TBD | TBD |
-| Achievements | IDs, categories, dates, points, completion and criteria | TBD | TBD | TBD |
-| Statistics | IDs, category paths, values, units, encounter associations | TBD | TBD | TBD |
+| Achievements | IDs, categories, dates, points, completion and criteria | Partial | TBD | Recent-activity achievements with IDs/names/time text are present; not a full achievements-page traversal |
+| Statistics | IDs, category paths, values, units, encounter associations | Not captured | TBD | Statistics page link present, but statistics-page content not captured |
 | PvE selection | Category enumeration, identifier mappings and coverage | TBD | TBD | TBD |
 
 ## 6. Investigation procedure
@@ -237,7 +239,9 @@ Use small fixtures under `tests/fixtures/` and document them:
 
 | Fixture | Source / synthetic | Captured UTC | Realm / ruleset | Purpose | Sanitization / reuse notes |
 |---|---|---|---|---|---|
-| To add | TBD | TBD | TBD | TBD | TBD |
+| tests/fixtures/synthetic/cloudflare-1010-access-denied-synthetic.json | Synthetic | N/A | Synthetic | Offline classification tests for Cloudflare 1010-style access denial | Minimal fields only (`status`, `Content-Type`, body text) |
+| tests/fixtures/synthetic/summary-page-dom-synthetic.html | Synthetic | N/A | Synthetic | Offline parser tests for identity, stats, equipment rel namespaces, specializations, navigation links, and recent activity | Synthetic content modeled on observed structure; safe to commit |
+| local-captures/aikka-onyxia-summary-dom.html | Manual local capture (ignored) | User-provided local file | Onyxia rendered DOM | Offline structural investigation only | Raw capture remains git-ignored pending reuse/licensing decision |
 
 Do not commit full browser sessions, cookies, tokens, IP addresses, or unnecessarily large captures. Check whether source terms allow committing captured content; if not, use permitted minimal excerpts or labeled synthetic equivalents. Fixtures must preserve the structures necessary for their tests.
 
@@ -257,7 +261,29 @@ Limitations:
 Implementation consequence:
 ```
 
-No verified local findings recorded yet.
+```text
+Finding ID: armory-onyxia-aikka-2026-10-23-access-block-1010
+Observed UTC: 2026-10-23 20:51:24 GMT (from response Date header)
+Character / realm / source: Aikka / Onyxia / warmane-armory
+Question: Is initial character-page retrieval available for source inspection?
+Method and request count: Single direct GET probe, 1 attempt, no retry, no redirect following.
+Result: Access blocked before character content retrieval. HTTP 403, Content-Type text/plain; charset=UTF-8, body `error code: 1010`.
+Evidence / fixture: Live probe result recorded in findings log (response summary retained in docs); synthetic test fixture at tests/fixtures/synthetic/cloudflare-1010-access-denied-synthetic.json
+Limitations: No character fields could be inspected; this is an access finding, not a character-data absence finding.
+Implementation consequence: Classify this response as `client_signature_blocked` (non-retryable for current run path) and keep character fields as unverified.
+```
+
+```text
+Finding ID: armory-onyxia-aikka-rendered-dom-offline-parse-2026-10-23
+Observed UTC: Local offline inspection time (capture timestamp not embedded as source last-update)
+Character / realm / source: Aikka / Onyxia / local rendered-DOM capture of summary page
+Question: Which required fields are directly visible in one summary rendered-DOM capture without network access?
+Method and request count: Offline text parsing of local-captures/aikka-onyxia-summary-dom.html; zero network requests.
+Result: Identity, character-stats text, item `rel` payloads (item/ench/gems), explicit empty Shirt/Tabard slots, two specialization summary point distributions, nav links to other sections, and recent achievement activity snippets were observable.
+Evidence / fixture: local-captures/aikka-onyxia-summary-dom.html (ignored), tests/fixtures/synthetic/summary-page-dom-synthetic.html, parser output from offline diagnostic command.
+Limitations: Capture may include JavaScript-generated elements; full talents/glyphs/statistics/reputation/achievement traversal not captured here. Recent activity is explicitly partial.
+Implementation consequence: Added offline summary-capture parser mode that preserves raw namespaces and reports ambiguity instead of guessing slot names.
+```
 
 ## 14. Open questions
 
@@ -269,6 +295,7 @@ No verified local findings recorded yet.
 6. How many requests are needed to enumerate PvE achievement/statistic categories?
 7. What portion of progression grouping and reputation relevance can be verified?
 8. What source limitations require a specification change?
+9. What allowed/manual capture workflow can provide inspectable character HTML evidence when direct probe access is blocked?
 
 ## 15. Milestone 0 completion checklist
 

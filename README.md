@@ -6,6 +6,62 @@ Give the tool a public armory URL. It will collect character, build, equipment, 
 
 > Status: specification stage. The exporter and commands described below are planned, not implemented. Live source access and field availability must be investigated first.
 
+## Milestone 0 probe (offline-first)
+
+The repository now includes a minimal Milestone 0 probe scaffold focused on local validation only.
+
+- Proposed Python version target: **3.12+** (validated locally with newer versions).
+- HTTP client for probe: Python stdlib **`urllib.request`**.
+- HTML parser strategy at this stage: conservative text/classification checks, with stdlib parsing to be expanded only when live evidence exists.
+- Test framework: Python stdlib **`unittest`**.
+- Current timeout limitation: urllib exposes a single socket timeout; the probe currently uses `max(connect_timeout, read_timeout)` as one timeout budget.
+
+No dependencies are required for the current probe and tests.
+
+### Local setup
+
+```text
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -e .
+```
+
+### Offline probe run (no network request)
+
+```text
+warmane-probe "https://armory.warmane.com/character/Aikka/Onyxia/summary"
+```
+
+Default behavior is offline planning output only. A live request requires explicit `--live`.
+
+Single-attempt live mode is also available for initial investigation runs:
+
+```text
+warmane-probe "https://armory.warmane.com/character/Aikka/Onyxia/summary" --live-once
+```
+
+`--live-once` keeps host cooldown checks but disables retries, does not follow redirects, and limits response body reads.
+
+### Offline tests
+
+```text
+$env:PYTHONPATH="src"
+python -m unittest discover -s tests -v
+```
+
+Tests use synthetic fixtures and mocked clock/sleep behavior; they do not perform network access.
+
+### Offline rendered-DOM diagnostic parser
+
+To parse a locally saved summary-page HTML file (no script execution, no resource loading, no network requests):
+
+```text
+$env:PYTHONPATH="src"
+python -m warmane_exporter.summary_diagnostic "local-captures\aikka-onyxia-summary-dom.html"
+```
+
+Output is a diagnostic parse result for feasibility investigation, not the final exporter schema/report.
+
 ## Why this project exists
 
 Character evaluation needs more than a list of equipped item names. It needs item effects, gems, enchantments, talents, glyphs, character-sheet values, and evidence of dungeon/raid progression.

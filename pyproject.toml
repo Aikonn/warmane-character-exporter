@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "warmane-character-exporter"
+version = "0.1.0"
+description = "Milestone 0 retrieval probe for Warmane character export feasibility."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+warmane-probe = "warmane_exporter.cli:main"
+warmane-summary-diagnostic = "warmane_exporter.summary_diagnostic:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

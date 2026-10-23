@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+.venv/
+venv/
+
+.warmane-probe-checkpoint.json
+local-captures/
+tests/fixtures/captures/last-live-response-sanitized.json
