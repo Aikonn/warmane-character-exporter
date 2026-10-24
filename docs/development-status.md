@@ -277,3 +277,10 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 
 - tests/fixtures/real/ holds small live samples (two JSON summary responses, a trimmed achievements category, one statistics category) with a README on provenance. tests/test_real_fixtures.py checks their shape.
 - Milestone 0 evidence is now complete except a final review pass: remaining items are the review document (what is verified, what is absent, proposed scope changes) and deciding how HTML pages are fetched, since plain scripted HTTP is blocked.
+
+## Update: Milestone 1 started (2026-10-24)
+
+- Milestone 0 evidence is complete (docs/milestone-0-review.md). Fetch strategy: plain HTTP from Python with one fixed browser-compatible header set (no rotation).
+- http_client.py: DEFAULT_HEADERS and post_form (XMLHttpRequest-style form POST). transport.py: optional form and referer; the checkpoint key for POST includes the form fields, so resume and duplicate suppression work per category.
+- warmane_api.py: URL builder and validating parser for the JSON summary, covered by the real fixtures.
+- Next: response cache (SQLite index plus raw files, freshness 15 minutes for character data), then an end-to-end "fetch JSON summary" CLI command using cache and throttling, then the HTML summary and talents fetch.

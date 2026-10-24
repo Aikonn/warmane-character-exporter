@@ -58,12 +58,21 @@ class RequestOrchestrator:
     random_fn: Callable[[], float] = random
     _last_request_time_by_host: dict[str, float] = field(default_factory=dict)
 
-    def execute_single_request(self, url: str, client) -> RequestResult:
+    def execute_single_request(
+        self,
+        url: str,
+        client,
+        form: dict[str, str] | None = None,
+        referer: str | None = None,
+    ) -> RequestResult:
         host = (urlparse(url).hostname or "").lower()
         if not host:
             raise ValueError("URL host is required.")
 
-        request_key = f"GET {url}"
+        if form is None:
+            request_key = f"GET {url}"
+        else:
+            request_key = f"POST {url} " + "&".join(f"{k}={v}" for k, v in sorted(form.items()))
         if self.checkpoint.is_completed(request_key):
             return RequestResult(
                 status="skipped_completed",
@@ -80,7 +89,7 @@ class RequestOrchestrator:
         while True:
             attempts += 1
             self._apply_waits(host)
-            response = client.get(
+            response = self._post(client, url, form, referer) if form is not None else client.get(
                 url=url,
                 connect_timeout=self.config.connect_timeout_seconds,
                 read_timeout=self.config.read_timeout_seconds,
@@ -166,6 +175,15 @@ class RequestOrchestrator:
                 body_text=response.body_text,
                 transport_error=response.transport_error,
             )
+
+    def _post(self, client, url: str, form: dict[str, str], referer: str | None) -> HttpResponse:
+        return client.post_form(
+            url=url,
+            form=form,
+            connect_timeout=self.config.connect_timeout_seconds,
+            read_timeout=self.config.read_timeout_seconds,
+            referer=referer,
+        )
 
     def _apply_waits(self, host: str) -> None:
         now = self.now_fn()

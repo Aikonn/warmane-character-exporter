@@ -2,7 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+# One fixed, browser-compatible header set. Verified 2026-10-24: the default
+# Python User-Agent is rejected by Cloudflare (error 1010), this one is accepted.
+# The header set is constant on purpose: no User-Agent rotation or other evasion.
+DEFAULT_HEADERS: dict[str, str] = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/json,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 
 @dataclass(frozen=True)
@@ -23,18 +36,44 @@ class NoRedirectHandler(HTTPRedirectHandler):
 class UrllibHttpClient:
     """
     urllib uses one socket timeout value for connect/read operations.
-    This probe therefore applies a single timeout budget for both phases.
+    This client therefore applies a single timeout budget for both phases.
     """
 
-    def __init__(self, max_body_bytes: int = 131072) -> None:
+    def __init__(self, max_body_bytes: int = 131072, headers: dict[str, str] | None = None) -> None:
         if max_body_bytes <= 0:
             raise ValueError("max_body_bytes must be positive.")
         self.max_body_bytes = max_body_bytes
+        self.headers = dict(DEFAULT_HEADERS if headers is None else headers)
         self._opener = build_opener(NoRedirectHandler())
 
     def get(self, url: str, connect_timeout: float, read_timeout: float) -> HttpResponse:
-        timeout = max(connect_timeout, read_timeout)
-        request = Request(url=url, method="GET")
+        request = Request(url=url, method="GET", headers=self.headers)
+        return self._send(request, max(connect_timeout, read_timeout))
+
+    def post_form(
+        self,
+        url: str,
+        form: dict[str, str],
+        connect_timeout: float,
+        read_timeout: float,
+        referer: str | None = None,
+    ) -> HttpResponse:
+        """POST url-encoded form data the way the armory page scripts do (XMLHttpRequest)."""
+        headers = dict(self.headers)
+        headers["Accept"] = "application/json,*/*;q=0.8"
+        headers["X-Requested-With"] = "XMLHttpRequest"
+        headers["Origin"] = "https://armory.warmane.com"
+        if referer:
+            headers["Referer"] = referer
+        request = Request(
+            url=url,
+            data=urlencode(form).encode("utf-8"),
+            method="POST",
+            headers=headers,
+        )
+        return self._send(request, max(connect_timeout, read_timeout))
+
+    def _send(self, request: Request, timeout: float) -> HttpResponse:
         try:
             with self._opener.open(request, timeout=timeout) as response:
                 raw_body = response.read(self.max_body_bytes + 1)
