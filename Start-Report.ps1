@@ -146,6 +146,7 @@ $wait.Show()
 
 $process = Start-Process -FilePath $python -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput $logOut -RedirectStandardError $logErr -PassThru
+$null = $process.Handle   # keeps the exit code readable after the process ends
 $tick = 0
 while (-not $process.HasExited) {
     [System.Windows.Forms.Application]::DoEvents()

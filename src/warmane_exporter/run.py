@@ -80,8 +80,13 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         if args.html_output:
             source = Path(args.cache_dir) / "exports" / f"{name.lower()}-{realm.lower()}-pve.html"
-            args.html_output.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, args.html_output)
+            try:
+                args.html_output.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, args.html_output)
+            except OSError as exc:
+                print(f"Could not save the report to {args.html_output}: {exc}")
+                print(f"The report is still available at: {source}")
+                return 1
             print(f"copied report to: {args.html_output}")
     return 0
 
