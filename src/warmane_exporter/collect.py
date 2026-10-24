@@ -18,6 +18,7 @@ from time import time
 from typing import Any
 
 from .achievements_parser import CategoryError, parse_achievements_response, parse_statistics_response
+from .budget import DEFAULT_INTERVAL_SECONDS, BudgetExhausted, budgeted_client
 from .cache import ResponseCache
 from .checkpoint import ProbeCheckpointStore
 from .http_client import UrllibHttpClient
@@ -183,7 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--section", choices=("achievements", "statistics"), default="achievements")
     parser.add_argument("--cache-dir", default=".warmane-cache")
     parser.add_argument("--limit", type=int, default=None, help="maximum live requests this run")
-    parser.add_argument("--interval", type=float, default=10.0)
+    parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL_SECONDS)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--refresh", action="store_true")
@@ -198,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     try:
         collection = collect_achievements(
-            args.name, args.realm, cache, orchestrator, UrllibHttpClient(),
+            args.name, args.realm, cache, orchestrator, budgeted_client(cache_dir),
             limit=args.limit, dry_run=args.dry_run, offline=args.offline, refresh=args.refresh,
             reject_dir=cache_dir / "rejected", section=args.section,
         )

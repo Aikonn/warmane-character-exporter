@@ -362,3 +362,11 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Total live requests for the four full exports: about 350 over roughly 2.5 hours at 10 s spacing. Milestone 6 end-to-end validation is met for the data the armory exposes.
 - Known remaining gaps: item quality and socket structure (not in armory summary), active spec, professions skill values look unreliable, item detail pages (optional, about 20 requests per character), single-command orchestration of all steps.
 
+
+
+## Update: budget, library, single run command (2026-10-24)
+
+- budget.py: shared daily live-request ledger (.warmane-cache/budget.json), default 500 per day, every real HTTP request counts, BudgetExhausted (a ValueError) stops a run before sending. python -m warmane_exporter.budget shows usage; --set N changes today's limit (owner decision). Default spacing between requests is now 3 s (owner decision) for all commands.
+- library.py: local Library of static reference pages (items, gems, enchants...), git-ignored folder library/, one file per page plus index.jsonl (url, time, sha256, version); get_or_fetch fetches only on a miss. Nothing is fetched into it yet; a third-party item source still needs a terms review before any request.
+- run.py: python -m warmane_exporter.run NAME REALM or --all runs snapshot, reputation, mounts, achievements, statistics and export in order, stops at the first failing step and resumes from the cache.
+

@@ -14,6 +14,7 @@ from pathlib import Path
 from time import time
 from typing import Callable
 
+from .budget import DEFAULT_INTERVAL_SECONDS, BudgetExhausted, budgeted_client
 from .cache import ResponseCache
 from .checkpoint import ProbeCheckpointStore
 from .http_client import UrllibHttpClient
@@ -97,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
     orchestrator = RequestOrchestrator(checkpoint=checkpoint, skip_completed=False)
     try:
         result = fetch_character_summary(
-            args.name, args.realm, cache, orchestrator, UrllibHttpClient(),
+            args.name, args.realm, cache, orchestrator, budgeted_client(cache_dir),
             refresh=args.refresh, offline=args.offline, allow_stale=args.allow_stale,
         )
     except ValueError as exc:

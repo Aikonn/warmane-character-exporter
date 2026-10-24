@@ -17,6 +17,7 @@ from time import time
 from typing import Any, Callable
 from urllib.parse import quote
 
+from .budget import DEFAULT_INTERVAL_SECONDS, BudgetExhausted, budgeted_client
 from .cache import ResponseCache
 from .checkpoint import ProbeCheckpointStore
 from .fetch import CHARACTER_MAX_AGE_SECONDS, FetchResult
@@ -28,7 +29,7 @@ from .transport import RequestOrchestrator, TransportConfig
 from .warmane_api import api_summary_url, parse_api_summary
 
 SNAPSHOT_SCHEMA = "character-snapshot/0"
-SNAPSHOT_INTERVAL_SECONDS = 10.0
+SNAPSHOT_INTERVAL_SECONDS = DEFAULT_INTERVAL_SECONDS
 
 
 def _validate_summary_html(text: str) -> dict[str, Any]:
@@ -191,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         snapshot = build_snapshot(
-            args.name, args.realm, cache, orchestrator, UrllibHttpClient(), defs=defs,
+            args.name, args.realm, cache, orchestrator, budgeted_client(cache_dir), defs=defs,
             reject_dir=cache_dir / "rejected",
             refresh=args.refresh, offline=args.offline, allow_stale=args.allow_stale,
         )
