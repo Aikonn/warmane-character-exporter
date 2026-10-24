@@ -4,9 +4,9 @@ A local Python tool that exports a Warmane character (Onyxia, Icecrown) into a s
 
 ## Download and run (Windows)
 
-1. Open the [Releases page](https://github.com/Aikonn/warmane-character-exporter/releases/latest) and download `warmane-character-exporter-windows.zip`.
-2. Extract it anywhere (for example the Desktop). Python is included; nothing to install, no game client and no configuration needed.
-3. Double-click `Start-Report.cmd`, paste an armory link (for example `https://armory.warmane.com/character/Aikka/Onyxia/summary`), choose where to save, and the report opens in the browser.
+1. On the [repository page](https://github.com/Aikonn/warmane-character-exporter) choose Code, then Download ZIP, and extract it anywhere (for example the Desktop).
+2. Double-click `Start-Report.cmd`. On the first run, if Python 3.12 or newer is missing, the launcher offers to download a portable copy (about 11 MB, from python.org) into the same folder. Nothing is installed on the system, and no game client or configuration is needed.
+3. Paste an armory link (for example `https://armory.warmane.com/character/Aikka/Onyxia/summary`), choose where to save, and the report opens in the browser.
 
 If Windows SmartScreen warns about the script, choose More info, then Run anyway. A run takes a few minutes and uses about 28 requests of the daily budget.
 

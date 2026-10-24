@@ -12,7 +12,8 @@ param(
     [string]$Link,
     [string]$Output,
     [switch]$Offline,
-    [switch]$NoOpen
+    [switch]$NoOpen,
+    [switch]$InstallPython
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,14 +34,57 @@ function Show-Message([string]$text, [string]$title, [string]$icon = "Informatio
     [void][System.Windows.Forms.MessageBox]::Show($text, $title, "OK", $icon)
 }
 
+function Test-PythonVersion([string]$exe) {
+    try {
+        $v = & $exe -c "import sys; print(sys.version_info >= (3, 12))" 2>$null
+        return ($v -eq "True")
+    } catch { return $false }
+}
+
 function Find-Python {
     $embedded = Join-Path $root ".tools\python312\python.exe"
     if (Test-Path $embedded) { return $embedded }
     foreach ($name in "python", "py") {
         $found = Get-Command $name -ErrorAction SilentlyContinue
-        if ($found) { return $found.Source }
+        if ($found -and (Test-PythonVersion $found.Source)) { return $found.Source }
     }
     return $null
+}
+
+function Install-Python {
+    # First run on a machine without Python 3.12+: fetch the official portable (embeddable) Python into .tools\python312.
+    $url = "https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip"
+    $zip = Join-Path $root ".tools\python-embed.zip"
+    $target = Join-Path $root ".tools\python312"
+    $note = New-Object System.Windows.Forms.Form
+    $note.Text = "Warmane Character Exporter"
+    $note.StartPosition = "CenterScreen"
+    $note.FormBorderStyle = "FixedDialog"
+    $note.ControlBox = $false
+    $note.ClientSize = New-Object System.Drawing.Size(420, 70)
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = "First run: downloading portable Python (about 11 MB) from python.org ..."
+    $label.Location = New-Object System.Drawing.Point(12, 20)
+    $label.Size = New-Object System.Drawing.Size(396, 40)
+    $note.Controls.Add($label)
+    $note.Show()
+    [System.Windows.Forms.Application]::DoEvents()
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        New-Item -ItemType Directory -Force -Path (Join-Path $root ".tools") | Out-Null
+        Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+        if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+        Expand-Archive -Path $zip -DestinationPath $target -Force
+        Remove-Item $zip -Force
+        $pth = Get-ChildItem $target -Filter "*._pth" | Select-Object -First 1
+        [System.IO.File]::WriteAllText($pth.FullName, "python312.zip`r`n.`r`n..\..\src`r`nimport site`r`n", [System.Text.Encoding]::ASCII)
+        return $true
+    } catch {
+        Show-Message ("Could not download Python: " + $_.Exception.Message + "`r`nInstall Python 3.12 or newer from https://www.python.org/downloads/ and start again.") "Warmane Character Exporter" "Error"
+        return $false
+    } finally {
+        $note.Close()
+    }
 }
 
 function Read-Link {
@@ -86,8 +130,13 @@ function Read-Link {
 
 $python = Find-Python
 if (-not $python) {
-    Show-Message "Python was not found. Download the ready-to-run zip (it includes Python) from the Releases page of https://github.com/Aikonn/warmane-character-exporter and start it from the extracted folder." "Warmane Character Exporter" "Error"
-    exit 1
+    $answer = "Yes"
+    if (-not $InstallPython) {
+        $answer = [System.Windows.Forms.MessageBox]::Show("Python 3.12 or newer was not found.`r`nDownload a portable copy (about 11 MB, from python.org) into this folder? Nothing is installed on the system.", "Warmane Character Exporter", "YesNo", "Question")
+    }
+    if ($answer -ne "Yes" -or -not (Install-Python)) { exit 1 }
+    $python = Find-Python
+    if (-not $python) { Show-Message "Python is still not available after the download." "Warmane Character Exporter" "Error"; exit 1 }
 }
 
 if (-not $Link) {

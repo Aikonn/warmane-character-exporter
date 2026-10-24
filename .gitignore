@@ -21,4 +21,3 @@ library/definitions/*
 !library/acore/
 library/acore/*
 !library/acore/items.db
-dist/
