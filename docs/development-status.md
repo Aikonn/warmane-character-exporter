@@ -272,3 +272,8 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Live evidence so far: 7 requests through the user's Chrome (4 JSON summary, achievements page, one achievements POST, statistics page). No blocks.
 - data-sources.md section 16 holds the field matrix, access finding, request-cost estimate and checklist status.
 - Proposed next: second small live batch (under 10 requests) for the remaining HTML pages and ids, then sanitized fixtures and closing Milestone 0.
+
+## Update: real-response fixtures (2026-10-24)
+
+- tests/fixtures/real/ holds small live samples (two JSON summary responses, a trimmed achievements category, one statistics category) with a README on provenance. tests/test_real_fixtures.py checks their shape.
+- Milestone 0 evidence is now complete except a final review pass: remaining items are the review document (what is verified, what is absent, proposed scope changes) and deciding how HTML pages are fetched, since plain scripted HTTP is blocked.
