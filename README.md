@@ -83,3 +83,7 @@ Out of scope: GUI, hosted service, DPS prediction, GearScore, automated upgrade 
 ## Quick start (Windows)
 
 Double-click `Start-Report.cmd`. It asks for an armory link, asks where to save the HTML report, runs the export and opens the report in the default browser. Command line equivalent: `python -m warmane_exporter.run https://armory.warmane.com/character/Aikka/Onyxia/summary --html-output report.html`.
+
+## License
+
+GNU Affero General Public License v3.0 (see LICENSE). The bundled item database in `library/acore/items.db` is derived from the AzerothCore database (AGPL-3.0). `library/definitions/client-export.json` contains spell, enchant and gem texts extracted from the World of Warcraft 3.3.5a client, which remain Blizzard material.
