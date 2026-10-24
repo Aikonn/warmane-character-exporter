@@ -606,3 +606,10 @@ Status: verified by 3 further live requests (user-approved; achievements page GE
 - Category 92 response (about 30 KB, 54 achievements): each entry has id (id="ach6"), points, icon URL, title, description and a date ("Earned MM/DD/YYYY"). Whether unearned entries are included, and the exact markup for them, needs checking in the saved file.
 - Statistics page (/statistics): sidebar categories with ids (Character 130, Combat 141, Kills 128, Deaths 122, Quests 133, Dungeons and Raids 14807, Skills 132, Travel 134, Social 131, Player vs. Player 21, with subcategories) and a name-and-value summary list; unset values appear as "- -".
 - Estimated full export cost for one character via the site: about 9 achievement POSTs plus statistics category loads, in addition to the pages already known. Needs a throttled, resumable run; do not fetch all at once.
+
+### Finding: achievements-locked-entries-2026-10-24
+
+Status: verified offline against the saved category 92 response (no new requests).
+
+- The response includes unearned achievements: markup class="achievement locked" (no date div), earned ones class="achievement" with a "Earned MM/DD/YYYY" date. Category 92 held 24 earned and 31 locked entries (55 total) while the page header said 24 / 54, so the entry count can differ by one from the header total; the parser must report both and warn on mismatch rather than assume equality.
+- One POST per category therefore yields both the earned and the full achievement list.
