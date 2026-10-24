@@ -419,3 +419,11 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 - `python -m warmane_exporter.definition_export` writes library/definitions/client-export.json from the client: 2656 enchant/gem texts, 892 talents, 362 glyphs, 2667 spells (rendered descriptions; 135 keep unresolved template parts, 0 render errors). Run on the HD client on the PC; 197 tests pass.
 - file_definitions.py reads that file; Definitions uses text sources in order client, export file, and item facts from client then AzerothCore. With the export file and library/acore/items.db present, the exporter no longer needs the game client.
 - Not verified: whether the HD client texts equal what Warmane serves (no online source reviewed). Backlog: PvE report profile, direct URL command, export comparison over time.
+
+
+## Update: PvE report as one HTML file (2026-10-24)
+
+- pve_report.py writes .warmane-cache/exports/<name>-<realm>-pve.html next to the Markdown export (export and run create it automatically; `python -m warmane_exporter.pve_report NAME REALM` rebuilds it offline). One self-contained file: inline CSS, plain tables, no scripts, no external files, all armory text HTML-escaped; also suitable to attach to an AI chat.
+- Sections: header, equipment (item level, base stats, enchant, gems, empty sockets), talents and glyphs per specialization with rendered effect text, professions, bosses killed per instance and mode, per-boss kill tables (10/25, normal/heroic; instances split over several categories, such as Vault of Archavon, are merged), entered/completed counters, deaths in raids, dungeon and raid achievements (earned with date, not earned with requirement), emblems, reputation, mounts.
+- Decision: comparing exports over time is out of scope. The goal is the character as it is now.
+- Known limits: armory difficulty columns sometimes repeat the same number (noted in the report); the active specialization is unknown; item level, stats and sockets come from the 2017 AzerothCore dump, not from Warmane. Verified on the PC with the cached Aikka and Bezduse characters (201 tests pass).
