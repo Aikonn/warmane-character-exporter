@@ -58,7 +58,7 @@ class ExportTests(unittest.TestCase):
 
     def test_export_content(self):
         self.assertEqual(self.data["enchants"], {"3820": "+30 Spell Power", "3627": "+20 Crit"})
-        self.assertEqual(self.data["client_tables"], {"enchants": 2, "gem_properties": 2, "talents": 1, "glyphs": 1, "spells": 3})
+        self.assertEqual(self.data["client_tables"], {"enchants": 2, "gem_properties": 2, "enchant_conditions": 0, "talents": 1, "glyphs": 1, "spells": 3})
         self.assertIn("render_error", self.data["spells"]["200"])
         self.assertTrue(self.data["spells"]["101"]["rendered_unresolved"])
 

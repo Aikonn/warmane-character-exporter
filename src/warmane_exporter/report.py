@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .gear_bonuses import analyze
+
 
 def _section_data(snapshot: dict[str, Any], name: str) -> dict[str, Any]:
     section = snapshot.get("sections", {}).get(name) or {}
@@ -35,7 +37,8 @@ def gem_line(gem: dict[str, Any]) -> str:
 BELT_BUCKLE = "Eternal Belt Buckle"
 
 
-def gem_columns(slot_name: str | None, gems: list[dict[str, Any]], sockets: list[str] | None) -> tuple[list[str], bool]:
+def gem_columns(slot_name: str | None, gems: list[dict[str, Any]], sockets: list[str] | None,
+                states: list[str | None] | None = None) -> tuple[list[str], bool]:
     """Lines for the gem column and whether the item carries a belt buckle. Empty sockets show as <no gem>.
 
     A gem beyond the item's own sockets sits in an extra socket; on the belt that socket is the belt buckle,
@@ -46,10 +49,12 @@ def gem_columns(slot_name: str | None, gems: list[dict[str, Any]], sockets: list
     buckle = False
     for index, gem in enumerate(gems):
         filled = bool(gem.get("text")) or (gem.get("id") and not gem.get("empty"))
+        state = states[index] if states and index < len(states) else None
+        suffix = f" ({state})" if state else ""
         if sockets is not None and index < len(sockets):
-            lines.append(gem_line(gem) if filled else "<no gem>")
+            lines.append(gem_line(gem) + suffix if filled else "<no gem>")
         elif filled:
-            lines.append(gem_line(gem))
+            lines.append(gem_line(gem) + suffix)
             if slot_name == "Waist" and sockets is not None:
                 buckle = True
     return lines, buckle
@@ -75,11 +80,14 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
         total_gems = len([g for g in client.get("gems", []) if isinstance(g, dict)])
         slot_name = (slot.get("layout_inference") or {}).get("inferred_slot_name") or slot.get("slot_name") or slot.get("slot_key")
         sockets = (client.get("acore") or {}).get("sockets")
-        gem_lines, buckle = gem_columns(slot_name, [g for g in client.get("gems", []) if isinstance(g, dict)], sockets)
+        gem_details = [g for g in client.get("gems", []) if isinstance(g, dict)]
+        _, buckle = gem_columns(slot_name, gem_details, sockets)
         equipment.append({
             "slot": slot_name,
             "inventory_type": (client.get("item") or {}).get("inventory_type"),
-            "gem_lines": gem_lines,
+            "gem_details": gem_details,
+            "armor": (client.get("acore") or {}).get("armor"),
+            "socket_bonus": (client.get("acore") or {}).get("socket_bonus"),
             "buckle": buckle,
             "item_id": item_id,
             "quality": ref.get("quality_name"),
@@ -95,6 +103,10 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
             "sockets": (client.get("acore") or {}).get("sockets"),
             "sockets_empty": (client.get("acore") or {}).get("sockets_empty"),
         })
+
+    bonuses = analyze(equipment)
+    for item in equipment:
+        item["gem_lines"], _ = gem_columns(item["slot"], item["gem_details"], item["sockets"], item["gem_states"])
 
     specs = []
     for spec in talents.get("specs", []):
@@ -127,6 +139,8 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
             "name", "realm", "level", "faction", "race", "class", "gender", "guild",
             "achievement_points", "honorable_kills")},
         "equipment": equipment,
+        "bonus_totals": bonuses["totals"],
+        "bonus_warnings": bonuses["warnings"],
         "specializations": specs,
         "active_specialization": "unknown (not exposed by Warmane)",
         "professions": html.get("professions") if html.get("professions") is not None else summary.get("professions"),

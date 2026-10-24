@@ -77,6 +77,9 @@ class Definitions:
         quality = self.acore.gem_quality(props_id) if self.acore is not None else None
         return {"color": GEM_COLORS.get(mask, f"mask {mask}"), "quality": QUALITY_NAMES.get(quality) if quality is not None else None}
 
+    def gem_requirements(self, enchant_id: int):
+        return self._first("gem_requirements", enchant_id)
+
     def spell(self, spell_id: int):
         return self._first("spell", spell_id)
 
