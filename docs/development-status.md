@@ -354,3 +354,27 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Death Knight export complete with about 88 live requests (no errors, no rate limit): 52 achievement categories (203 earned of 1163, points 2180 equal the armory total), 33 statistics categories (497 rows), reputation and mounts pages. The export merges without missing sections.
 - Pipeline is now validated on two characters of two classes. Remaining for Milestone 6: Aikka@Icecrown and Bezduse@Icecrown.
 
+
+
+## Update: all four characters exported (2026-10-24)
+
+- Aikka@Icecrown (1162 achievements, 97 earned, 1005 points) and Bezduse@Icecrown (173 earned, 1785 points) exported completely: about 88 live requests each, no errors, no rate limit, achievement points equal the armory totals for all four characters (3355, 2180, 1005, 1785). Exports in .warmane-cache/exports/.
+- Total live requests for the four full exports: about 350 over roughly 2.5 hours at 10 s spacing. Milestone 6 end-to-end validation is met for the data the armory exposes.
+- Known remaining gaps: item quality and socket structure (not in armory summary), active spec, professions skill values look unreliable, item detail pages (optional, about 20 requests per character), single-command orchestration of all steps.
+
+
+
+## Update: budget, library, single run command (2026-10-24)
+
+- budget.py: shared daily live-request ledger (.warmane-cache/budget.json), default 500 per day, every real HTTP request counts, BudgetExhausted (a ValueError) stops a run before sending. python -m warmane_exporter.budget shows usage; --set N changes today's limit (owner decision). Default spacing between requests is now 3 s (owner decision) for all commands.
+- library.py: local Library of static reference pages (items, gems, enchants...), git-ignored folder library/, one file per page plus index.jsonl (url, time, sha256, version); get_or_fetch fetches only on a miss. Nothing is fetched into it yet; a third-party item source still needs a terms review before any request.
+- run.py: python -m warmane_exporter.run NAME REALM or --all runs snapshot, reputation, mounts, achievements, statistics and export in order, stops at the first failing step and resumes from the cache.
+
+
+
+## Update: item quality found in the armory page (2026-10-24)
+
+- Correction: item quality is present in the character page markup as the CSS class icon-quality<N> (0 poor to 7 heirloom) on every equipped item; the earlier note that quality was unavailable was wrong. summary_parser now stores quality and quality_name per item and the report shows it. Rebuilt for all four characters from cache with no new requests.
+- Still unavailable from the armory: socket structure (the rel gems field always lists three positions, 0 meaning no gem, without telling an empty socket from no socket), active spec, reliable profession skill values.
+- GitHub Copilot: the account has Copilot Pro with cloud agent and CLI enabled, but the reviewer's GitHub connection rejects agent tasks and has no token for the Copilot CLI, so code generation is not offloaded.
+

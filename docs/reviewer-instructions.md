@@ -59,3 +59,9 @@ Implementation rules for Copilot live in .github/copilot-instructions.md.
 ## Reviewer Python (offline runs)
 
 The reviewer account cannot launch the user venv. A git-ignored embeddable Python 3.12 lives in .tools/python312 (its sitecustomize.py works around the restricted temp-dir ACL; set TEMP and TMP to .tools/tmp). Run: .tools\python312\python.exe -m unittest discover -s tests. Used only for offline work; live requests and pushes stay with the user.
+
+
+## Branch workflow (from 2026-10-24)
+
+The user approved a development branch. The reviewer commits to branch dev and pushes it from the cloud clone (the PC account has no GitHub credentials), then opens a pull request to main when a milestone is ready. The user merges. The reviewer never pushes to main. Transfer: git diff on the PC, applied and committed in the cloud clone. The reviewer also runs Python and live requests on the PC itself within the budget the user sets.
+

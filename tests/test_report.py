@@ -11,7 +11,7 @@ SNAP = {
             "guild": "G", "achievement_points": 1, "honorable_kills": 2,
             "equipment": [{"item_id": 5, "name": "Helm", "transmog": ""}]}},
         "html_summary": {"status": "ok", "data": {"equipment": {"slots": [
-            {"is_empty": False, "item_reference": {"href_item_id": "5"},
+            {"is_empty": False, "item_reference": {"href_item_id": "5", "quality_name": "epic"},
              "layout_inference": {"inferred_slot_name": "Head"},
              "client": {"enchant": {"text": "+1 Stam"}, "gems": [{"position": 1, "id": 9, "text": "+2 Int"}, {"position": 2, "id": 0, "empty": True}]}},
             {"is_empty": True}]}}},
@@ -33,7 +33,7 @@ class ReportTests(unittest.TestCase):
 
     def test_markdown_contains_key_facts(self):
         md = render_markdown(build_report(SNAP))
-        for needle in ("# X - Onyxia", "| Head | Helm (5) | +1 Stam | +2 Int |", "### Holy (1/70)", "Glyph of X"):
+        for needle in ("# X - Onyxia", "| Head | Helm (5, epic) | +1 Stam | +2 Int |", "### Holy (1/70)", "Glyph of X"):
             self.assertIn(needle, md)
 
     def test_missing_sections_do_not_crash(self):

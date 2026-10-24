@@ -11,6 +11,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .budget import DEFAULT_INTERVAL_SECONDS, BudgetExhausted, budgeted_client
 from .cache import ResponseCache
 from .checkpoint import ProbeCheckpointStore
 from .http_client import UrllibHttpClient
@@ -39,12 +40,12 @@ def main(argv: list[str] | None = None) -> int:
     cache = ResponseCache(cache_dir / "responses.sqlite")
     orchestrator = RequestOrchestrator(
         checkpoint=ProbeCheckpointStore(path=cache_dir / "transport-state.json"),
-        config=TransportConfig(min_request_interval_seconds=10.0),
+        config=TransportConfig(min_request_interval_seconds=DEFAULT_INTERVAL_SECONDS),
         skip_completed=False,
     )
     try:
         url = character_page_url(args.name, args.realm, args.view)
-        result = fetch_validated(url, f"page-{args.view}", _validate, cache, orchestrator, UrllibHttpClient(),
+        result = fetch_validated(url, f"page-{args.view}", _validate, cache, orchestrator, budgeted_client(cache_dir),
                                  refresh=args.refresh, max_age_seconds=24 * 3600,
                                  reject_dir=cache_dir / "rejected")
         entry = cache.get(f"page-{args.view}|{url}")

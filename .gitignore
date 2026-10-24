@@ -14,3 +14,4 @@ tests/fixtures/captures/last-live-response-sanitized.json
 .warmane-cache/
 
 .tools/
+library/
