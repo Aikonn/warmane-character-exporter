@@ -36,12 +36,20 @@ def _download(url: str) -> str:
         return response.read().decode("utf-8")
 
 
+def _has_effects(path: Path) -> bool:
+    db = AcoreItems(path)
+    try:
+        return db.has_effects()
+    finally:
+        db.close()
+
+
 def fetch(library_root: Path, download=_download) -> tuple[int, bool]:
     """Ensure the item database exists. Returns (item_count, downloaded_now)."""
     library = Library(library_root, version="acore-master-2017")
     sql, live = library.get_or_fetch(KIND, SQL_KEY, SOURCE_URL, download, ext="sql")
     target = db_path(library_root)
-    if live or not target.exists():
+    if live or not target.exists() or not _has_effects(target):   # rebuild from the stored dump, no download
         return build_database(sql, target), live
     db = AcoreItems(target)
     try:

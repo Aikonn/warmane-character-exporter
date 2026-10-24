@@ -206,6 +206,9 @@ class AcoreItems:
             return ()
         return tuple((row[f"spellid_{i}"], row[f"spelltrigger_{i}"]) for i in range(1, 6) if row[f"spellid_{i}"])
 
+    def has_effects(self) -> bool:
+        return any(r[1] == "spellid_1" for r in self._con.execute("PRAGMA table_info(item)"))
+
     def effect_spell_ids(self) -> set[int]:
         """Spell ids of use / equip / proc effects on weapons and armor of uncommon quality or better."""
         try:
