@@ -322,3 +322,11 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - fetch_validated accepts form and referer for POST requests; the cache key includes the form fields.
 - Statistics collection is not built yet: the statistics sidebar markup (category and subcategory ids) has not been captured, so a one-request discovery fetch of the statistics page is needed first.
 
+
+
+## Update: full achievements export verified (2026-10-24)
+
+- Aikka@Onyxia: all 52 achievement categories collected live through the resumable collector (52 POSTs in 6 runs of at most 9, 10 s apart, 60 s between runs, no errors, no rate limit). Result: 1167 unique achievements, 323 earned, no duplicate ids across categories, and the summed earned points equal the armory total exactly (3355).
+- This validates the category table and the parser end to end. The earlier header-count difference in category 92 (54 vs 55 entries) is harmless because points reconcile.
+- Next: statistics. discover.py (python -m warmane_exporter.discover NAME REALM statistics) fetches one page and stores the raw HTML so the sidebar category ids can be parsed offline.
+
