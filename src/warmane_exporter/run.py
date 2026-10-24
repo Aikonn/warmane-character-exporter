@@ -1,8 +1,9 @@
 """One command for the whole export of one or all known characters.
 
 python -m warmane_exporter.run NAME REALM          one character
+python -m warmane_exporter.run LINK                an armory link, e.g. https://armory.warmane.com/character/Aikka/Onyxia/summary
 python -m warmane_exporter.run --all               Aikka and Bezduse on Onyxia and Icecrown
-Options: --refresh (ignore the 24 h cache), --offline (no requests, only rebuild the export)
+Options: --html-output FILE (copy the PvE report there), --refresh (ignore the 24 h cache), --offline (no requests, only rebuild the export)
 
 Steps per character: snapshot, reputation page, mounts page, achievements, statistics, export.
 Every live request is counted against the daily budget (python -m warmane_exporter.budget) and
@@ -13,9 +14,12 @@ everything already fetched is served from the cache.
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
+from pathlib import Path
 
 from . import collect, discover, export, snapshot
+from .identity import parse_character_link
 
 ALL_CHARACTERS = (("Aikka", "Onyxia"), ("Aikka", "Icecrown"), ("Bezduse", "Onyxia"), ("Bezduse", "Icecrown"))
 
@@ -47,8 +51,9 @@ def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("name", nargs="?")
+    parser.add_argument("name", nargs="?", help="character name, or an armory link such as https://armory.warmane.com/character/Aikka/Onyxia/summary")
     parser.add_argument("realm", nargs="?")
+    parser.add_argument("--html-output", type=Path, help="also copy the PvE report HTML to this file")
     parser.add_argument("--all", action="store_true")
     parser.add_argument("--cache-dir", default=".warmane-cache")
     parser.add_argument("--refresh", action="store_true")
@@ -58,11 +63,26 @@ def main(argv: list[str] | None = None) -> int:
         targets = ALL_CHARACTERS
     elif args.name and args.realm:
         targets = ((args.name, args.realm),)
+    elif args.name and not args.realm:
+        try:
+            identity = parse_character_link(args.name)
+        except ValueError as exc:
+            print(f"Not a usable armory link: {exc}")
+            print("Expected something like https://armory.warmane.com/character/Aikka/Onyxia/summary")
+            return 2
+        targets = ((identity.name, identity.realm),)
     else:
-        parser.error("give NAME REALM or --all")
+        parser.error("give NAME REALM, an armory link, or --all")
+    if args.html_output and len(targets) != 1:
+        parser.error("--html-output works with one character")
     for name, realm in targets:
         if not run_character(name, realm, args.cache_dir, args.refresh, args.offline):
             return 1
+        if args.html_output:
+            source = Path(args.cache_dir) / "exports" / f"{name.lower()}-{realm.lower()}-pve.html"
+            args.html_output.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, args.html_output)
+            print(f"copied report to: {args.html_output}")
     return 0
 
 
