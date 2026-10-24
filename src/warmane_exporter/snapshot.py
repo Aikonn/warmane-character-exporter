@@ -59,8 +59,10 @@ def fetch_validated(
     allow_stale: bool = False,
     max_age_seconds: float = CHARACTER_MAX_AGE_SECONDS,
     reject_dir: Path | None = None,
+    form: dict[str, str] | None = None,
+    referer: str | None = None,
 ) -> FetchResult:
-    key = f"{source}|{url}"
+    key = f"{source}|{url}" + ("" if form is None else "|" + "&".join(f"{k}={v}" for k, v in sorted(form.items())))
     entry = cache.get(key)
     now = now_fn()
 
@@ -74,7 +76,7 @@ def fetch_validated(
             return from_entry("stale-cache", f"Offline mode: cached data is {int(entry.age_seconds(now))} s old.")
         return FetchResult("offline_miss", None, "none", None, "Offline mode and nothing cached.")
 
-    result = orchestrator.execute_single_request(url=url, client=client)
+    result = orchestrator.execute_single_request(url=url, client=client, form=form, referer=referer)
     if result.status == "success":
         try:
             parsed = validate(result.body_text)

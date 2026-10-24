@@ -313,3 +313,12 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Snapshots now carry description_rendered / selected_rank_description_rendered with an _unresolved flag; the report prefers rendered text. python -m warmane_exporter.spell_diagnostic [IDS] prints template and result.
 - Reviewer Python (.tools) now runs tests and offline commands; 159 tests pass. Next: achievements and statistics parser from the saved category captures, then a small live fetch plan for your approval.
 
+
+
+## Update: achievements and statistics parsing, collector (2026-10-24)
+
+- achievements_parser.py parses category POST responses (achievements: id, title, description, points, icon, earned flag, earned date; statistics: description/value rows). Tested on the real fixtures; on local captures category 92 gives 55 entries (24 earned), 96 gives 19, 14861 gives 5.
+- collect.py: python -m warmane_exporter.collect NAME REALM [--limit N] [--dry-run] [--offline] [--refresh] [--interval S]. 52 achievement categories (9 top-level plus subcategories, table in code), one POST each, 24 h cache, resumable, --limit caps live requests per run. Output .warmane-cache/collections/. After a complete run it compares summed earned points with the armory total from the latest snapshot.
+- fetch_validated accepts form and referer for POST requests; the cache key includes the form fields.
+- Statistics collection is not built yet: the statistics sidebar markup (category and subcategory ids) has not been captured, so a one-request discovery fetch of the statistics page is needed first.
+
