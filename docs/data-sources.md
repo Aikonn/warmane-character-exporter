@@ -102,10 +102,10 @@ Update realm coverage separately. Where characters differ within one realm, name
 | Meta gems | Requirement text; source of activation state if any | TBD | TBD | TBD |
 | Enchantments | Raw codes, namespaces, resolved effect text | Partial | TBD | Raw enchantment codes present in `rel` payloads and tooltip-script URLs; no definition verification from this offline capture alone |
 | Sets | Membership, thresholds, bonus descriptions | TBD | TBD | TBD |
-| Primary spec | Tree totals, selected talents/ranks, effect text | Partial | TBD | Rendered-DOM capture contains specialization summary totals only (for one spec entry), not talent-by-talent selections |
-| Secondary spec | Presence, talents/ranks, source order/identifier | Partial | TBD | Rendered-DOM capture shows two specialization summary entries; detail pages not captured |
-| Active spec | Explicit active-state evidence | Not exposed in capture | TBD | No explicit active-spec marker observed in inspected rendered-DOM capture |
-| Glyphs | Identifiers, effects, categories, association with each spec | Not exposed in capture | TBD | No glyph records found in this capture; this is not evidence that the character has no glyphs |
+| Primary spec | Tree totals, selected talents/ranks, effect text | Partial | TBD | Rendered-DOM talents capture contains all selected-talent allocations per spec with source spell IDs; effect text absent (candidate rank-discovery mechanism identified for spell resolution; see Findings) |
+| Secondary spec | Presence, talents/ranks, source order/identifier | Partial | TBD | Both captured specs (0=Discipline, 1=Holy) fully extracted with allocations; active in-game spec unknown from capture |
+| Active spec | Explicit active-state evidence | Not exposed in capture | TBD | In-game active specialization is unknown. Both captured specs and their associated glyphs are included; observed equipment is recorded separately. Tab UI state and display visibility do not indicate in-game active spec. |
+| Glyphs | Identifiers, effects, categories, association with each spec | Partial | TBD | Spec-associated glyph identifiers and categories extracted from rendered-DOM (Spec 0: 3 major + 2 minor; Spec 1: 3 major + 3 minor); effect descriptions absent; glyph definition resolution mechanism unknown |
 | Professions | Names and skill levels | TBD | TBD | TBD |
 | Reputation | Standing/progress and verified PvE relevance | TBD | TBD | TBD |
 | Achievements | IDs, categories, dates, points, completion and criteria | Partial | TBD | Recent-activity achievements with IDs/names/time text are present; not a full achievements-page traversal |
@@ -314,6 +314,50 @@ Glyphs are organized by spec in separate blocks (major/minor categories) with sp
 Evidence / fixture: local-captures/aikka-onyxia-talents-spec1-dom.html (ignored), local-captures/aikka-onyxia-talents-spec2-dom.html (ignored), tests/fixtures/synthetic/talents-page-dom-synthetic.html, talents_parser.py offline diagnostic output.
 Limitations: Rendered DOM only; JavaScript-generated or lazy-loaded elements may not be present. Talent effect text (selected-rank bonuses, etc.) is not embedded in these captures. Glyph effect descriptions are absent from these captures (future investigation needed).
 Implementation consequence: Added offline talents-capture parser (talents_parser.py) using stdlib HTMLParser for robust structural extraction. Parser extracts all specs regardless of visibility, preserves source spell IDs with raw href attributes, reports active-spec as "unknown_not_determined_from_capture", validates tree totals by comparing sum(points_spent) to reported_total (validation is indeterminate if any talent has rank_parse_error or tree-info is missing). Parser handles four edge cases: (1) talent anchors without talent-points divs are retained with null ranks and error marker; (2) trees without tree-info divs have null reported_total and indeterminate validation; (3) spec tabs without matching containers generate warnings; (4) glyph divs with reordered CSS classes (e.g., "major glyph" vs "glyph major") are correctly parsed. Handles malformed rank text (missing slash separator, out-of-range values) with error preservation. Distinguishes selected (points_spent > 0) vs. unselected (points_spent = 0) talents. 24 offline tests cover hidden/visible specs, rank validation, glyph associations, error cases, edge-case regression tests, and container boundary verification. All tree totals in both real captures MATCH reported values; both captures extract identically.
+```
+
+```text
+Finding ID: cavernoftime-spell-rank-discovery-2026-10-24
+Observed UTC: Exact observation time not retained
+Character / realm / source: Aikka / Onyxia / cavernoftime.com spell definition API (discovered during offline capture analysis)
+Question: How are multi-rank talent effects retrieved? Can selected-rank definitions be resolved from captured talent spell IDs?
+Method and request count: Two controlled live HTTP requests (redirects allowed on first, explicitly disabled on second). No retries, 30-second timeout, response cap 256 KiB (first) / 512 KiB (second).
+Result:
+  (1) GET https://wotlk.cavernoftime.com/spell=14748&power=true (HTTP 200, text/html) returned Rank 1 tooltip: "Improved Power Word: Shield" with 5% effect. Redirect history and exact request count unverified due to automatic redirect handling.
+  (2) GET https://wotlk.cavernoftime.com/spell=14748 (HTTP 200, text/html, explicit no-redirect handler) returned normal definition page with Rank 1 effect and related-spell data array: `[{name:'@Improved Power Word: Shield',rank:'Rank 2',"cat":-2,id:14768},{name:'@Improved Power Word: Shield',rank:'Rank 3',"cat":-2,id:14769},{name:'@Improved Power Word: Shield',rank:'',id:24191}]`. This identifies Rank 2 as spell 14768, Rank 3 as spell 14769; entry 24191 has no rank label (unranked related spell, not a rank mapping).
+Evidence / fixture: Live probe results recorded; no fixture created (live response content untrusted for redistribution). Rank 1 definition text and spell IDs for Rank 2/3 extracted from API responses.
+Limitations: Candidate mechanism observed for ONE talent (14748 with 1/3 selected). Higher-rank effects remain unverified (spell=14768 and spell=14769 not yet fetched). General applicability across all talents unknown. Unranked entry (24191) shows that not all "See Also" entries are rank mappings. Source access/reuse licensing terms remain unchecked. User observation: zero-rank talents (points_spent=0) display Rank 1 tooltips; this does not resolve selected-rank effects for unselected talent nodes. Glyph effect resolution mechanism unknown.
+Implementation consequence: Establishes a candidate rank-discovery route for talents: (1) extract spell ID from talent href; (2) fetch Cavernoftime spell page; (3) parse page for related spell entries to identify adjacent rank IDs; (4) fetch each rank's spell ID to retrieve rank-specific definition. Requires verification across additional talents, glyph mechanism discovery, ruleset compatibility check, and source licensing review before adoption.
+```
+
+```text
+Finding ID: cavernoftime-enchantment-gem-parameter-isolation-2026-10-24
+Observed UTC: 2026-10-24 (Copilot retained-file verification; no embedded timestamp)
+Character / realm / source: Item 51178 / Cavernoftime item tooltip API
+Question: Do enchantment (ench=) and gem codes (gems=) parameters independently resolve effect text? How do individual parameters contribute to equipped-instance tooltips?
+Method and request count: Five sequential item GET requests to https://wotlk.cavernoftime.com/item=51178 with varying parameters: (1) combined ench=3820&gems=3627:3879, (2) base (no params), (3) ench=3820 only, (4) gems=3627:3879 only. All HTTP 200, no redirects, 30-second timeout, 512 KiB+ cap. No retries. Retained responses saved to temporary files and verified via local file checks (no reconstruction).
+Result:
+  Base (no params): Explicit socket type labels "Meta Socket" and "Blue Socket" (q0 CSS class). No enchantment effect line. No gem-effect descriptions.
+  Ench=3820 isolated: Adds effect text "+30 Spell Power and 20 Critical strike rating." (q2 CSS). Socket labels REMAIN "Meta Socket" and "Blue Socket" (unchanged). No gem effects added.
+  Gems=3627:3879 isolated: Replaces socket labels with two gem-effect descriptions: "+21 Intellect and Chance to restore mana on spellcast" and "+10 All Stats" (both q1 CSS class with background icon URLs). No enchantment line added.
+  Combined ench=3820&gems=3627:3879: Enchantment effect line + gem-effect descriptions (union of isolated variants).
+Evidence / fixture: Actual retained response files verified: response_base.txt (1950 bytes), response_ench_only.txt (2029 bytes), response_gems_only.txt (2228 bytes). File-based presence checks performed; excerpts extracted from saved content.
+Limitations: Tested on ONE item (51178) with ONE enchantment code and ONE gem-code pair. Individual gem codes (3627, 3879) produce joint effect text; per-gem mapping not isolated. Socket-bonus CSS class (q0 vs. q2) was reported in earlier response excerpts but not confirmed by final retained-file verification—do not claim verified. Socket bonus activation state unknown. Meta socket requirement not explicitly stated; meta label present only when socket is unfilled. No verification of bonus activation rules or conditional effects.
+Implementation consequence: Cavernoftime item parameter API successfully resolves enchantment and gem effect text to readable descriptions for this item/parameter set. Enchantment ID 3820 → "+30 Spell Power and 20 Critical strike rating" (confirmed). Gem codes 3627:3879 → two effect descriptions (confirmed). Socket type labels are explicit in base response (Meta, Blue). Gem-code namespace (distinct from enchantment IDs or overlapping) and individual gem item identities remain unresolved. No item-ID or spell-ID mappings generated. Effect-text resolution confirmed; definition-lookup capability not established.
+```
+
+```text
+Finding ID: evowow-enchantment-3820-manual-verification-2026-10-24
+Observed UTC: User screenshot provided; no automated retrieval timestamp
+Character / realm / source: EvoWoW WOTLK enchantment lookup (https://wotlk.evowow.com/?enchantment=3820)
+Question: Does historical EvoWoW enchantment lookup provide enchantment ID and effect resolution? (User's old main.py sent both equipment enchantments and gem codes through EvoWoW ?enchantment= parameter.)
+Method and request count: One Copilot automated GET attempt to https://wotlk.evowow.com/?enchantment=3820 (HTTP 403 Forbidden, access denied; no content). User-provided browser screenshot of the same URL showing successful manual access.
+Result:
+  Automated Copilot fetch: HTTP 403 Forbidden. No page content retrieved.
+  User screenshot (manual browser access): Page title/heading shows "+30 Spell Power and 20 Critical strike rating." Quick Facts section displays "Enchantment ID: 3820". Effect details: Spell power Value 30; Critical strike rating Value 20. "Used by Item (3)" section lists multiple related items (Arcanum of Burning Mysteries entries noted; unique item IDs not extracted from screenshot).
+Evidence / fixture: User-provided screenshot; Copilot 403 response (no content). No sanitized fixture created (copyrighted content). Screenshot evidence shows explicit enchantment_id namespace and matching effect text.
+Limitations: Automated access currently blocked (403); manual access requires browser navigation. Gem-code 3627 lookup not attempted (investigation halted per safeguards after automated access failure). Related-item links visible in screenshot do not establish unique item IDs. EvoWoW data reuse terms and licensing unchecked. Historical main.py evidence shows ?enchantment= parameter used for both equipment enchantments and gem codes; gem-code namespace (whether distinct or overlapping with enchantment_id) not yet verified against EvoWoW. No per-gem (3627 vs 3879) isolation observed.
+Implementation consequence: EvoWoW enchantment_id 3820 explicitly maps to the same effect text as Cavernoftime ("+30 Spell Power and 20 Critical strike rating"). Source namespace established: enchantment_id. Automated access currently unavailable; manual verification feasible. Gem-code namespace remains unresolved; requires separate investigation of EvoWoW gem lookups or alternative source. Historical script design (conflating ench codes and gem codes in single parameter) suggests possible namespace overlap, but no current evidence.
 ```
 
 ## 14. Open questions

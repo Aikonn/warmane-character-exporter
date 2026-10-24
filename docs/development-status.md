@@ -35,7 +35,34 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 
 **Offline talents-parser increment status:** Accepted after bounded review. Fixes to edge cases verified; no regressions.
 
-**Milestone 0 status:** **Incomplete** — remaining gaps unaddressed.
+**NEW — Rank-discovery mechanism candidate identified:**
+- Two controlled live Copilot HTTP requests to cavernoftime.com spell API (exact requests: `/spell=14748&power=true` and `/spell=14748`)
+- GET `/spell=14748&power=true` returned HTTP 200: Rank 1 tooltip definition ("Improved Power Word: Shield", 5% effect)
+- GET `/spell=14748` (no-redirect handler) returned HTTP 200: normal definition page with Rank 1 effect and related-spell data identifying Rank 2=spell_id 14768 and Rank 3=spell_id 14769
+- Unranked related entry (spell_id 24191) present in data; not all "See Also" entries are rank mappings
+- **Mechanism candidate:** Extract spell ID from talent href → fetch Cavernoftime spell page → parse related-spell entries for rank IDs → fetch each rank's spell page for definition
+- **Verified for:** Only one talent (14748 with 1/3 selected); higher ranks not yet fetched
+- **Requires:** Verification across additional talents, glyph mechanism discovery, ruleset compatibility check, source access/reuse terms review
+- See [data-sources.md Finding: cavernoftime-spell-rank-discovery-2026-10-24](./data-sources.md#findings-log)
+
+**NEW — Enchantment and gem parameter isolation (Cavernoftime):**
+- Five controlled item GETs to https://wotlk.cavernoftime.com/item=51178 with parameter variations.
+- Base (no params): Meta/Blue socket labels (q0 CSS).
+- Ench=3820 isolated: Adds "+30 Spell Power and 20 Critical strike rating" effect text; socket labels unchanged.
+- Gems=3627:3879 isolated: Replaces socket labels with two gem-effect descriptions ("+21 Intellect...mana", "+10 All Stats"); socket labels removed.
+- Combined: Union of isolated effects.
+- **Finding:** Enchantment code 3820 effect text resolved and matches EvoWoW manual screenshot evidence (see below).
+- **Limitation:** Gem codes produce joint effect text; per-gem mapping not isolated. Socket bonus activation state unknown. Bonus CSS class (q0→q2) reported earlier but not confirmed in final retained-file verification.
+- See [data-sources.md Finding: cavernoftime-enchantment-gem-parameter-isolation-2026-10-24](./data-sources.md#findings-log).
+
+**NEW — EvoWoW enchantment lookup verification:**
+- One Copilot automated GET to https://wotlk.evowow.com/?enchantment=3820: HTTP 403 Forbidden (access blocked).
+- User-provided browser screenshot shows successful manual access: Enchantment ID 3820 explicit; effect "+30 Spell Power and 20 Critical strike rating" matches Cavernoftime output.
+- **Finding:** Enchantment ID namespace established via manual evidence; automated access currently blocked. EvoWoW ?enchantment= parameter historically used for both equipment enchantments and gem codes (historical main.py evidence), but gem-code namespace not yet verified.
+- **Limitation:** Automated access blocked. Gem code 3627 lookup not attempted. Related-item names do not establish unique item IDs. Source reuse terms unchecked.
+- See [data-sources.md Finding: evowow-enchantment-3820-manual-verification-2026-10-24](./data-sources.md#findings-log).
+
+**Milestone 0 status:** **Incomplete** — equipment-to-definition chain partially explored; gem codes, bonus activation, and active spec remain unresolved.
 
 ## Access finding (automated retrieval)
 - One approved automated request to `Aikka / Onyxia / summary` returned:
