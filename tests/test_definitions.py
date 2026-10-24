@@ -124,7 +124,7 @@ class DefinitionsTests(unittest.TestCase):
         summary["equipment"]["slots"][0]["item_reference"]["namespaces"]["item"] = "5"
         out = enrich_summary_result(summary, defs)
         info = out["equipment"]["slots"][0]["client"]["set"]
-        self.assertEqual((info["name"], info["size"]), ("Test Raiment", 3))
+        self.assertEqual((info["name"], info["size"]), ("Test Raiment", 1))
         self.assertEqual(info["bonuses"][0], {"threshold": 2, "spell": 77, "text": "Bonus text."})
         self.assertIsNone(info["bonuses"][1]["text"])
         self.assertTrue(any("set bonus spell 78" in w for w in out["client_warnings"]))

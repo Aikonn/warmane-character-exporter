@@ -206,8 +206,9 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
             }
             item_set = defs.item_set(acore.itemset) if acore.itemset else None
             if item_set:
-                size = defs.acore.set_size(acore.itemset) if getattr(defs, "acore", None) is not None else 0
-                client["set"] = _set_info(defs, item_set, size or len(item_set["items"]), slot.get("slot_key"), warnings)
+                # piece count from the client's set record; item_template counts every difficulty variant of the set
+                size = len(item_set["items"]) or (defs.acore.set_size(acore.itemset) if getattr(defs, "acore", None) is not None else 0)
+                client["set"] = _set_info(defs, item_set, size, slot.get("slot_key"), warnings)
             effects = _item_effects(defs, acore, slot.get("slot_key"), warnings)
             if effects:
                 client["acore"]["effects"] = effects
