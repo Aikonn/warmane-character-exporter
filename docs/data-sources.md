@@ -673,3 +673,13 @@ Status: verified by 6 further live requests through the user's Chrome (3 HTML su
 - Whether a top-level category POST already returns its subcategories' entries is not yet established (category 92 has no subcategories). The first test on a category with subcategories decides whether a full export needs about 9 or about 50 achievement requests.
 - Statistics: POST with the same category field works (category=130 returned a JSON {"content": html} with a Description/Value table, about 2 KB; values such as "Talent tree respecs 8"). The statistics sidebar has about 30 category and subcategory ids, so a full statistics export is about 10 to 30 requests per character.
 - Revised request estimate per character: roughly 30 to 90 requests depending on subcategory behaviour. Needs throttling, caching and resumability; a full export of four characters should be an explicit, user-triggered, slow run.
+
+
+### Finding: summary-captures-other-characters-2026-10-24
+
+Status: verified by user-run enrich_summary_diagnostic on the three batch-2 captures (client_warnings: 0 for all).
+
+- Every enchant and nonzero gem code on Bezduse@Onyxia, Bezduse@Icecrown and Aikka@Icecrown resolved from SpellItemEnchantment.dbc. Aikka@Icecrown passed the inventory-type slot check for all 17 items (Main Hand one-hand, Off Hand shield, Ranged relic).
+- Bug found and fixed: the Bezduse captures showed no inferred slot names (slot check = None). Cause: Warmane labels the empty off-hand slot "Off-Hand", the layout table expects "Off Hand", so the anchor check failed and inference was disabled. Label comparison now ignores case and hyphen/space differences (summary_parser._labels_match, unit tested). Re-verification of the Bezduse captures is pending (user-run).
+- Layout facts: a two-hand weapon occupies Main Hand and leaves Off Hand empty (empty slot carries data-tooltip="Off-Hand"); a death knight sigil sits in the Ranged slot (relic inventory type).
+- Same slot-label strictness was the only blocker; item IDs and enchant/gem payloads parsed identically across Priest, Death Knight and Paladin.

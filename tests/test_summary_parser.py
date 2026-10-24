@@ -107,6 +107,15 @@ class LayoutInferenceTests(unittest.TestCase):
             self.assertIsNone(slot["layout_inference"]["inferred_slot_name"])
             self.assertEqual(slot["layout_inference"]["status"], "unverified")
 
+    def test_hyphenated_off_hand_label_matches_layout(self) -> None:
+        """Warmane labels the empty off-hand slot 'Off-Hand'; it must match 'Off Hand'."""
+        from warmane_exporter.summary_parser import _labels_match
+
+        self.assertTrue(_labels_match("Off-Hand", "Off Hand"))
+        self.assertTrue(_labels_match("off hand", "Off Hand"))
+        self.assertFalse(_labels_match("Main Hand", "Off Hand"))
+        self.assertFalse(_labels_match(None, "Off Hand"))
+
     def test_anchor_mismatch_marks_unverified_with_issue(self) -> None:
         """Anchor mismatch (Shirt at left_5 instead of left_6) should mark unverified with issue."""
         html = Path("tests/fixtures/synthetic/layout-anchor-mismatch.html").read_text(encoding="utf-8")

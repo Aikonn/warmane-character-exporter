@@ -265,6 +265,15 @@ def _parse_rel_payload(rel_payload: str) -> dict[str, object]:
     }
 
 
+def _labels_match(observed: object, expected: str) -> bool:
+    """Compare slot labels ignoring case and hyphen/space differences (Warmane writes 'Off-Hand')."""
+
+    def norm(value: str) -> str:
+        return " ".join(value.replace("-", " ").lower().split())
+
+    return isinstance(observed, str) and norm(observed) == norm(expected)
+
+
 def _validate_and_infer_layout(slots: list[dict[str, object]]) -> dict[str, object]:
     """
     Validate equipment layout against standard WotLK paperdoll order and add per-slot inference.
@@ -304,7 +313,7 @@ def _validate_and_infer_layout(slots: list[dict[str, object]]) -> dict[str, obje
                 })
             else:
                 expected_name = STANDARD_WOTLK_LAYOUT[group][index - 1]
-                match = slot_name == expected_name
+                match = _labels_match(slot_name, expected_name)
                 anchors_checked.append({
                     "slot_key": slot.get("slot_key"),
                     "explicit_label": slot_name,
