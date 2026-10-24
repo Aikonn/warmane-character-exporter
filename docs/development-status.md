@@ -383,3 +383,8 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 
 The JSON summary lists professions unreliably. The summary HTML has two profskills blocks (professions and secondary skills) with current and maximum skill. summary_parser now parses both and the report prefers them. Verified on all four characters.
 
+
+## Update 2026-10-24: static item, gem and enchant data
+
+No third-party definition site is needed. Enchant and gem texts come from the client SpellItemEnchantment.dbc, spells from Spell.dbc, and item names from the armory JSON summary, which is cached in the Library and SQLite cache. Socket structure and the active spec remain unavailable from any source we use. Next: README and handoff polish.
+
