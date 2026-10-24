@@ -78,7 +78,7 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
         "equipment": equipment,
         "specializations": specs,
         "active_specialization": "unknown (not exposed by Warmane)",
-        "professions": summary.get("professions"),
+        "professions": html.get("professions") if html.get("professions") is not None else summary.get("professions"),
         "sections": {n: (s or {}).get("status") for n, s in snapshot.get("sections", {}).items()},
     }
 

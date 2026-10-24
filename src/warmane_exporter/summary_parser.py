@@ -47,6 +47,7 @@ def parse_summary_capture_html(html: str, source_name: str = "<memory>") -> dict
     specializations = _parse_specializations(html)
     recent_achievements = _parse_recent_achievements(html)
     model_viewer = _parse_model_viewer_items(html)
+    professions = _parse_professions(html)
 
     ambiguous_slots = [slot for slot in equipment["slots"] if slot.get("slot_name") is None]
 
@@ -56,6 +57,7 @@ def parse_summary_capture_html(html: str, source_name: str = "<memory>") -> dict
         "identity": identity,
         "character_stats": character_stats,
         "equipment": equipment,
+        "professions": professions,
         "specializations": {
             "specs": specializations,
             "active_spec_status": "unknown_not_explicit_in_capture",
@@ -439,6 +441,18 @@ def _parse_model_viewer_items(html: str) -> list[dict[str, int]]:
     for item_match in re.finditer(r"\[(\d+)\s*,\s*(\d+)\]", model_block):
         pairs.append({"viewer_slot_id": int(item_match.group(1)), "viewer_model_item_id": int(item_match.group(2))})
     return pairs
+
+
+def _parse_professions(html: str) -> list[dict[str, object]]:
+    """Professions and secondary skills with current and maximum skill (empty list if none)."""
+    skills: list[dict[str, object]] = []
+    for opening in re.finditer(r'<div class="profskills">', html):
+        start = opening.start()
+        end = html.find("<h3", start)
+        block = html[start:end] if end > 0 else html[start:start + 4000]
+        for match in re.finditer(r'<div class="text">\s*([^<]+?)\s*<span class="value">\s*(\d+)\s*/\s*(\d+)\s*</span>', block, flags=re.S):
+            skills.append({"name": _clean_text(match.group(1)), "skill": int(match.group(2)), "maximum": int(match.group(3))})
+    return skills
 
 
 def _extract_lines_with_breaks(fragment: str) -> list[str]:
