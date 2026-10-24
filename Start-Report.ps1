@@ -27,11 +27,26 @@ $cache = Join-Path $root ".warmane-cache"
 New-Item -ItemType Directory -Force -Path $cache, (Join-Path $root ".tools\tmp") | Out-Null
 $logOut = Join-Path $cache "launcher.log"
 $logErr = Join-Path $cache "launcher-error.log"
-$lastDirFile = Join-Path $cache "launcher-last-dir.txt"
 $pattern = 'armory\.warmane\.com/character/([^/\s?#"''<>]+)/([^/\s?#"''<>]+)'
 
 function Show-Message([string]$text, [string]$title, [string]$icon = "Information") {
     [void][System.Windows.Forms.MessageBox]::Show($text, $title, "OK", $icon)
+}
+
+function Get-DownloadsFolder {
+    # The user's Downloads folder, also when it was moved (known folder lookup); fallback: %USERPROFILE%\Downloads.
+    try {
+        Add-Type -Namespace Win32 -Name Known -MemberDefinition '[DllImport("shell32.dll")] public static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] System.Guid id, uint flags, System.IntPtr token, out System.IntPtr path);' -ErrorAction SilentlyContinue
+        $ptr = [System.IntPtr]::Zero
+        if ([Win32.Known]::SHGetKnownFolderPath([System.Guid]"374DE290-123F-4565-9164-39C4925E467B", 0, [System.IntPtr]::Zero, [ref]$ptr) -eq 0) {
+            $path = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($ptr)
+            [System.Runtime.InteropServices.Marshal]::FreeCoTaskMem($ptr)
+            if ($path -and (Test-Path $path)) { return $path }
+        }
+    } catch { }
+    $fallback = Join-Path $env:USERPROFILE "Downloads"
+    if (Test-Path $fallback) { return $fallback }
+    return [Environment]::GetFolderPath("MyDocuments")
 }
 
 function Test-PythonVersion([string]$exe) {
@@ -162,15 +177,10 @@ if (-not $Output) {
     $dialog.Filter = "HTML report (*.html)|*.html"
     $dialog.DefaultExt = "html"
     $dialog.FileName = ("{0}-{1}-pve.html" -f $charName.ToLower(), $charRealm.ToLower())
-    $startDir = [Environment]::GetFolderPath("MyDocuments")
-    if (Test-Path $lastDirFile) {
-        $saved = (Get-Content $lastDirFile -Raw).Trim()
-        if ($saved -and (Test-Path $saved)) { $startDir = $saved }
-    }
+    $startDir = Get-DownloadsFolder
     $dialog.InitialDirectory = $startDir
     if ($dialog.ShowDialog() -ne "OK") { exit 0 }
     $Output = $dialog.FileName
-    Set-Content -Path $lastDirFile -Value (Split-Path -Parent $Output) -Encoding ASCII
 }
 
 $env:TEMP = Join-Path $root ".tools\tmp"
