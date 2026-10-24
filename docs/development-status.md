@@ -388,3 +388,13 @@ The JSON summary lists professions unreliably. The summary HTML has two profskil
 
 No third-party definition site is needed. Enchant and gem texts come from the client SpellItemEnchantment.dbc, spells from Spell.dbc, and item names from the armory JSON summary, which is cached in the Library and SQLite cache. Socket structure and the active spec remain unavailable from any source we use. Next: README and handoff polish.
 
+
+
+## Update: AzerothCore item data, first batch of client-independent definitions (2026-10-24)
+
+- Source: github.com/azerothcore/database-wotlk (AGPL-3.0), sql/base/item_template.sql, 38610 items, one 14 MB download. Note: this repository was last updated in January 2017, so it is a frozen 3.3.5a dump, not the current AzerothCore tree. Its spell_dbc.sql holds only AzerothCore custom spells, not the full Spell.dbc, so it is no source for spell, talent or glyph text.
+- acore_items.py converts the dump into library/acore/items.db (SQLite, 2 s); acore_cli.py has `fetch` (one request, skipped when already local) and `verify` (local files only).
+- Verification against known Warmane data (armory JSON summaries of Aikka@Onyxia and Bezduse@Icecrown): 33 of 33 equipped item names match exactly. `verify` also checks item quality from the page markup of every snapshot in .warmane-cache/ and reports any difference; run it on the PC after `fetch`.
+- Gives, without the client: item name, quality, slot, item level, stats, socket colours and socket bonus enchant id (this closes the socket structure gap).
+- Still needs the client or another source: texts of enchants, gems and socket bonuses (SpellItemEnchantment ids are not in item_template), and spell, talent and glyph descriptions. Warmane item tooltips are the planned source for the enchant and gem texts.
+- Next batches: (2) swappable definition source (client or local cache) wired into enrichment and report, with socket structure shown; (3) Warmane item tooltips into the Library, plus a startup check comparing client and online values.
