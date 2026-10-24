@@ -338,3 +338,12 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Reputation page is static HTML, no POST: a flat list of 38 factions for Aikka@Onyxia, each with standing class, name, current / maximum, standing text. reputation_parser.py parses all 38 and cross-checks the standing class against its text; tested on a real 6-faction fixture.
 - The mounts URL is /character/NAME/REALM/mounts-and-companions (plain /mounts returned the profile page). Other character views: profile, match-history, achievements, talents, statistics, reputation. discover.py view names updated.
 
+
+
+## Update: statistics verified, mounts parser, final export (2026-10-24)
+
+- Aikka@Onyxia statistics: all 33 categories collected live (33 POSTs, no errors): 497 rows, no empty values, no duplicate names. A top-level category response contains only its own rows, so subcategories must be requested separately (same as achievements).
+- Mounts and companions page is static HTML (two tabs of journal boxes with item id and npc id). mounts_parser.py parses 8 mounts and 4 companions and fails when the box count and parsed count differ.
+- export.py merges the newest snapshot, achievements and statistics collections, reputation and mounts pages into .warmane-cache/exports/<name>-<realm>.json and .md, listing any missing section. First export for Aikka@Onyxia is complete and its achievement points match the armory (3355).
+- Per-character cost of a complete export: 3 (snapshot) + 52 achievements + 33 statistics + reputation + mounts = 90 live requests, resumable.
+
