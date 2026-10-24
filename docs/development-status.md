@@ -347,3 +347,10 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - export.py merges the newest snapshot, achievements and statistics collections, reputation and mounts pages into .warmane-cache/exports/<name>-<realm>.json and .md, listing any missing section. First export for Aikka@Onyxia is complete and its achievement points match the armory (3355).
 - Per-character cost of a complete export: 3 (snapshot) + 52 achievements + 33 statistics + reputation + mounts = 90 live requests, resumable.
 
+
+
+## Update: second full export, Bezduse@Onyxia (2026-10-24)
+
+- Death Knight export complete with about 88 live requests (no errors, no rate limit): 52 achievement categories (203 earned of 1163, points 2180 equal the armory total), 33 statistics categories (497 rows), reputation and mounts pages. The export merges without missing sections.
+- Pipeline is now validated on two characters of two classes. Remaining for Milestone 6: Aikka@Icecrown and Bezduse@Icecrown.
+
