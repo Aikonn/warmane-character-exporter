@@ -406,3 +406,9 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 - snapshot.py loads both (the client is now optional; a missing client no longer disables item enrichment) and prints which sources are active.
 - Enrichment adds client.acore per equipped item: name, quality, item level, stats, socket colours, socket bonus enchant id, filled and empty socket counts. Gems beyond the listed sockets produce a warning (extra sockets such as a belt buckle). The report marks empty sockets.
 - 192 tests pass. Next: batch 3, Warmane item tooltips into the Library (needs a live probe on the PC, which the cloud session cannot reliably do) and the client-versus-online comparison.
+
+
+## Update: verified on the PC (2026-10-24)
+
+- acore_cli fetch on the PC: 38610 items. acore_cli verify over 76 local JSON files: 330 item observations, 61 unique items, 0 missing, 0 differences (names from the armory JSON summaries and quality from the page markup). 192 tests pass on Windows; Definitions.close() added so the SQLite file is released (Windows file lock in tests).
+

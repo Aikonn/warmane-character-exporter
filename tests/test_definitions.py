@@ -18,6 +18,11 @@ class DefinitionsTests(unittest.TestCase):
         build_database(_sql([_row(1, "Hood", inv=1, sockets=(1, 8, 0)), _row(2, "Ring", inv=11, sockets=(0, 0, 0))]),
                        self.lib / "acore" / "items.db")
 
+    def _defs(self):
+        defs = load_definitions(None, self.lib)
+        self.addCleanup(defs.close)
+        return defs
+
     def _summary(self, gems):
         return {"equipment": {"slots": [{
             "slot_key": "left_0", "is_empty": False,
@@ -33,7 +38,7 @@ class DefinitionsTests(unittest.TestCase):
             Definitions()
 
     def test_acore_only_enrichment_and_report(self):
-        defs = load_definitions(None, self.lib)
+        defs = self._defs()
         self.assertEqual(defs.source_names, ["acore"])
         out = enrich_summary_result(self._summary(["3", "0", "0"]), defs)
         client = out["equipment"]["slots"][0]["client"]
@@ -44,20 +49,20 @@ class DefinitionsTests(unittest.TestCase):
         self.assertEqual(out["client_warnings"], ["left_0: gem code 3 text unresolved (no text source has it)"])
 
     def test_extra_gem_is_warned_not_hidden(self):
-        defs = load_definitions(None, self.lib)
+        defs = self._defs()
         out = enrich_summary_result(self._summary(["3", "4", "5"]), defs)
         self.assertEqual(out["equipment"]["slots"][0]["client"]["acore"]["sockets_empty"], 0)
         self.assertTrue(any("extra socket" in w for w in out["client_warnings"]))
 
     def test_unknown_item_is_reported(self):
-        defs = load_definitions(None, self.lib)
+        defs = self._defs()
         summary = self._summary(["0", "0", "0"])
         summary["equipment"]["slots"][0]["item_reference"]["namespaces"]["item"] = "999"
         out = enrich_summary_result(summary, defs)
         self.assertTrue(any("not in any definition source" in w for w in out["client_warnings"]))
 
     def test_report_shows_empty_sockets(self):
-        defs = load_definitions(None, self.lib)
+        defs = self._defs()
         html = enrich_summary_result(self._summary(["0", "0", "0"]), defs)
         snap = {"sections": {"html_summary": {"data": html, "status": "ok"}, "json_summary": {"data": {}}}}
         text = render_markdown(build_report(snap))
