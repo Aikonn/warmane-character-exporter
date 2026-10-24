@@ -52,6 +52,9 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
             "enchant": (client.get("enchant") or {}).get("text"),
             "gems": gems,
             "gem_slots_seen": total_gems,
+            "item_level": (client.get("acore") or {}).get("item_level"),
+            "stats": (client.get("acore") or {}).get("stats"),
+            "scaling_stats": (client.get("acore") or {}).get("scaling_stats"),
             "sockets": (client.get("acore") or {}).get("sockets"),
             "sockets_empty": (client.get("acore") or {}).get("sockets_empty"),
         })
@@ -63,6 +66,15 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
             "label": spec.get("label"),
             "split": [t.get("reported_total") for t in spec.get("trees", [])],
             "trees": [t.get("name") for t in spec.get("trees", [])],
+            "talent_detail": [
+                {"tree": t.get("name"), "points": t.get("reported_total"), "talents": [
+                    {"name": (x.get("client") or {}).get("name"), "spent": x.get("points_spent"),
+                     "max": x.get("points_max"), "row": (x.get("client") or {}).get("row"),
+                     "column": (x.get("client") or {}).get("column"),
+                     "description": (x.get("client") or {}).get("selected_rank_description_rendered")
+                     or (x.get("client") or {}).get("selected_rank_description")}
+                    for x in t.get("talents", []) if isinstance(x.get("points_spent"), int) and x["points_spent"] > 0]}
+                for t in spec.get("trees", [])],
             "glyphs": [
                 {"category": g.get("category"), "name": g.get("name"),
                  "effect": _glyph_effect(g.get("client"))}
