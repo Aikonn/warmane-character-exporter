@@ -584,3 +584,15 @@ Status: verified against the real capture aikka-onyxia-summary-dom.html and the 
 - Gem code 0 is reported as an empty position. The rel payload always lists three positions, so "empty" cannot distinguish an unfilled socket from a socket that does not exist; the number of real sockets is unknown (it needs item socket data, which is not in Item.dbc).
 - Not available offline: item names, item quality, socket count and socket bonus, item stats.
 
+
+### Finding: warmane-json-api-live-2026-10-24
+
+Status: verified by 4 live GET requests (user-approved, one per character, 15 s apart, via the user's own Chrome; no blocks, no rate limit). Raw responses saved to git-ignored local-captures/api-<name>-<realm>-summary.json.
+
+- Endpoint: https://armory.warmane.com/api/character/<Name>/<Realm>/summary returns JSON (HTTP OK in a normal browser). It is the source for item names, which the client DBCs lack.
+- Fields: name, realm, online, level, faction, gender, race, racemask, class, classmask, honorablekills, guild, achievementpoints, equipment[] (name, item id, transmog), talents[] (tree name, points per tree, two entries for dual spec), professions[] (name, skill), pvpteams[].
+- Equipment lists only non-empty slots and carries NO slot index, NO enchant, NO gems. Slot must come from Item.dbc inventory type or from the HTML summary. Enchants and gems still require the HTML summary rel payload.
+- Aikka@Onyxia: all 17 item IDs match the saved HTML capture in the same order. Talent point splits are given per tree but without an active-spec marker.
+- Both realms and both characters answered (Bezduse 16 items, Aikka@Icecrown 17 items; empty professions/pvpteams/guild appear as [] or "").
+- Request cost: 1 request per character for JSON basics; HTML summary and talents pages are still needed for enchants, gems, talents and glyphs.
+- Not yet probed live: achievements, statistics, HTML pages from a plain HTTP client (earlier scripted request got Cloudflare 1010).
