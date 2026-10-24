@@ -25,7 +25,7 @@ CLIENT_SIGNATURE_BLOCK_MARKERS = (
 
 @dataclass(frozen=True)
 class TransportConfig:
-    min_request_interval_seconds: float = 3.0
+    min_request_interval_seconds: float = 1.0
     connect_timeout_seconds: float = 10.0
     read_timeout_seconds: float = 30.0
     max_rate_limit_retries: int = 3

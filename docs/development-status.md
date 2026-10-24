@@ -457,3 +457,7 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 
 - Not taken from the armory tooltip (it does not evaluate them). Static data: set id of each item from AzerothCore item_template (itemset), set name, piece count and bonus spells with thresholds from ItemSet.dbc (exported into client-export.json as item_sets, 475 sets), bonus text from the client's rendered spell description.
 - The report counts equipped items per set id (all difficulty variants of a set share one id) and marks each bonus active when the count reaches its threshold. Inactive set bonuses, socket bonuses and meta gems are gray.
+
+## PvE-only fetch and 1 s spacing
+- run.py now fetches only what the PvE report reads: 13 of 52 achievement categories (168 and its children) and 9 of 33 statistic categories (14807, the six instance categories, 125, 130). About 28 live requests instead of about 90. `--full` (run.py and collect.py) fetches everything; cached categories are reused.
+- Default spacing between requests is now 1 s (owner decision, one character at a time); it was 3 s.

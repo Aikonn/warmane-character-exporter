@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_DAILY_LIMIT = 500
-DEFAULT_INTERVAL_SECONDS = 3.0
+DEFAULT_INTERVAL_SECONDS = 1.0
 
 
 class BudgetExhausted(ValueError):

@@ -17,7 +17,7 @@ Project: Warmane Character Exporter (repo Aikonn/warmane-character-exporter, loc
 
 ## Access rules
 
-- Warmane armory: plain HTTP, fixed browser-like User-Agent, requests 3 s apart, daily budget 500 (python -m warmane_exporter.budget). Stop on the first error. Never provoke a rate limit. No User-Agent rotation or evasion.
+- Warmane armory: plain HTTP, fixed browser-like User-Agent, requests 1 s apart (owner decision, single character), daily budget 500 (python -m warmane_exporter.budget). Stop on the first error. Never provoke a rate limit. No User-Agent rotation or evasion.
 - Respect robots.txt and terms of every third-party site before any request. wago.tools disallows automated access in robots.txt. Cavernoftime and EvoWoW blocked automated access earlier and their terms were never reviewed.
 
 ## State
