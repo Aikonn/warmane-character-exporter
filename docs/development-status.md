@@ -378,3 +378,8 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Still unavailable from the armory: socket structure (the rel gems field always lists three positions, 0 meaning no gem, without telling an empty socket from no socket), active spec, reliable profession skill values.
 - GitHub Copilot: the account has Copilot Pro with cloud agent and CLI enabled, but the reviewer's GitHub connection rejects agent tasks and has no token for the Copilot CLI, so code generation is not offloaded.
 
+
+## Update 2026-10-24: professions from the armory page
+
+The JSON summary lists professions unreliably. The summary HTML has two profskills blocks (professions and secondary skills) with current and maximum skill. summary_parser now parses both and the report prefers them. Verified on all four characters.
+
