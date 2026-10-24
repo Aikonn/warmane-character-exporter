@@ -193,7 +193,10 @@ class ClientDefinitions:
 
     def item_set_for_item(self, item_id: int) -> dict[str, Any] | None:
         if self._set_by_item is None:
-            self._set_by_item = {i: s for s in self.item_sets() for i in s["items"]}
+            try:
+                self._set_by_item = {i: s for s in self.item_sets() for i in s["items"]}
+            except DbcError:   # table missing in this client: the export file may still know the sets
+                self._set_by_item = {}
         return self._set_by_item.get(item_id)
 
     def spell(self, spell_id: int) -> SpellInfo | None:
