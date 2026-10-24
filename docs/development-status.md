@@ -427,3 +427,10 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 - Sections: header, equipment (item level, base stats, enchant, gems, empty sockets), talents and glyphs per specialization with rendered effect text, professions, bosses killed per instance and mode, per-boss kill tables (10/25, normal/heroic; instances split over several categories, such as Vault of Archavon, are merged), entered/completed counters, deaths in raids, dungeon and raid achievements (earned with date, not earned with requirement), emblems, reputation, mounts.
 - Decision: comparing exports over time is out of scope. The goal is the character as it is now.
 - Known limits: armory difficulty columns sometimes repeat the same number (noted in the report); the active specialization is unknown; item level, stats and sockets come from the 2017 AzerothCore dump, not from Warmane. Verified on the PC with the cached Aikka and Bezduse characters (201 tests pass).
+
+
+## Update: PvE report refocused on WotLK raiding (2026-10-24)
+
+- Open by default: equipment, talents (per-spec sections collapsed), WotLK raid boss-kill tables (one collapsible table per raid, open), WotLK raid achievements (categories collapsed). Collapsed by default and placed last: WotLK dungeons, Burning Crusade and Classic, unmatched statistics, entered/completed, deaths, and the dungeon/Classic/TBC achievements.
+- Removed the "bosses killed per instance and mode" overview table.
+- Red warning box: some armory kill counts are known to be wrong. A heroic count equal to the normal count of the same raid size is marked with * (computed automatically; the warning states how many cells were marked).

@@ -26,6 +26,7 @@ PROGRESS_CATEGORIES = (
     (14821, "Classic"), (14822, "The Burning Crusade"), (14823, "Wrath of the Lich King"),
     (14963, "Secrets of Ulduar"), (15021, "Call of the Crusade"), (15062, "Fall of the Lich King"),
 )
+OLDER_HEADINGS = ("Classic", "The Burning Crusade")
 OVERVIEW_CATEGORY = 14807     # Dungeons & Raids: entered / completed counters
 DEATHS_CATEGORY = 125         # Deaths > Dungeons: "Deaths in <raid>"
 ACHIEVEMENT_PARENT = 168      # Dungeons & Raids
@@ -112,10 +113,20 @@ def build_progression(statistics: list[dict[str, Any]]) -> dict[str, Any]:
             inst["modes"].add(mode)
             inst["bosses"].setdefault(parsed["boss"], {})[mode] = count
         groups.append({"heading": heading, "instances": list(instances.values()), "other": other})
+    wotlk_raids, wotlk_dungeons, older = [], [], []
+    for group in groups:
+        for inst in group["instances"]:
+            if group["heading"] in OLDER_HEADINGS:
+                older.append(inst)
+            elif any(size in (10, 25) for size, _ in inst["modes"]):
+                wotlk_raids.append(inst)
+            else:
+                wotlk_dungeons.append(inst)
     overview = [{"name": r["name"], "value": r["value"]} for r in (by_id.get(OVERVIEW_CATEGORY) or {}).get("rows", [])]
     deaths = [{"name": r["name"], "value": r["value"]} for r in (by_id.get(DEATHS_CATEGORY) or {}).get("rows", [])
               if r["name"].startswith(("Deaths in", "Total"))]
-    return {"groups": groups, "overview": overview, "deaths": deaths}
+    return {"groups": groups, "wotlk_raids": wotlk_raids, "wotlk_dungeons": wotlk_dungeons, "older": older,
+            "overview": overview, "deaths": deaths}
 
 
 def _mode_label(mode: tuple[int | None, bool]) -> str:
@@ -168,6 +179,7 @@ body{font-family:Segoe UI,Arial,sans-serif;max-width:1100px;margin:1.5em auto;pa
 h1{border-bottom:2px solid #444;padding-bottom:.2em} h2{margin-top:1.8em;border-bottom:1px solid #999}
 table{border-collapse:collapse;margin:.6em 0;font-size:.92em} th,td{border:1px solid #bbb;padding:.25em .6em;text-align:left;vertical-align:top}
 th{background:#eee} td.n{text-align:right} .muted{color:#555} .note{background:#f6f6f0;border-left:4px solid #aa8;padding:.4em .8em}
+.warn{background:#fde8e8;border:1px solid #c33;border-left:6px solid #b00;color:#600;padding:.5em .9em;margin:.6em 0}
 details{margin:.4em 0} summary{cursor:pointer}
 """
 
@@ -238,62 +250,97 @@ def _spec_section(report: dict[str, Any]) -> str:
     return "".join(out)
 
 
+def suspect_cells(inst: dict[str, Any]) -> set[tuple[str, tuple[int | None, bool]]]:
+    """(boss, heroic mode) pairs whose heroic count equals the normal count of the same size (and is above 0)."""
+    found = set()
+    for boss, counts in inst["bosses"].items():
+        for (size, heroic), value in counts.items():
+            if heroic and value and counts.get((size, False)) == value:
+                found.add((boss, (size, heroic)))
+    return found
+
+
+def _instance_table(inst: dict[str, Any], heading: bool = True) -> str:
+    modes = _sorted_modes(inst["modes"])
+    suspects = suspect_cells(inst)
+    rows = []
+    for boss, counts in inst["bosses"].items():
+        row = [boss]
+        for mode in modes:
+            if mode not in counts:
+                row.append("n/a")
+            else:
+                row.append(_count_text(counts[mode]) + (" *" if (boss, mode) in suspects else ""))
+        rows.append(row)
+    return (f"<h4>{_e(inst['name'])}</h4>" if heading else "") + _table(["Boss"] + [_mode_label(m) for m in modes], rows, numeric_from=1)
+
+
+def _stat_table(rows: list[dict[str, Any]]) -> str:
+    return _table(["Statistic", "Value"], [[r["name"], r["value"]] for r in rows])
+
+
 def _progress_section(progress: dict[str, Any]) -> str:
-    out = ["<h2 id=\"progress\">Dungeon and raid progression</h2>",
-           '<p class="note">Source: armory statistics. These are lifetime kill counters for this character, not current lockouts. '
-           "A dash means the armory shows no entry (never killed or not tracked). "
-           "Counters are shown exactly as the armory reports them. Some bosses show the same number in several difficulty columns "
-           "(for example 13 in all four modes); the armory does not always separate difficulties cleanly, so read those columns with care. "
-           "Instances that are spread over several statistic categories (Vault of Archavon) are merged into one table.</p>"]
-    # at-a-glance table
-    glance = []
-    for group in progress["groups"]:
-        for inst in group["instances"]:
-            modes = _sorted_modes(inst["modes"])
-            cells = []
-            for mode in modes:
-                killed = sum(1 for b in inst["bosses"].values() if b.get(mode, 0) > 0)
-                total = sum(1 for b in inst["bosses"].values() if mode in b)
-                cells.append(f"{_mode_label(mode)}: {killed}/{total}")
-            glance.append([group["heading"], inst["name"], "; ".join(cells)])
-    out.append("<h3>Bosses killed per instance and mode</h3>")
-    out.append(_table(["Expansion", "Instance", "Bosses with at least one kill"], glance))
+    suspect_total = sum(len(suspect_cells(i)) for key in ("wotlk_raids", "wotlk_dungeons", "older") for i in progress[key])
+    raid_suspects = sum(len(suspect_cells(i)) for i in progress["wotlk_raids"])
+    out = ["<h2 id=\"progress\">WotLK raid progression: boss kills</h2>",
+           '<div class="warn"><b>Warning: some armory kill counts are known to be wrong.</b> '
+           "These are lifetime kill counters for this character, not current lockouts, shown exactly as the armory reports them. "
+           "The armory often fails to separate difficulties, so a heroic count that equals the normal count of the same raid size "
+           "is most likely wrong: treat it as unreliable. Such cells are marked with * "
+           f"({raid_suspects} in the raid tables below, {suspect_total} in the whole report). "
+           "A dash means the armory shows no entry. Instances spread over several statistic categories "
+           "(Vault of Archavon) are merged into one table.</div>"]
+    for inst in progress["wotlk_raids"]:
+        out.append(f"<details open><summary><b>{_e(inst['name'])}</b></summary>{_instance_table(inst, heading=False)}</details>")
+    if not progress["wotlk_raids"]:
+        out.append("<p>No WotLK raid statistics were collected.</p>")
+    return "".join(out)
+
+
+def _other_content_section(progress: dict[str, Any]) -> str:
+    """Collapsed sections: WotLK dungeons, older content, counters, deaths. Placed last in the report."""
+    out = ["<h2 id=\"other\">Other dungeon and raid statistics</h2>",
+           "<p class=\"muted\">Collapsed by default. The same armory warning applies (* marks suspect heroic counts).</p>"]
+    if progress["wotlk_dungeons"]:
+        out.append("<details><summary><b>WotLK dungeons</b></summary>" + "".join(_instance_table(i) for i in progress["wotlk_dungeons"]) + "</details>")
+    if progress["older"]:
+        out.append("<details><summary><b>Burning Crusade and Classic</b></summary>" + "".join(_instance_table(i) for i in progress["older"]) + "</details>")
+    other_rows = [r for g in progress["groups"] for r in g["other"]]
+    if other_rows:
+        out.append("<details><summary><b>Statistics not matched to an instance</b></summary>" + _stat_table(other_rows) + "</details>")
     if progress["overview"]:
-        out.append("<h3>Entered and completed</h3>")
-        out.append(_table(["Statistic", "Value"], [[r["name"], r["value"]] for r in progress["overview"]]))
-    for group in progress["groups"]:
-        out.append(f"<h3>{_e(group['heading'])}</h3>")
-        for inst in group["instances"]:
-            modes = _sorted_modes(inst["modes"])
-            rows = [[boss] + [_count_text(counts.get(m)) if m in counts else "n/a" for m in modes]
-                    for boss, counts in inst["bosses"].items()]
-            out.append(f"<h4>{_e(inst['name'])}</h4>")
-            out.append(_table(["Boss"] + [_mode_label(m) for m in modes], rows, numeric_from=1))
-        if group["other"]:
-            out.append("<details><summary>Rows not matched to an instance</summary>"
-                       + _table(["Statistic", "Value"], [[r["name"], r["value"]] for r in group["other"]]) + "</details>")
+        out.append("<details><summary><b>Entered and completed</b></summary>" + _stat_table(progress["overview"]) + "</details>")
     if progress["deaths"]:
-        out.append("<h3>Deaths in dungeons and raids</h3>")
-        out.append(_table(["Statistic", "Value"], [[r["name"], r["value"]] for r in progress["deaths"]]))
+        out.append("<details><summary><b>Deaths in dungeons and raids</b></summary>" + _stat_table(progress["deaths"]) + "</details>")
+    return "".join(out)
+
+
+def _achievement_block(g: dict[str, Any]) -> str:
+    total = len(g["earned"]) + len(g["missing"])
+    out = [f"<details><summary><b>{_e(g['name'])}</b>: {len(g['earned'])} of {total} earned</summary>"]
+    if g["earned"]:
+        out.append("<h4>Earned</h4>" + _table(["Achievement", "Points", "Date"],
+                   [[a["title"], a.get("points"), a.get("earned_date")] for a in g["earned"]]))
+    if g["missing"]:
+        out.append("<h4>Not earned</h4>" + _table(["Achievement", "Points", "Requirement"],
+                   [[a["title"], a.get("points"), a.get("description")] for a in g["missing"]]))
+    out.append("</details>")
     return "".join(out)
 
 
 def _achievement_section(groups: list[dict[str, Any]]) -> str:
-    out = ["<h2 id=\"achievements\">Dungeon and raid achievements</h2>"]
+    out = ["<h2 id=\"achievements\">WotLK raid achievements</h2>"]
     if not groups:
         return out[0] + "<p>No achievement data collected.</p>"
-    out.append(_table(["Category", "Earned", "Total"], [[g["name"], len(g["earned"]), len(g["earned"]) + len(g["missing"])] for g in groups],
+    raid_names = set(ACHIEVEMENT_ORDER[5:])
+    raid = [g for g in groups if g["name"] in raid_names]
+    rest = [g for g in groups if g["name"] not in raid_names]
+    out.append(_table(["Category", "Earned", "Total"], [[g["name"], len(g["earned"]), len(g["earned"]) + len(g["missing"])] for g in raid + rest],
                       numeric_from=1))
-    for g in groups:
-        total = len(g["earned"]) + len(g["missing"])
-        out.append(f"<details><summary><b>{_e(g['name'])}</b>: {len(g['earned'])} of {total} earned</summary>")
-        if g["earned"]:
-            out.append("<h4>Earned</h4>" + _table(["Achievement", "Points", "Date"],
-                       [[a["title"], a.get("points"), a.get("earned_date")] for a in g["earned"]]))
-        if g["missing"]:
-            out.append("<h4>Not earned</h4>" + _table(["Achievement", "Points", "Requirement"],
-                       [[a["title"], a.get("points"), a.get("description")] for a in g["missing"]]))
-        out.append("</details>")
+    out.extend(_achievement_block(g) for g in raid)
+    if rest:
+        out.append("<details><summary><b>Dungeon, heroic dungeon, Classic and Burning Crusade achievements</b></summary>"
+                   + "".join(_achievement_block(g) for g in rest) + "</details>")
     return "".join(out)
 
 
@@ -319,8 +366,9 @@ def render_html(pve: dict[str, Any]) -> str:
     when = datetime.fromtimestamp(taken, timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if isinstance(taken, (int, float)) else "unknown"
     title = f"{ident.get('name')} - {ident.get('realm')} - PvE report"
     toc = "".join(f'<li><a href="#{a}">{_e(t)}</a></li>' for a, t in (
-        ("gear", "Equipment"), ("specs", "Talents and glyphs"), ("progress", "Dungeon and raid progression"),
-        ("achievements", "Dungeon and raid achievements"), ("currency", "Badges and emblems"), ("rep", "Reputation"), ("mounts", "Mounts")))
+        ("gear", "Equipment"), ("specs", "Talents and glyphs"), ("progress", "WotLK raid progression: boss kills"),
+        ("achievements", "WotLK raid achievements"), ("currency", "Badges and emblems"), ("rep", "Reputation"), ("mounts", "Mounts"),
+        ("other", "Other dungeon and raid statistics (collapsed)")))
     missing = report.get("missing_sections") or []
     parts = [
         f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{_e(title)}</title><style>{CSS}</style></head><body>",
@@ -336,6 +384,7 @@ def render_html(pve: dict[str, Any]) -> str:
         _progress_section(pve["progression"]),
         _achievement_section(pve["achievement_groups"]),
         _other_section(pve),
+        _other_content_section(pve["progression"]),
     ]
     if missing:
         parts.append(f"<h2>Missing sections</h2><p>{_e(', '.join(missing))}</p>")

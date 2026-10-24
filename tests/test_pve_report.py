@@ -90,9 +90,10 @@ class HtmlTests(unittest.TestCase):
         self.assertEqual(len(pve["achievement_groups"]), 1)
         html = render_html(pve)
         for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "1 empty socket(s)", "Penance", "Do the thing",
-                       "Sindragosa", "heroic", "Argent Crusade", "Wind Rider", "2026-"):
+                       "Sindragosa", "heroic", "Warning: some armory kill counts", "Argent Crusade", "Wind Rider", "2026-"):
             self.assertIn(needle, html)
-        self.assertNotIn("<b>", html.replace("<b>" + "Secrets of Ulduar 10", ""))  # raw armory text is never injected
+        self.assertNotIn("Ulduar <10>", html)  # raw armory text is never injected
+        self.assertNotIn("<h1>A<b>", html)
         self.assertNotIn("<script", html)
         self.assertNotIn("http", html)
 
@@ -103,3 +104,29 @@ class HtmlTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SuspectTests(unittest.TestCase):
+    def test_equal_heroic_count_is_marked(self):
+        from warmane_exporter.pve_report import suspect_cells
+        prog = build_progression(_stats() + [{"category_id": 14963, "category": "U", "parent": 14807, "rows": [
+            {"name": "Ignis kills (Ulduar 10 player)", "value": "13"}, {"name": "Ignis kills (Heroic Ulduar 10 player)", "value": "13"},
+            {"name": "Ignis kills (Ulduar 25 player)", "value": "5"}, {"name": "Ignis kills (Heroic Ulduar 25 player)", "value": "- -"}]}])
+        ulduar = [i for i in prog["wotlk_raids"] if i["name"] == "Ulduar"][0]
+        self.assertEqual(suspect_cells(ulduar), {("Ignis", (10, True))})
+        self.assertIn("Ulduar", {i["name"] for i in prog["wotlk_raids"]})
+        self.assertIn("The Nexus", {i["name"] for i in prog["wotlk_dungeons"]})
+
+    def test_sections_and_removed_table(self):
+        html = render_html(build_pve_report(HtmlTests("test_content_and_escaping").report if False else _full_report()))
+        self.assertNotIn("Bosses killed per instance and mode", html)
+        self.assertIn("<details open>", html)
+        self.assertLess(html.index("WotLK raid progression"), html.index("Other dungeon and raid statistics</h2>"))
+        self.assertLess(html.index("Mounts</h2>"), html.index("Entered and completed"))
+        self.assertIn('class="warn"', html)
+
+
+def _full_report():
+    t = HtmlTests("test_content_and_escaping")
+    t.setUp()
+    return t.report
