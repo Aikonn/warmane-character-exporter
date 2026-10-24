@@ -18,7 +18,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from . import collect, discover, export, snapshot
+from . import collect, discover, export, progress, snapshot
 from .identity import parse_character_link
 
 ALL_CHARACTERS = (("Aikka", "Onyxia"), ("Aikka", "Icecrown"), ("Bezduse", "Onyxia"), ("Bezduse", "Icecrown"))
@@ -38,14 +38,32 @@ def steps(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool) -
     return plan
 
 
+STEP_TEXT = {
+    "snapshot": "Reading character summary and talents",
+    "reputation": "Reading reputation",
+    "mounts-and-companions": "Reading mounts and companions",
+    "export": "Building the report",
+}
+
+
+def step_units(label: str) -> int:
+    """Progress units of a step; the achievement and statistics steps count one per category and report it themselves."""
+    return {"snapshot": 3, "achievements": len(collect.ACHIEVEMENT_CATEGORIES), "statistics": len(collect.STATISTIC_CATEGORIES)}.get(label, 1)
+
+
 def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool) -> bool:
     print(f"== {name}@{realm}")
-    for label, entry, argv in steps(name, realm, cache_dir, refresh, offline):
+    plan = steps(name, realm, cache_dir, refresh, offline)
+    progress.start(sum(step_units(label) for label, _, _ in plan), f"Starting {name} ({realm})")
+    for label, entry, argv in plan:
         print(f"-- {label}")
+        progress.note(STEP_TEXT.get(label, label))
         code = entry(argv)  # type: ignore[operator]
         if code != 0:
             print(f"Stopped at step '{label}' (exit code {code}). Run the same command again to continue.")
             return False
+        if label not in ("achievements", "statistics"):
+            progress.advance(f"{STEP_TEXT.get(label, label)}: done", step_units(label))
     return True
 
 
