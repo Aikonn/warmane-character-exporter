@@ -42,3 +42,14 @@ class ProgressTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PveSubsetTests(unittest.TestCase):
+    def test_default_categories_are_a_subset_and_full_is_everything(self):
+        from warmane_exporter import collect
+        for section, everything in (("achievements", collect.ACHIEVEMENT_CATEGORIES), ("statistics", collect.STATISTIC_CATEGORIES)):
+            subset = collect.categories_for(section, False)
+            self.assertEqual(collect.categories_for(section, True), everything)
+            self.assertTrue(0 < len(subset) < len(everything))
+        self.assertEqual(len(collect.categories_for("achievements", False)), 13)
+        self.assertEqual(len(collect.categories_for("statistics", False)), 9)
