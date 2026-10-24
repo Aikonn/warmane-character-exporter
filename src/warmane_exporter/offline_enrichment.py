@@ -128,7 +128,7 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
         item_id = _as_int(ns.get("item") or reference.get("href_item_id"))
         info = defs.item(item_id) if item_id is not None else None
         if info is None:
-            warnings.append(f"{slot.get('slot_key')}: item {item_id} not in client Item.dbc")
+            warnings.append(f"{slot.get('slot_key')}: item {item_id} not in any definition source")
         else:
             client["item"] = {
                 "item_id": info.item_id,
@@ -145,12 +145,33 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
                         f"{slot.get('slot_key')}: item {item_id} is {info.inventory_type_name}, "
                         f"inferred slot is {inferred}"
                     )
+        acore_fn = getattr(defs, "acore_item", None)
+        acore = acore_fn(item_id) if (acore_fn and item_id is not None) else None
+        if acore is not None:
+            positions = ns.get("gem_positions", [])
+            filled = sum(1 for p in positions if _as_int(p.get("raw_value")))
+            client["acore"] = {
+                "name": acore.name,
+                "quality": acore.quality_name,
+                "item_level": acore.item_level,
+                "stats": [list(s) for s in acore.stats],
+                "sockets": list(acore.sockets),
+                "socket_bonus_enchant_id": acore.socket_bonus_enchant_id,
+                "gems_filled": filled,
+                "sockets_empty": max(len(acore.sockets) - filled, 0),
+                "scaling_stats": acore.scaling,
+            }
+            if filled > len(acore.sockets):
+                warnings.append(
+                    f"{slot.get('slot_key')}: {filled} gems but AzerothCore lists {len(acore.sockets)} sockets "
+                    "(extra socket, for example a belt buckle or blacksmith socket)"
+                )
         ench = _as_int(ns.get("ench"))
         if ench:
             text = defs.enchant_text(ench)
             client["enchant"] = {"id": ench, "text": text}
             if text is None:
-                warnings.append(f"{slot.get('slot_key')}: enchant {ench} not in client data")
+                warnings.append(f"{slot.get('slot_key')}: enchant {ench} text unresolved (no text source has it)")
         gems = []
         for position in ns.get("gem_positions", []):
             code = _as_int(position.get("raw_value"))
@@ -160,7 +181,7 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
             text = defs.enchant_text(code)
             gems.append({"position": position.get("position"), "id": code, "text": text})
             if text is None:
-                warnings.append(f"{slot.get('slot_key')}: gem code {code} not in client data")
+                warnings.append(f"{slot.get('slot_key')}: gem code {code} text unresolved (no text source has it)")
         if gems:
             client["gems"] = gems
     enriched["client_warnings"] = warnings

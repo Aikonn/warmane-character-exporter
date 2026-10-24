@@ -52,6 +52,8 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
             "enchant": (client.get("enchant") or {}).get("text"),
             "gems": gems,
             "gem_slots_seen": total_gems,
+            "sockets": (client.get("acore") or {}).get("sockets"),
+            "sockets_empty": (client.get("acore") or {}).get("sockets_empty"),
         })
 
     specs = []
@@ -102,7 +104,10 @@ def render_markdown(report: dict[str, Any]) -> str:
         item = f"{e['name'] or '?'} ({e['item_id']}, {e.get('quality') or 'quality unknown'})"
         if e.get("transmog"):
             item += f", transmog: {e['transmog']}"
-        lines.append(f"| {e['slot']} | {item} | {e['enchant'] or ''} | {'; '.join(e['gems'])} |")
+        gems = "; ".join(e["gems"])
+        if e.get("sockets_empty"):
+            gems += (" " if gems else "") + f"[{e['sockets_empty']} empty socket(s)]"
+        lines.append(f"| {e['slot']} | {item} | {e['enchant'] or ''} | {gems} |")
     lines += ["", "## Specializations", "", f"Active specialization: {report['active_specialization']}", ""]
     for s in report["specializations"]:
         split = "/".join(str(x) for x in s["split"])

@@ -176,7 +176,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     defs_ctx = None
-    defs = None
+    client_defs = None
     if not args.no_client:
         try:
             from .client_definitions import ClientDefinitions
@@ -185,10 +185,17 @@ def main(argv: list[str] | None = None) -> int:
 
             data_dir = resolve_wow_client_dir(load_config(find_config_path(None))) / "Data"
             defs_ctx = ClientData(data_dir)
-            defs = ClientDefinitions(defs_ctx.__enter__())
-        except Exception as exc:  # enrichment is optional; report and continue
-            print(f"Note: client enrichment unavailable ({exc}).", file=sys.stderr)
-            defs = None
+            client_defs = ClientDefinitions(defs_ctx.__enter__())
+        except Exception as exc:  # the client is optional; continue with other sources
+            print(f"Note: game client unavailable ({exc}).", file=sys.stderr)
+            client_defs = None
+    from .definitions import load_definitions
+
+    defs = load_definitions(client_defs, Path("library"))
+    if defs is None:
+        print("Note: no definition source (no client, no library/acore/items.db; run acore_cli fetch).", file=sys.stderr)
+    else:
+        print("Definition sources: " + ", ".join(defs.source_names), file=sys.stderr)
 
     try:
         snapshot = build_snapshot(
