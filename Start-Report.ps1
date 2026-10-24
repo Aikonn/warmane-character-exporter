@@ -131,7 +131,7 @@ $wait.Text = "Warmane Character Exporter"
 $wait.StartPosition = "CenterScreen"
 $wait.FormBorderStyle = "FixedDialog"
 $wait.MaximizeBox = $false
-$wait.ClientSize = New-Object System.Drawing.Size(520, 150)
+$wait.ClientSize = New-Object System.Drawing.Size(520, 175)
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "Creating the report for $charName ($charRealm)"
 $title.Location = New-Object System.Drawing.Point(12, 12)
@@ -149,7 +149,7 @@ $elapsedLabel = New-Object System.Windows.Forms.Label
 $elapsedLabel.Text = "Elapsed 0:00"
 $elapsedLabel.ForeColor = [System.Drawing.Color]::Gray
 $elapsedLabel.Location = New-Object System.Drawing.Point(12, 100)
-$elapsedLabel.Size = New-Object System.Drawing.Size(496, 40)
+$elapsedLabel.Size = New-Object System.Drawing.Size(496, 65)
 $wait.Controls.AddRange(@($title, $percentLabel, $status, $elapsedLabel))
 $wait.Add_FormClosing({
     param($sender, $e)
@@ -184,9 +184,10 @@ while (-not $process.HasExited) {
         } catch { }
     }
     $seconds = [int]$clock.Elapsed.TotalSeconds
-    $dots = "." * (1 + ($tick / 3) % 4)
+    $pos = [math]::Abs(([int][math]::Floor($tick / 3) % 10) - 5)   # 0..5..1, moves left and right
+    $track = (0..5 | ForEach-Object { if ($_ -eq $pos) { "o" } else { "." } }) -join " "
     $status.Text = $lastText
-    $elapsedLabel.Text = ("Working{0}  elapsed {1}:{2:00}. Requests to Warmane are spaced 1 second apart, so this takes a while. The window can be minimized or placed behind other windows." -f $dots, [math]::Floor($seconds / 60), ($seconds % 60))
+    $elapsedLabel.Text = ("Working  {0}`r`nElapsed {1}:{2:00}. Requests to Warmane are spaced 1 second apart, so this takes a while. The window can be minimized or placed behind other windows." -f $track, [math]::Floor($seconds / 60), ($seconds % 60))
 }
 $process.WaitForExit()
 $code = $process.ExitCode
