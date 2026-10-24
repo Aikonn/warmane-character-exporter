@@ -256,4 +256,4 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Verified on the user's client: enchant 3820, gem codes 3627 and 3879 (enchantment IDs), spells 14769 and 55679, item 51178 (head). Gem codes resolve offline, so live definition requests are no longer needed for enchants, gems, spells and glyph spells.
 - Local machine config created for HALL10K (git-ignored). Full suite: 126 tests passed (user-run).
 - Open: item names and socket bonuses are not in DBCs; rank mapping for talents (rank N spell IDs) may be resolvable from Spell.dbc/Talent.dbc offline and should be the next check; wire definitions into the probe output.
-
+- Talent rank mapping verified offline (talent 343 via 14748/14768/14769). Live Cavernoftime rank discovery is superseded. Next: glyph lookup (glyph spell to GlyphProperties) and wiring definitions into the talents parser output.

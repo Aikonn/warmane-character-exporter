@@ -557,3 +557,10 @@ Status: verified offline against the local 3.3.5a client (user-run output).
 - Weapon/armor enchant 3820 resolves to "+30 Spell Power and 20 Critical strike rating."
 - Raw spell descriptions keep template tokens (for example $s1) and may lack spaces where the web page inserts markup (for example "yourPower Word: Shield"). Treat description text as raw; do not claim rendered tooltip text.
 - Consequence: enchant and gem text no longer needs any live definition site. Remaining unresolved: item names, socket bonuses and the gem item-to-enchant mapping, in case a source reports gem item IDs.
+
+### Finding: talent-rank-spells-offline-2026-10-24
+
+Status: verified offline against the local 3.3.5a client (user-run output).
+
+- Talent.dbc (23 fields): tab = field 1, row = 2, column = 3, rank spell IDs = fields 4..12 (zero = unused).
+- Spells 14748, 14768 and 14769 all resolve to talent 343 (tab 201, row 2, column 2) with ranks [14748, 14768, 14769]. This matches the earlier Cavernoftime rank discovery for Improved Power Word: Shield, so live rank discovery is no longer needed.

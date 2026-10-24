@@ -15,8 +15,10 @@ Implementation rules for Copilot live in .github/copilot-instructions.md.
   Make file edits, write and run code and tests, and make local commits
   when they serve the goal.
 - The user only copies and pastes and skims quickly. Keep replies short.
-- When a user decision is needed, put it at the very end under a label
-  "Decision needed:", at most 400 characters.
+- When the user must run a command or do something, put it at the very
+  end under "Action needed:" with commands in code blocks. A real choice
+  goes under "Decision needed:". Each at most 400 characters.
+- Always put commands and text meant for copying in code blocks.
 - Still requires explicit user approval: git push, any GitHub change,
   and any live network request to a data source (Warmane, EvoWoW,
   Cavernoftime). Read-only access to local files is allowed.
