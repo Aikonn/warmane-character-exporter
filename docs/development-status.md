@@ -412,3 +412,10 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 
 - acore_cli fetch on the PC: 38610 items. acore_cli verify over 76 local JSON files: 330 item observations, 61 unique items, 0 missing, 0 differences (names from the armory JSON summaries and quality from the page markup). 192 tests pass on Windows; Definitions.close() added so the SQLite file is released (Windows file lock in tests).
 
+
+
+## Update: client-independent definitions export (2026-10-24)
+
+- `python -m warmane_exporter.definition_export` writes library/definitions/client-export.json from the client: 2656 enchant/gem texts, 892 talents, 362 glyphs, 2667 spells (rendered descriptions; 135 keep unresolved template parts, 0 render errors). Run on the HD client on the PC; 197 tests pass.
+- file_definitions.py reads that file; Definitions uses text sources in order client, export file, and item facts from client then AzerothCore. With the export file and library/acore/items.db present, the exporter no longer needs the game client.
+- Not verified: whether the HD client texts equal what Warmane serves (no online source reviewed). Backlog: PvE report profile, direct URL command, export comparison over time.
