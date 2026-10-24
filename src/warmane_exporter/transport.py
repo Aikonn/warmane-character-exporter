@@ -56,6 +56,7 @@ class RequestOrchestrator:
     now_fn: Callable[[], float] = time
     sleep_fn: Callable[[float], None] = sleep
     random_fn: Callable[[], float] = random
+    skip_completed: bool = True
     _last_request_time_by_host: dict[str, float] = field(default_factory=dict)
 
     def execute_single_request(
@@ -73,7 +74,7 @@ class RequestOrchestrator:
             request_key = f"GET {url}"
         else:
             request_key = f"POST {url} " + "&".join(f"{k}={v}" for k, v in sorted(form.items()))
-        if self.checkpoint.is_completed(request_key):
+        if self.skip_completed and self.checkpoint.is_completed(request_key):
             return RequestResult(
                 status="skipped_completed",
                 detail="Request was already completed in checkpoint.",

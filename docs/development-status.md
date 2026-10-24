@@ -284,3 +284,10 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - http_client.py: DEFAULT_HEADERS and post_form (XMLHttpRequest-style form POST). transport.py: optional form and referer; the checkpoint key for POST includes the form fields, so resume and duplicate suppression work per category.
 - warmane_api.py: URL builder and validating parser for the JSON summary, covered by the real fixtures.
 - Next: response cache (SQLite index plus raw files, freshness 15 minutes for character data), then an end-to-end "fetch JSON summary" CLI command using cache and throttling, then the HTML summary and talents fetch.
+
+## Update: cache and fetch command (2026-10-24)
+
+- cache.py: SQLite response cache (key, source, body, fetched_at, sha256, 2 MB body limit). Only validated bodies are stored.
+- fetch.py: python -m warmane_exporter.fetch NAME REALM [--refresh] [--offline] [--allow-stale] [--cache-dir DIR]. Fresh cache (15 minutes) is used without a request; error pages and invalid JSON never replace valid cache; stale data is used only with --allow-stale or --offline and is labeled stale-cache. At most one live request per run. Cache and transport state live in git-ignored .warmane-cache/.
+- RequestOrchestrator.skip_completed=False for the fetch command, since the cache (not the probe checkpoint) decides whether a request is needed; cooldowns still persist.
+- Next: HTML summary fetch (enchants, gems, slots) and talents fetch using the same cache, then combine JSON + HTML + client definitions into the first character snapshot.
