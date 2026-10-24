@@ -251,3 +251,9 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
   Then compare the strings against manually verified text, and map field indexes (3.3.5a DBC layouts) in a follow-up.
 - Pending: add the terms-review findings and the DBC plan to data-sources.md.
 - Rules: see Autonomy in reviewer-instructions.md (push and live data-site requests still need user approval).
+
+## Update: offline definitions verified (2026-10-24)
+- Verified on the user's client: enchant 3820, gem codes 3627 and 3879 (enchantment IDs), spells 14769 and 55679, item 51178 (head). Gem codes resolve offline, so live definition requests are no longer needed for enchants, gems, spells and glyph spells.
+- Local machine config created for HALL10K (git-ignored). Full suite: 126 tests passed (user-run).
+- Open: item names and socket bonuses are not in DBCs; rank mapping for talents (rank N spell IDs) may be resolvable from Spell.dbc/Talent.dbc offline and should be the next check; wire definitions into the probe output.
+

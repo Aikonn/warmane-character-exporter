@@ -548,3 +548,12 @@ Status: verified against the local 3.3.5a (build 12340) client by the user runni
 - Not available offline: item names, and the item-to-gem-property mapping (3.3.5a keeps these in the item cache, not in DBC files). Gem item definitions still need another source or manual evidence.
 - Earlier live-site findings: EvoWoW robots.txt does not disallow item/spell/enchantment pages but no terms were found; Cavernoftime has no robots.txt and states "All rights reserved". Both reject non-browser clients. Automated live access is not established as permitted.
 - Client path comes from warmane-character-exporter.config (not committed) or --data-dir.
+
+### Finding: gem-codes-are-enchantment-ids-2026-10-24
+
+Status: verified offline against the local 3.3.5a client (user-run output).
+
+- Gem codes seen in the Cavernoftime parameter test (3627, 3879) are SpellItemEnchantment IDs, not item IDs. Offline lookup: 3627 = "+21 Intellect and Chance to restore mana on spellcast", 3879 = "+10 All Stats". This matches the Cavernoftime joint effect text, and each gem is now resolved individually.
+- Weapon/armor enchant 3820 resolves to "+30 Spell Power and 20 Critical strike rating."
+- Raw spell descriptions keep template tokens (for example $s1) and may lack spaces where the web page inserts markup (for example "yourPower Word: Shield"). Treat description text as raw; do not claim rendered tooltip text.
+- Consequence: enchant and gem text no longer needs any live definition site. Remaining unresolved: item names, socket bonuses and the gem item-to-enchant mapping, in case a source reports gem item IDs.
