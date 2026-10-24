@@ -266,3 +266,9 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - enrich_summary_diagnostic on the real Aikka summary capture: 17/17 items slot-consistent, all enchants and gems resolved, 0 warnings. Full suite: 129 tests passed (user-run).
 - Offline client data now covers talents, glyphs, spells, enchants, gems and item slot types. Remaining Milestone 0 gaps are Warmane-side or need other sources: item names/quality/sockets, achievements and statistics enumeration, field-availability matrix across both realms and four debug characters, ruleset compatibility, request counts. Live Warmane requests need user approval.
 
+
+## Update: Milestone 0 matrix written (2026-10-24)
+
+- Live evidence so far: 7 requests through the user's Chrome (4 JSON summary, achievements page, one achievements POST, statistics page). No blocks.
+- data-sources.md section 16 holds the field matrix, access finding, request-cost estimate and checklist status.
+- Proposed next: second small live batch (under 10 requests) for the remaining HTML pages and ids, then sanitized fixtures and closing Milestone 0.

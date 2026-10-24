@@ -613,3 +613,52 @@ Status: verified offline against the saved category 92 response (no new requests
 
 - The response includes unearned achievements: markup class="achievement locked" (no date div), earned ones class="achievement" with a "Earned MM/DD/YYYY" date. Category 92 held 24 earned and 31 locked entries (55 total) while the page header said 24 / 54, so the entry count can differ by one from the header total; the parser must report both and warn on mismatch rather than assume equality.
 - One POST per category therefore yields both the earned and the full achievement list.
+
+
+## 16. Milestone 0 field-availability matrix and status (2026-10-24)
+
+Status legend: verified = seen in real data; partial = seen for some characters or incompletely; not tested = no evidence yet; blocked = access failed.
+
+### Field matrix
+
+| Field | Best source found | Status | Notes |
+|---|---|---|---|
+| Name, realm, level, faction, race, class, gender, guild | JSON summary API | verified (4 of 4 characters) | Also in HTML summary |
+| Achievement points, honorable kills | JSON summary API | verified (4 of 4) | |
+| Equipped item IDs and names | JSON summary API | verified (4 of 4) | Names only here; no slot index, empty slots omitted |
+| Equipment slot | HTML summary layout, cross-checked with Item.dbc inventory type | verified (Aikka@Onyxia, 17 of 17) | Not tested on other characters |
+| Enchants and gems | HTML summary rel payload; text from SpellItemEnchantment.dbc | verified (Aikka@Onyxia) | Socket count and bonus unknown |
+| Item quality, stats, sockets | none found | absent | Not in DBCs or JSON API |
+| Talent points per tree | JSON summary API | verified (4 of 4) | Both specs, no active-spec marker |
+| Individual talents and ranks | HTML talents page; definitions from Talent.dbc/Spell.dbc | verified (Aikka@Onyxia, both specs) | Not tested on other characters |
+| Glyphs | HTML talents page; GlyphProperties.dbc | verified (Aikka@Onyxia) | |
+| Active spec | none | absent | Not in JSON or rendered DOM |
+| Professions and skill | JSON summary API | verified (4 of 4) | Skill values look inconsistent for one character (Bezduse@Onyxia, skill "1"); treat as unreliable |
+| PvP teams | JSON summary API | verified (4 of 4) | |
+| Achievements (earned and locked) | POST category=<id> on /achievements | partial (1 category, Aikka@Onyxia) | Header total differs by one from entry count |
+| Statistics | /statistics page, category sidebar | partial (summary text only, Aikka@Onyxia) | Per-category loads not tested |
+| Reputation, mounts, companions, match history | pages exist in the armory menu | not tested | |
+| Icecrown HTML pages | not fetched | not tested | Only JSON API tested on Icecrown |
+
+### Access finding
+
+- Plain scripted HTTP to the HTML pages was blocked (Cloudflare 1010 and a 1015 rate limit seen earlier). The user's own Chrome worked for every request (7 live requests total, none blocked).
+- Consequence: the exporter cannot assume a plain HTTP client for HTML pages. Options to evaluate in a later milestone: user-driven browser session, a browser-based fetcher run by the user, or accepting the JSON API only where a script client is allowed (not tested).
+
+### Request-cost estimate per character (not yet measured end to end)
+
+- JSON summary: 1
+- HTML summary: 1; talents: 1 to 2 (spec switch may need a second load)
+- Achievements: 1 page + about 9 category POSTs (subcategories may add more)
+- Statistics: 1 page + about 10 category loads (not tested)
+- Total: roughly 25 to 35 requests per character. Needs a throttled, resumable run with caching; do not run in one burst.
+
+### Checklist status (section 15)
+
+- Done or substantially done: client DBC offline definitions; equipment-to-definition chain; dual-spec and glyph findings; access terms review; request-cost estimate.
+- Partial: field matrix (three characters lack HTML-page evidence); progression traversal (achievements/statistics only sampled); ruleset compatibility (client build 12340 matches the Warmane data seen, no mismatch found, but no explicit realm ruleset comparison done).
+- Open: sanitized fixtures committed to the repo (captures are local and git-ignored); plain-HTTP viability; rate-limit safeguards verified under real conditions; statistics category structure; Professions, Reputation, World Events and Feats achievement ids.
+
+### Proposed next step
+
+Complete the remaining Milestone 0 gaps with a small second live batch (under 10 requests): Aikka@Icecrown and Bezduse HTML summary pages, one statistics category POST, and the remaining achievement category ids. Then build sanitized fixtures from saved captures and close Milestone 0 for review.
