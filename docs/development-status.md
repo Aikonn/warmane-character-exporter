@@ -354,3 +354,11 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Death Knight export complete with about 88 live requests (no errors, no rate limit): 52 achievement categories (203 earned of 1163, points 2180 equal the armory total), 33 statistics categories (497 rows), reputation and mounts pages. The export merges without missing sections.
 - Pipeline is now validated on two characters of two classes. Remaining for Milestone 6: Aikka@Icecrown and Bezduse@Icecrown.
 
+
+
+## Update: all four characters exported (2026-10-24)
+
+- Aikka@Icecrown (1162 achievements, 97 earned, 1005 points) and Bezduse@Icecrown (173 earned, 1785 points) exported completely: about 88 live requests each, no errors, no rate limit, achievement points equal the armory totals for all four characters (3355, 2180, 1005, 1785). Exports in .warmane-cache/exports/.
+- Total live requests for the four full exports: about 350 over roughly 2.5 hours at 10 s spacing. Milestone 6 end-to-end validation is met for the data the armory exposes.
+- Known remaining gaps: item quality and socket structure (not in armory summary), active spec, professions skill values look unreliable, item detail pages (optional, about 20 requests per character), single-command orchestration of all steps.
+
