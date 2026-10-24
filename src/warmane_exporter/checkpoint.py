@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,7 +49,15 @@ class ProbeCheckpointStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
         tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-        tmp.replace(self.path)
+        # Cloud-synced folders (OneDrive/SkyDrive) and scanners can briefly lock files on Windows.
+        for attempt in range(6):
+            try:
+                tmp.replace(self.path)
+                return
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.2 * (attempt + 1))
 
     def get_cooldown_until(self, host: str) -> float | None:
         return self.state.cooldowns.get(host)
