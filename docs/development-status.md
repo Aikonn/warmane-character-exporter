@@ -303,3 +303,13 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Live snapshots of Aikka and Bezduse on Onyxia and Icecrown (3 requests each, 10 s apart, no rate limit, no errors) all pass snapshot_report: raw-HTTP HTML parses with the existing parsers, 16-17 equipped items with slot checks ok, item ids equal the JSON endpoint, 2 talent specs each with 0 warnings and point totals equal to the JSON splits. Death Knight (16 items, sigil in Ranged) and Icecrown pages need no parser changes.
 - Milestone 1 is functionally complete (transport, cache, fetch, snapshot). Next: Markdown and JSON character report from a snapshot (Milestone 2), then achievements/statistics fetch.
 
+
+
+## Update: spell description rendering (2026-10-24)
+
+- spell_text.py renders Spell.dbc description templates offline (\$s, \$m, \$M, \$d, \$a, \$t, \$o, \$x, \$h, \$n, \$u, \$e, other-spell references, \$/N; and \$*N; prefixes, arithmetic in \$\{...\}, \$l plurals). Spell.dbc field offsets used: proc chance 35, charges 36, duration index 40, stack 49, die sides 74-76, base points 80-82, radius index 92-94, amplitude 98-100, multiple value 101-103, chain targets 104-106; SpellDuration.dbc and SpellRadius.dbc (4 fields each) give duration in ms and radius in yards.
+- Verified on real client values: Glyph of Frost Strike 8 Runic Power, Horn of Winter 1 min, Pestilence 5 yards, Vampiric Blood 5 sec, Flash Heal 10 percent, Obliterate 25 percent. All glyphs of the four characters render without markers.
+- Not resolvable offline and flagged unresolved (never guessed): conditionals such as \$?s123[a][b], player-stat variables, \$<name> references (for example Lifebloom).
+- Snapshots now carry description_rendered / selected_rank_description_rendered with an _unresolved flag; the report prefers rendered text. python -m warmane_exporter.spell_diagnostic [IDS] prints template and result.
+- Reviewer Python (.tools) now runs tests and offline commands; 159 tests pass. Next: achievements and statistics parser from the saved category captures, then a small live fetch plan for your approval.
+

@@ -18,6 +18,13 @@ def _section_data(snapshot: dict[str, Any], name: str) -> dict[str, Any]:
     return section.get("data") or {}
 
 
+def _glyph_effect(client: Any) -> str | None:
+    """Prefer the rendered text; fall back to the raw template only when nothing better exists."""
+    if not isinstance(client, dict):
+        return None
+    return client.get("description_rendered") or client.get("description")
+
+
 def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Merge snapshot sections into one plain report structure."""
     summary = _section_data(snapshot, "json_summary")
@@ -55,7 +62,7 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
             "trees": [t.get("name") for t in spec.get("trees", [])],
             "glyphs": [
                 {"category": g.get("category"), "name": g.get("name"),
-                 "effect": (g.get("client") or {}).get("description") if isinstance(g.get("client"), dict) else None}
+                 "effect": _glyph_effect(g.get("client"))}
                 for g in glyph_block.get("entries", [])
             ],
         })

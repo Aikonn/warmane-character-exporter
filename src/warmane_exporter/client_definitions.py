@@ -10,6 +10,7 @@ Item names are NOT in 3.3.5a DBCs (they live in the item cache), so they are not
 
 from __future__ import annotations
 
+import struct
 from dataclasses import dataclass
 
 from .dbc_parser import DbcError, DbcTable
@@ -21,6 +22,19 @@ SPELL_FIELDS = 234
 SPELL_NAME = 136
 SPELL_RANK = 153
 SPELL_DESCRIPTION = 170
+SPELL_PROC_CHANCE = 35
+SPELL_PROC_CHARGES = 36
+SPELL_DURATION_INDEX = 40
+SPELL_STACK_AMOUNT = 49
+SPELL_EFFECT_DIE_SIDES = 74       # 3 fields each, effect 1..3
+SPELL_EFFECT_BASE_POINTS = 80
+SPELL_EFFECT_RADIUS_INDEX = 92
+SPELL_EFFECT_AMPLITUDE = 98
+SPELL_EFFECT_MULTIPLE_VALUE = 101
+SPELL_EFFECT_CHAIN_TARGETS = 104
+DURATION_FIELDS = 4               # SpellDuration.dbc: ID, Duration, PerLevel, Max
+RADIUS_FIELDS = 4                 # SpellRadius.dbc: ID, Radius, PerLevel, Max (floats)
+
 TALENT_FIELDS = 23
 TALENT_TAB = 1
 TALENT_ROW = 2
@@ -118,6 +132,61 @@ class ClientDefinitions:
             table.string_at(row[SPELL_RANK]) or "",
             table.string_at(row[SPELL_DESCRIPTION]) or "",
         )
+
+    def spell_numbers(self, spell_id: int):
+        """Numeric fields needed to render description templates (layout verified by diagnostics)."""
+        from .spell_text import SpellNumbers
+
+        table = self._table("Spell.dbc", SPELL_FIELDS)
+        row = table.find(spell_id)
+        if row is None:
+            return None
+
+        def signed(value: int) -> int:
+            return value - (1 << 32) if value >= (1 << 31) else value
+
+        def triple(first: int):
+            return tuple(signed(row[first + i]) for i in range(3))
+
+        return SpellNumbers(
+            spell_id,
+            base_points=triple(SPELL_EFFECT_BASE_POINTS),
+            die_sides=triple(SPELL_EFFECT_DIE_SIDES),
+            radius_index=triple(SPELL_EFFECT_RADIUS_INDEX),
+            amplitude_ms=triple(SPELL_EFFECT_AMPLITUDE),
+            chain_targets=triple(SPELL_EFFECT_CHAIN_TARGETS),
+            multiple_value=tuple(struct.unpack("<f", struct.pack("<I", row[SPELL_EFFECT_MULTIPLE_VALUE + i]))[0] for i in range(3)),
+            duration_index=row[SPELL_DURATION_INDEX],
+            proc_chance=row[SPELL_PROC_CHANCE],
+            proc_charges=row[SPELL_PROC_CHARGES],
+            stack_amount=row[SPELL_STACK_AMOUNT],
+        )
+
+    def duration_ms(self, index: int):
+        if index == 0:
+            return 0
+        table = self._table("SpellDuration.dbc", DURATION_FIELDS)
+        row = table.find(index)
+        if row is None:
+            return None
+        value = row[1] - (1 << 32) if row[1] >= (1 << 31) else row[1]
+        return value
+
+    def radius_yards(self, index: int):
+        if index == 0:
+            return 0.0
+        table = self._table("SpellRadius.dbc", RADIUS_FIELDS)
+        row = table.find(index)
+        if row is None:
+            return None
+        return struct.unpack("<f", struct.pack("<I", row[1]))[0]
+
+    def render_spell_description(self, spell_id: int):
+        """Rendered description (spell_text.Rendered) or None if the spell is unknown."""
+        from .spell_text import render_description
+
+        info = self.spell(spell_id)
+        return None if info is None else render_description(info.description, spell_id, self)
 
     def item(self, item_id: int) -> ItemInfo | None:
         table = self._table("Item.dbc", ITEM_FIELDS)

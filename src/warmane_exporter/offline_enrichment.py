@@ -19,6 +19,14 @@ def _as_int(value: Any) -> int | None:
         return None
 
 
+def _add_rendered(client: dict[str, Any], key: str, defs: ClientDefinitions, spell_id: int) -> None:
+    """Add <key>_rendered (numbers filled in from the client) and <key>_unresolved."""
+    rendered = defs.render_spell_description(spell_id)
+    if rendered is not None:
+        client[f"{key}_rendered"] = rendered.text
+        client[f"{key}_unresolved"] = rendered.unresolved
+
+
 def _enrich_talent(talent: dict[str, Any], defs: ClientDefinitions, warnings: list[str]) -> None:
     spell_id = _as_int(talent.get("source_spell_id"))
     client: dict[str, Any] = {"resolved": False}
@@ -50,6 +58,7 @@ def _enrich_talent(talent: dict[str, Any], defs: ClientDefinitions, warnings: li
         spell = defs.spell(selected)
         client["selected_rank_spell_id"] = selected
         client["selected_rank_description"] = spell.description if spell else None
+        _add_rendered(client, "selected_rank_description", defs, selected)
 
 
 def _enrich_glyph(glyph: dict[str, Any], defs: ClientDefinitions, warnings: list[str]) -> None:
@@ -65,6 +74,7 @@ def _enrich_glyph(glyph: dict[str, Any], defs: ClientDefinitions, warnings: list
         return
     props = defs.glyph_for_spell(spell_id)
     client.update(resolved=True, spell_name=spell.name, description=spell.description)
+    _add_rendered(client, "description", defs, spell_id)
     if props is not None:
         slot = {0: "major", 1: "minor"}.get(props.slot_flags, f"unknown({props.slot_flags})")
         client.update(glyph_id=props.glyph_id, slot_type=slot)
