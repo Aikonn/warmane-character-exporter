@@ -1,6 +1,6 @@
 """Fetch one character page once and keep the raw HTML for offline analysis.
 
-python -m warmane_exporter.discover NAME REALM VIEW   (VIEW: statistics, mounts, reputation, ...)
+python -m warmane_exporter.discover NAME REALM VIEW   (VIEW: statistics, mounts-and-companions, reputation, ...)
 
 One live request (cached for 24 hours); the raw page goes to .warmane-cache/discovery/.
 """
@@ -17,7 +17,7 @@ from .http_client import UrllibHttpClient
 from .snapshot import character_page_url, fetch_validated
 from .transport import RequestOrchestrator, TransportConfig
 
-KNOWN_VIEWS = ("statistics", "achievements", "mounts", "reputation", "matches", "talents", "summary")
+KNOWN_VIEWS = ("statistics", "achievements", "mounts-and-companions", "reputation", "match-history", "talents", "profile")
 
 
 def _validate(text: str) -> dict:

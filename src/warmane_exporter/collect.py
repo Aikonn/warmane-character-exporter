@@ -17,7 +17,7 @@ from pathlib import Path
 from time import time
 from typing import Any
 
-from .achievements_parser import CategoryError, parse_achievements_response
+from .achievements_parser import CategoryError, parse_achievements_response, parse_statistics_response
 from .cache import ResponseCache
 from .checkpoint import ProbeCheckpointStore
 from .http_client import UrllibHttpClient
@@ -60,6 +60,31 @@ def _validate(text: str) -> dict[str, Any]:
     return {"entries": parse_achievements_response(text)}
 
 
+# Statistics sidebar of /statistics (Aikka@Onyxia, 2026-10-24): (id, name, parent_id).
+STATISTIC_CATEGORIES: tuple[tuple[int, str, int | None], ...] = (
+    (130, "Character", None), (140, "Wealth", 130), (145, "Consumables", 130),
+    (147, "Reputation", 130), (191, "Gear", 130),
+    (141, "Combat", None),
+    (128, "Kills", None), (135, "Creatures", 128), (136, "Honorable Kills", 128), (137, "Killing Blows", 128),
+    (122, "Deaths", None), (123, "Arenas", 122), (124, "Battlegrounds", 122), (125, "Dungeons", 122),
+    (126, "World", 122), (127, "Resurrection", 122),
+    (133, "Quests", None),
+    (14807, "Dungeons & Raids", None), (14821, "Classic", 14807), (14822, "The Burning Crusade", 14807),
+    (14823, "Wrath of the Lich King", 14807), (14963, "Secrets of Ulduar", 14807),
+    (15021, "Call of the Crusade", 14807), (15062, "Fall of the Lich King", 14807),
+    (132, "Skills", None), (178, "Secondary Skills", 132), (173, "Professions", 132),
+    (134, "Travel", None), (131, "Social", None),
+    (21, "Player vs. Player", None), (152, "Rated Arenas", 21), (153, "Battlegrounds", 21), (154, "World", 21),
+)
+
+
+def _validate_statistics(text: str) -> dict[str, Any]:
+    return {"entries": parse_statistics_response(text)}
+
+
+_VALIDATORS = {"achievements": _validate, "statistics": _validate_statistics}
+
+
 def summarize(categories: list[dict[str, Any]]) -> dict[str, Any]:
     """Totals over unique achievement ids (an id seen in two categories counts once)."""
     seen: dict[int, dict[str, Any]] = {}
@@ -85,15 +110,16 @@ def collect_achievements(
     name: str, realm: str, cache: ResponseCache, orchestrator: RequestOrchestrator, client,
     *, limit: int | None = None, dry_run: bool = False, offline: bool = False,
     refresh: bool = False, reject_dir: Path | None = None,
-    categories: tuple[tuple[int, str, int | None], ...] = ACHIEVEMENT_CATEGORIES,
+    categories: tuple[tuple[int, str, int | None], ...] | None = None, section: str = "achievements",
 ) -> dict[str, Any]:
-    url = character_page_url(name, realm, "achievements")
+    url = character_page_url(name, realm, section)
+    categories = categories or (STATISTIC_CATEGORIES if section == "statistics" else ACHIEVEMENT_CATEGORIES)
     live = 0
     results: list[dict[str, Any]] = []
     for cat_id, cat_name, parent in categories:
         record: dict[str, Any] = {"id": cat_id, "name": cat_name, "parent": parent}
         form = {"category": str(cat_id)}
-        source = "achievements"
+        source = section
         key_probe = cache.get(f"{source}|{url}|category={cat_id}")
         cached_fresh = key_probe is not None and not refresh and key_probe.age_seconds(time()) <= COLLECTION_MAX_AGE_SECONDS
         needs_live = not cached_fresh and not offline
@@ -105,7 +131,7 @@ def collect_achievements(
                           detail="Live request limit reached; run again to continue.")
         else:
             result = fetch_validated(
-                url, source, _validate, cache, orchestrator, client,
+                url, source, _VALIDATORS[section], cache, orchestrator, client,
                 refresh=refresh, offline=offline, allow_stale=offline,
                 max_age_seconds=COLLECTION_MAX_AGE_SECONDS, reject_dir=reject_dir,
                 form=form, referer=url,
@@ -119,12 +145,12 @@ def collect_achievements(
     complete = all(r["status"] == "ok" for r in results)
     return {
         "schema": COLLECTION_SCHEMA,
-        "section": "achievements",
+        "section": section,
         "generated_at": time(),
         "character": {"name": name, "realm": SUPPORTED_REALMS[realm.strip().lower()]},
         "live_requests": live,
         "complete": complete,
-        "summary": summarize(results),
+        "summary": summarize(results) if section == "achievements" else summarize_rows(results),
         "categories": results,
     }
 
@@ -141,10 +167,20 @@ def _latest_snapshot_points(cache_dir: Path, name: str, realm: str) -> int | Non
         return None
 
 
+def summarize_rows(categories: list[dict[str, Any]]) -> dict[str, Any]:
+    rows = sum(len(c.get("entries") or []) for c in categories)
+    return {
+        "rows": rows,
+        "categories_ok": sum(1 for c in categories if c["status"] == "ok"),
+        "categories_total": len(categories),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("name")
     parser.add_argument("realm")
+    parser.add_argument("--section", choices=("achievements", "statistics"), default="achievements")
     parser.add_argument("--cache-dir", default=".warmane-cache")
     parser.add_argument("--limit", type=int, default=None, help="maximum live requests this run")
     parser.add_argument("--interval", type=float, default=10.0)
@@ -164,7 +200,7 @@ def main(argv: list[str] | None = None) -> int:
         collection = collect_achievements(
             args.name, args.realm, cache, orchestrator, UrllibHttpClient(),
             limit=args.limit, dry_run=args.dry_run, offline=args.offline, refresh=args.refresh,
-            reject_dir=cache_dir / "rejected",
+            reject_dir=cache_dir / "rejected", section=args.section,
         )
     except (ValueError, CategoryError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -176,15 +212,18 @@ def main(argv: list[str] | None = None) -> int:
         count = "" if c["entries"] is None else f" {len(c['entries'])} entries"
         print(f"{c['id']:>6} {c['name']}: {c['status']} ({c['origin']}){count}")
     summary = collection["summary"]
-    expected = _latest_snapshot_points(cache_dir, args.name, args.realm)
     print(f"live requests: {collection['live_requests']}; categories ok: {summary['categories_ok']}/{summary['categories_total']}")
     if not args.dry_run:
-        print(f"earned: {summary['earned']} of {summary['unique_achievements']}; earned points: {summary['earned_points']}"
-              + ("" if expected is None else f"; armory total: {expected}"))
-        print(f"duplicate ids across categories: {summary['duplicate_ids']}")
+        if args.section == "achievements":
+            expected = _latest_snapshot_points(cache_dir, args.name, args.realm)
+            print(f"earned: {summary['earned']} of {summary['unique_achievements']}; earned points: {summary['earned_points']}"
+                  + ("" if expected is None else f"; armory total: {expected}"))
+            print(f"duplicate ids across categories: {summary['duplicate_ids']}")
+        else:
+            print(f"statistic rows: {summary['rows']}")
         out_dir = cache_dir / "collections"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out = out_dir / f"{args.name.lower()}-{collection['character']['realm'].lower()}-achievements-{int(collection['generated_at'])}.json"
+        out = out_dir / f"{args.name.lower()}-{collection['character']['realm'].lower()}-{args.section}-{int(collection['generated_at'])}.json"
         out.write_text(json.dumps(collection, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"complete: {collection['complete']}\nsaved: {out}")
     return 0 if args.dry_run or collection["complete"] else 1

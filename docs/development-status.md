@@ -330,3 +330,11 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - This validates the category table and the parser end to end. The earlier header-count difference in category 92 (54 vs 55 entries) is harmless because points reconcile.
 - Next: statistics. discover.py (python -m warmane_exporter.discover NAME REALM statistics) fetches one page and stores the raw HTML so the sidebar category ids can be parsed offline.
 
+
+
+## Update: statistics, reputation and mounts discovery (2026-10-24)
+
+- Statistics page (3 live requests total with the two below, no errors): the sidebar lists 10 top-level categories and 23 subcategories (data-category / data-subcategory); the table in collect.py matches it exactly (33 ids). collect.py now takes --section statistics (same POST protocol; whether top-level responses omit subcategory rows is verified on the first live run).
+- Reputation page is static HTML, no POST: a flat list of 38 factions for Aikka@Onyxia, each with standing class, name, current / maximum, standing text. reputation_parser.py parses all 38 and cross-checks the standing class against its text; tested on a real 6-faction fixture.
+- The mounts URL is /character/NAME/REALM/mounts-and-companions (plain /mounts returned the profile page). Other character views: profile, match-history, achievements, talents, statistics, reputation. discover.py view names updated.
+
