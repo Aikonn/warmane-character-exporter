@@ -434,3 +434,10 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 - Open by default: equipment, talents (per-spec sections collapsed), WotLK raid boss-kill tables (one collapsible table per raid, open), WotLK raid achievements (categories collapsed). Collapsed by default and placed last: WotLK dungeons, Burning Crusade and Classic, unmatched statistics, entered/completed, deaths, and the dungeon/Classic/TBC achievements.
 - Removed the "bosses killed per instance and mode" overview table.
 - Red warning box: some armory kill counts are known to be wrong. A heroic count equal to the normal count of the same raid size is marked with * (computed automatically; the warning states how many cells were marked).
+
+
+## Update: PvE report, gems, GearScore, layout (2026-10-24)
+
+- Gems: one gem per line as "+23 Spell Power (epic red)" (quality from AzerothCore gem items, colour from GemProperties.dbc, now part of the definitions export: re-run definition_export once). Empty sockets show "<no gem>". On the belt, the gem beyond the belt's own sockets is shown in the Enchant column as "Belt buckle: ...".
+- GearScore (gearscore.py): formula of the GearScoreLite family (TacoTip version, https://github.com/anzz1/TacoTip/blob/master/gearscore.lua): per item floor(((ilvl - A) / B) x slot weight x 1.8618), sum over all items except shirt and tabard, hunter and Titan's Grip adjustments, no penalty for missing enchants. Shown with the average item level and per item. Real check: Aikka@Onyxia item level 249, GearScore 5546 (item levels from AzerothCore).
+- "Other dungeon and raid statistics" is one collapsed block placed before the achievements; the achievement table shows "earned / total" and a rounded percentage.

@@ -25,6 +25,33 @@ def _glyph_effect(client: Any) -> str | None:
     return client.get("description_rendered") or client.get("description")
 
 
+def gem_line(gem: dict[str, Any]) -> str:
+    """'+23 Spell Power (epic red)': gem effect text with quality and colour when known."""
+    text = gem.get("text") or f"gem effect {gem.get('id')} (text unresolved)"
+    tags = " ".join(t for t in (gem.get("quality"), gem.get("color")) if t)
+    return f"{text} ({tags})" if tags else text
+
+
+def gem_columns(slot_name: str | None, gems: list[dict[str, Any]], sockets: list[str] | None) -> tuple[list[str], str | None]:
+    """Lines for the gem column and the belt buckle gem. Empty sockets show as <no gem>.
+
+    Positions beyond the item's own sockets hold an extra socket gem; on the belt that is the belt buckle.
+    Without socket data (no item database) only the filled gems are listed.
+    """
+    lines: list[str] = []
+    buckle = None
+    for index, gem in enumerate(gems):
+        filled = bool(gem.get("text")) or (gem.get("id") and not gem.get("empty"))
+        if sockets is not None and index < len(sockets):
+            lines.append(gem_line(gem) if filled else "<no gem>")
+        elif filled:
+            if slot_name == "Waist" and buckle is None and sockets is not None:
+                buckle = gem_line(gem)
+            else:
+                lines.append(gem_line(gem))
+    return lines, buckle
+
+
 def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Merge snapshot sections into one plain report structure."""
     summary = _section_data(snapshot, "json_summary")
@@ -43,8 +70,14 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
         client = slot.get("client") or {}
         gems = [g.get("text") for g in client.get("gems", []) if isinstance(g, dict) and g.get("text")]
         total_gems = len([g for g in client.get("gems", []) if isinstance(g, dict)])
+        slot_name = (slot.get("layout_inference") or {}).get("inferred_slot_name") or slot.get("slot_name") or slot.get("slot_key")
+        sockets = (client.get("acore") or {}).get("sockets")
+        gem_lines, buckle = gem_columns(slot_name, [g for g in client.get("gems", []) if isinstance(g, dict)], sockets)
         equipment.append({
-            "slot": (slot.get("layout_inference") or {}).get("inferred_slot_name") or slot.get("slot_name") or slot.get("slot_key"),
+            "slot": slot_name,
+            "inventory_type": (client.get("item") or {}).get("inventory_type"),
+            "gem_lines": gem_lines,
+            "buckle": buckle,
             "item_id": item_id,
             "quality": ref.get("quality_name"),
             "name": names.get(item_id, ""),

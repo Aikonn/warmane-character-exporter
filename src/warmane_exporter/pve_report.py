@@ -19,6 +19,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from .gearscore import character_score
 from .identity import SUPPORTED_REALMS
 
 # Statistics categories that hold boss kill rows, in display order: (id, heading).
@@ -158,16 +159,14 @@ def build_pve_report(report: dict[str, Any]) -> dict[str, Any]:
             "earned": sorted([e for e in entries if e["earned"]], key=lambda e: (e.get("earned_date") or "", e["id"])),
             "missing": [e for e in entries if not e["earned"]],
         })
-    levels = [e["item_level"] for e in report.get("equipment", [])
-              if isinstance(e.get("item_level"), int) and e.get("slot") not in ("Shirt", "Tabard")]
+    score = character_score(report.get("equipment", []), (report.get("identity") or {}).get("class"))
     currencies = [r for c in stats if c["category_id"] == 130 for r in c["rows"]
                   if re.search(r"Emblems? of|Badges? of", r["name"])]
     return {
         "report": report,
         "progression": build_progression(stats),
         "achievement_groups": ach_groups,
-        "average_item_level": round(sum(levels) / len(levels), 1) if levels else None,
-        "item_level_count": len(levels),
+        "gearscore": score,
         "currencies": currencies,
     }
 
@@ -180,7 +179,7 @@ h1{border-bottom:2px solid #444;padding-bottom:.2em} h2{margin-top:1.8em;border-
 table{border-collapse:collapse;margin:.6em 0;font-size:.92em} th,td{border:1px solid #bbb;padding:.25em .6em;text-align:left;vertical-align:top}
 th{background:#eee} td.n{text-align:right} .muted{color:#555} .note{background:#f6f6f0;border-left:4px solid #aa8;padding:.4em .8em}
 .warn{background:#fde8e8;border:1px solid #c33;border-left:6px solid #b00;color:#600;padding:.5em .9em;margin:.6em 0}
-details{margin:.4em 0} summary{cursor:pointer}
+details{margin:.4em 0} details.big{margin-top:1.8em;border-bottom:1px solid #999} details.big>summary{font-size:1.5em;font-weight:bold} summary{cursor:pointer}
 """
 
 
@@ -195,7 +194,8 @@ def _table(headers: list[str], rows: list[list[Any]], numeric_from: int | None =
         cells = []
         for i, cell in enumerate(row):
             cls = ' class="n"' if numeric_from is not None and i >= numeric_from else ""
-            cells.append(f"<td{cls}>{_e(cell)}</td>")
+            text = "<br>".join(_e(c) for c in cell) if isinstance(cell, (list, tuple)) else _e(cell)
+            cells.append(f"<td{cls}>{text}</td>")
         body.append("<tr>" + "".join(cells) + "</tr>")
     return f"<table><tr>{head}</tr>{''.join(body)}</table>"
 
@@ -204,26 +204,40 @@ def _count_text(value: int | None) -> str:
     return "-" if not value else str(value)
 
 
-def _gear_section(report: dict[str, Any], average: float | None, count: int) -> str:
+def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
     rows = []
     for e in report.get("equipment", []):
         stats = ", ".join(f"+{v} {n}" for n, v in (e.get("stats") or []))
         if e.get("scaling_stats"):
             stats = (stats + " " if stats else "") + "(scaling item: stat values depend on character level)"
-        gems = "; ".join(e.get("gems") or [])
-        if e.get("sockets_empty"):
-            gems += (" " if gems else "") + f"[{e['sockets_empty']} empty socket(s)]"
+        if e.get("gem_lines") is not None and (e.get("gem_lines") or e.get("sockets") is not None):
+            gems = list(e["gem_lines"])
+        else:
+            gems = list(e.get("gems") or [])
+        enchant = [e["enchant"]] if e.get("enchant") else []
+        if e.get("buckle"):
+            enchant.append(f"Belt buckle: {e['buckle']}")
         item = f"{e.get('name') or '?'} ({e.get('item_id')})"
         if e.get("transmog"):
             item += f", transmog: {e['transmog']}"
+        item_score_value = score["per_item"].get(e.get("slot"))
         rows.append([e.get("slot"), item, e.get("quality") or "?", e.get("item_level") if e.get("item_level") is not None else "?",
-                     stats, e.get("enchant") or "", gems])
+                     item_score_value if item_score_value is not None else "", stats, enchant, gems])
     note = ""
-    if average is not None:
-        note = (f'<p class="muted">Derived: average item level {average} over {count} equipped items '
-                "(shirt and tabard excluded). Item level, stats and sockets come from the AzerothCore item database, "
-                "not from Warmane; enchants and gems come from the game client files.</p>")
-    return "<h2 id=\"gear\">Equipment</h2>" + _table(["Slot", "Item", "Quality", "Item level", "Base stats", "Enchant", "Gems"], rows) + note
+    if score["gearscore"] is not None:
+        extra = f" Adjustments applied: {', '.join(score['adjustments'])}." if score["adjustments"] else ""
+        note = (f'<p>Derived: average item level <b>{score["average_item_level"]}</b> and GearScore <b>{score["gearscore"]}</b> '
+                f'over {score["items"]} equipped items (shirt and tabard excluded).</p>'
+                '<p class="muted">GearScore is calculated per item as floor(((item level - A) / B) x slot weight x 1.8618), '
+                "summed over all items, with the formula of the GearScoreLite family of addons (TacoTip version). "
+                "It does not subtract anything for missing enchants or gems."
+                f"{extra} Item level, stats and sockets come from the AzerothCore item database, not from Warmane; "
+                "enchants and gems come from the game client files.</p>")
+    elif score["items"] or score["unknown_items"]:
+        note = (f'<p class="muted">Average item level and GearScore not calculated: item level data is missing for '
+                f'{score["unknown_items"]} item(s). Run the AzerothCore fetch and rebuild the snapshot.</p>')
+    return ("<h2 id=\"gear\">Equipment</h2>"
+            + _table(["Slot", "Item", "Quality", "Item level", "GearScore", "Base stats", "Enchant", "Gems"], rows) + note)
 
 
 def _spec_section(report: dict[str, Any]) -> str:
@@ -299,8 +313,8 @@ def _progress_section(progress: dict[str, Any]) -> str:
 
 def _other_content_section(progress: dict[str, Any]) -> str:
     """Collapsed sections: WotLK dungeons, older content, counters, deaths. Placed last in the report."""
-    out = ["<h2 id=\"other\">Other dungeon and raid statistics</h2>",
-           "<p class=\"muted\">Collapsed by default. The same armory warning applies (* marks suspect heroic counts).</p>"]
+    out = ["<details id=\"other\" class=\"big\"><summary><b>Other dungeon and raid statistics</b></summary>",
+           "<p class=\"muted\">The armory warning above applies here too (* marks suspect heroic counts).</p>"]
     if progress["wotlk_dungeons"]:
         out.append("<details><summary><b>WotLK dungeons</b></summary>" + "".join(_instance_table(i) for i in progress["wotlk_dungeons"]) + "</details>")
     if progress["older"]:
@@ -312,7 +326,12 @@ def _other_content_section(progress: dict[str, Any]) -> str:
         out.append("<details><summary><b>Entered and completed</b></summary>" + _stat_table(progress["overview"]) + "</details>")
     if progress["deaths"]:
         out.append("<details><summary><b>Deaths in dungeons and raids</b></summary>" + _stat_table(progress["deaths"]) + "</details>")
+    out.append("</details>")
     return "".join(out)
+
+
+def _percent(part: int, total: int) -> str:
+    return f"{int(100 * part / total + 0.5)}%" if total else "-"
 
 
 def _achievement_block(g: dict[str, Any]) -> str:
@@ -335,8 +354,9 @@ def _achievement_section(groups: list[dict[str, Any]]) -> str:
     raid_names = set(ACHIEVEMENT_ORDER[5:])
     raid = [g for g in groups if g["name"] in raid_names]
     rest = [g for g in groups if g["name"] not in raid_names]
-    out.append(_table(["Category", "Earned", "Total"], [[g["name"], len(g["earned"]), len(g["earned"]) + len(g["missing"])] for g in raid + rest],
-                      numeric_from=1))
+    out.append(_table(["Category", "Earned", "Percent"], [[g["name"], f"{len(g['earned'])} / {len(g['earned']) + len(g['missing'])}",
+                                                          _percent(len(g["earned"]), len(g["earned"]) + len(g["missing"]))]
+                                                         for g in raid + rest], numeric_from=1))
     out.extend(_achievement_block(g) for g in raid)
     if rest:
         out.append("<details><summary><b>Dungeon, heroic dungeon, Classic and Burning Crusade achievements</b></summary>"
@@ -367,8 +387,8 @@ def render_html(pve: dict[str, Any]) -> str:
     title = f"{ident.get('name')} - {ident.get('realm')} - PvE report"
     toc = "".join(f'<li><a href="#{a}">{_e(t)}</a></li>' for a, t in (
         ("gear", "Equipment"), ("specs", "Talents and glyphs"), ("progress", "WotLK raid progression: boss kills"),
-        ("achievements", "WotLK raid achievements"), ("currency", "Badges and emblems"), ("rep", "Reputation"), ("mounts", "Mounts"),
-        ("other", "Other dungeon and raid statistics (collapsed)")))
+        ("other", "Other dungeon and raid statistics"), ("achievements", "WotLK raid achievements"),
+        ("currency", "Badges and emblems"), ("rep", "Reputation"), ("mounts", "Mounts")))
     missing = report.get("missing_sections") or []
     parts = [
         f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{_e(title)}</title><style>{CSS}</style></head><body>",
@@ -379,12 +399,12 @@ def render_html(pve: dict[str, Any]) -> str:
         "intended for PvE discussion. Values the armory does not expose are marked unknown, never guessed "
         "(for example the active specialization).</p>",
         f"<ul>{toc}</ul>",
-        _gear_section(report, pve["average_item_level"], pve["item_level_count"]),
+        _gear_section(report, pve["gearscore"]),
         _spec_section(report),
         _progress_section(pve["progression"]),
+        _other_content_section(pve["progression"]),
         _achievement_section(pve["achievement_groups"]),
         _other_section(pve),
-        _other_content_section(pve["progression"]),
     ]
     if missing:
         parts.append(f"<h2>Missing sections</h2><p>{_e(', '.join(missing))}</p>")

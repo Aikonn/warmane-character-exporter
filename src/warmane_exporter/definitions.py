@@ -13,8 +13,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .acore_items import AcoreItem, AcoreItems
+from .acore_items import QUALITY_NAMES, AcoreItem, AcoreItems
 from .client_definitions import INVENTORY_TYPES, ItemInfo
+
+
+GEM_COLORS = {1: "meta", 2: "red", 4: "yellow", 8: "blue", 6: "orange", 10: "purple", 12: "green", 14: "prismatic"}
 
 
 class Definitions:
@@ -59,6 +62,20 @@ class Definitions:
 
     def enchant_text(self, enchant_id: int) -> str | None:
         return self._first("enchant_text", enchant_id)
+
+    def gem_info(self, enchant_id: int) -> dict[str, Any] | None:
+        """Colour name and quality name of the gem behind a socketed gem effect (either part may be missing)."""
+        found = None
+        for source in self._texts:
+            fn = getattr(source, "gem_properties", None)
+            found = fn(enchant_id) if fn else None
+            if found is not None:
+                break
+        if found is None:
+            return None
+        props_id, mask = found
+        quality = self.acore.gem_quality(props_id) if self.acore is not None else None
+        return {"color": GEM_COLORS.get(mask, f"mask {mask}"), "quality": QUALITY_NAMES.get(quality) if quality is not None else None}
 
     def spell(self, spell_id: int):
         return self._first("spell", spell_id)

@@ -179,7 +179,11 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
                 gems.append({"position": position.get("position"), "id": code or 0, "empty": True})
                 continue
             text = defs.enchant_text(code)
-            gems.append({"position": position.get("position"), "id": code, "text": text})
+            gem = {"position": position.get("position"), "id": code, "text": text}
+            info = defs.gem_info(code) if hasattr(defs, "gem_info") else None
+            if info:
+                gem.update(info)
+            gems.append(gem)
             if text is None:
                 warnings.append(f"{slot.get('slot_key')}: gem code {code} text unresolved (no text source has it)")
         if gems:

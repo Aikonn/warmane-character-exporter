@@ -66,7 +66,11 @@ class HtmlTests(unittest.TestCase):
             "snapshot_time": 1792846391, "active_specialization": "unknown (not exposed by Warmane)",
             "equipment": [
                 {"slot": "Head", "item_id": 1, "name": "Hood", "quality": "epic", "item_level": 264, "stats": [["stamina", 5]],
-                 "enchant": "+30 Spell Power", "gems": ["+10 All Stats"], "sockets_empty": 1, "transmog": ""},
+                 "enchant": "+30 Spell Power", "gems": ["+10 All Stats"], "sockets_empty": 1, "transmog": "", "inventory_type": "head",
+                 "sockets": ["meta", "blue"], "gem_lines": ["+10 All Stats (epic blue)", "<no gem>"], "buckle": None},
+                {"slot": "Waist", "item_id": 3, "name": "Belt", "quality": "epic", "item_level": 245, "stats": [], "enchant": None,
+                 "gems": [], "inventory_type": "waist", "sockets": ["yellow"], "gem_lines": ["+12 Spell Power (epic yellow)"],
+                 "buckle": "+12 Spell Power (epic red)"},
                 {"slot": "Shirt", "item_id": 2, "name": "Shirt", "quality": "common", "item_level": 1, "stats": [], "gems": []}],
             "specializations": [{"label": "Discipline", "split": [57, 14, 0], "glyphs": [], "talent_detail": [
                 {"tree": "Discipline", "points": 57, "talents": [{"name": "Penance", "spent": 1, "max": 1, "description": "Heals"}]}]}],
@@ -85,11 +89,11 @@ class HtmlTests(unittest.TestCase):
 
     def test_content_and_escaping(self):
         pve = build_pve_report(self.report)
-        self.assertEqual(pve["average_item_level"], 264.0)
+        self.assertEqual((pve["gearscore"]["average_item_level"], pve["gearscore"]["items"]), (254, 2))
         self.assertEqual([r["name"] for r in pve["currencies"]], ["Emblems of Frost acquired"])
         self.assertEqual(len(pve["achievement_groups"]), 1)
         html = render_html(pve)
-        for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "1 empty socket(s)", "Penance", "Do the thing",
+        for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "&lt;no gem&gt;", "+12 Spell Power (epic yellow)", "Belt buckle: +12 Spell Power (epic red)", "GearScore", "Penance", "Do the thing",
                        "Sindragosa", "heroic", "Warning: some armory kill counts", "Argent Crusade", "Wind Rider", "2026-"):
             self.assertIn(needle, html)
         self.assertNotIn("Ulduar <10>", html)  # raw armory text is never injected
@@ -104,6 +108,52 @@ class HtmlTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GearScoreTests(unittest.TestCase):
+    def test_item_formula(self):
+        from warmane_exporter.gearscore import item_score
+        self.assertEqual(item_score("epic", 264, "head"), (494, 264))        # floor((264-91.45)/0.65*1*1.8618)
+        self.assertEqual(item_score("epic", 245, "two-hand"), (floor_((245 - 91.45) / 0.65 * 2 * 1.8618), 245))
+        self.assertEqual(item_score("rare", 200, "waist")[0], floor_((200 - 81.375) / 0.8125 * 0.75 * 1.8618))
+        self.assertEqual(item_score("legendary", 284, "two-hand")[0], floor_((284 - 91.45) / 0.65 * 2 * 1.8618 * 1.3))
+        self.assertEqual(item_score("heirloom", 1, "chest"), (floor_((187.05 - 81.375) / 0.8125 * 1.8618), 0))
+        self.assertEqual(item_score("epic", 10, "head")[0], 0)                # never negative
+        self.assertIsNone(item_score("epic", None, "head"))
+        self.assertIsNone(item_score("epic", 200, "bag"))
+
+    def test_character_adjustments(self):
+        from warmane_exporter.gearscore import character_score
+        gear = [{"slot": "Main Hand", "quality": "epic", "item_level": 245, "inventory_type": "two-hand"},
+                {"slot": "Off Hand", "quality": "epic", "item_level": 245, "inventory_type": "two-hand"},
+                {"slot": "Shirt", "quality": "epic", "item_level": 245, "inventory_type": "shirt"}]
+        one = floor_((245 - 91.45) / 0.65 * 2 * 1.8618)
+        titan = character_score(gear, "Warrior")
+        self.assertEqual((titan["gearscore"], titan["items"], titan["adjustments"]), (floor_(one * 0.5 * 2), 2, ["Titan's Grip x0.5"]))
+        gear[1]["inventory_type"] = "off-hand"
+        hunter = character_score([{"slot": "Ranged", "quality": "epic", "item_level": 245, "inventory_type": "ranged"}], "Hunter")
+        self.assertEqual(hunter["gearscore"], floor_(floor_((245 - 91.45) / 0.65 * 0.3164 * 1.8618) * 5.3224))
+        missing = character_score([{"slot": "Head", "quality": "epic", "item_level": None, "inventory_type": "head"}], "Priest")
+        self.assertIsNone(missing["gearscore"])
+
+
+def floor_(x):
+    import math
+    return math.floor(x)
+
+
+class GemColumnTests(unittest.TestCase):
+    def test_columns(self):
+        from warmane_exporter.report import gem_columns
+        red = {"text": "+23 Spell Power", "id": 3520, "quality": "epic", "color": "red"}
+        empty = {"id": 0, "empty": True}
+        lines, buckle = gem_columns("Waist", [red, red, empty], ["yellow"])
+        self.assertEqual((lines, buckle), (["+23 Spell Power (epic red)"], "+23 Spell Power (epic red)"))
+        lines, buckle = gem_columns("Head", [red, empty, empty], ["meta", "blue"])
+        self.assertEqual((lines, buckle), (["+23 Spell Power (epic red)", "<no gem>"], None))
+        lines, buckle = gem_columns("Hands", [{"text": "+9 Stamina", "id": 1}, red, empty], ["red"])
+        self.assertEqual(lines, ["+9 Stamina", "+23 Spell Power (epic red)"])      # extra socket, no tags known
+        self.assertEqual(gem_columns("Waist", [red, red], None), (["+23 Spell Power (epic red)", "+23 Spell Power (epic red)"], None))
 
 
 class SuspectTests(unittest.TestCase):
@@ -121,8 +171,12 @@ class SuspectTests(unittest.TestCase):
         html = render_html(build_pve_report(HtmlTests("test_content_and_escaping").report if False else _full_report()))
         self.assertNotIn("Bosses killed per instance and mode", html)
         self.assertIn("<details open>", html)
-        self.assertLess(html.index("WotLK raid progression"), html.index("Other dungeon and raid statistics</h2>"))
-        self.assertLess(html.index("Mounts</h2>"), html.index("Entered and completed"))
+        self.assertLess(html.index("WotLK raid progression"), html.index("Other dungeon and raid statistics</b>"))
+        self.assertLess(html.index("Other dungeon and raid statistics</b>"), html.index("WotLK raid achievements</h2>"))
+        self.assertNotIn("Collapsed by default", html)
+        self.assertIn("<th>Percent</th>", html)
+        self.assertIn("1 / 2", html)
+        self.assertIn("50%", html)
         self.assertIn('class="warn"', html)
 
 

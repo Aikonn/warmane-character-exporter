@@ -3,7 +3,7 @@
 python -m warmane_exporter.definition_export [--output library/definitions/client-export.json]
 
 After the export the tool needs no game client: FileDefinitions reads this file.
-Content: every SpellItemEnchantment name (enchants, gems, socket bonuses), every talent with its
+Content: every SpellItemEnchantment name (enchants, gems, socket bonuses), the gem colour of each gem effect, every talent with its
 rank spells, every glyph, and name / rank / description / rendered description of the spells those
 reference. Unresolvable template parts stay flagged (rendered_unresolved), never guessed.
 The text is the client's own, so it reflects whichever client (stock, HD, custom patch) was used.
@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from .client_definitions import (
-    ENCHANT_FIELDS, ENCHANT_NAME, GLYPH_FIELDS, TALENT_COLUMN, TALENT_FIELDS, TALENT_RANK_COUNT,
+    ENCHANT_FIELDS, ENCHANT_NAME, GEMPROP_FIELDS, GLYPH_FIELDS, TALENT_COLUMN, TALENT_FIELDS, TALENT_RANK_COUNT,
     TALENT_RANK_FIRST, TALENT_ROW, TALENT_TAB, ClientDefinitions,
 )
 
@@ -32,6 +32,13 @@ def export_definitions(defs: ClientDefinitions) -> dict[str, Any]:
     for position in range(len(enchant_table)):
         row = enchant_table.row(position)
         enchants[str(row[0])] = enchant_table.string_at(row[ENCHANT_NAME]) or ""
+
+    gem_table = defs._table("GemProperties.dbc", GEMPROP_FIELDS)
+    gem_properties: dict[str, list[int]] = {}
+    for position in range(len(gem_table)):
+        row = gem_table.row(position)
+        if row[1]:
+            gem_properties.setdefault(str(row[1]), [row[0], row[4]])
 
     talent_table = defs._table("Talent.dbc", TALENT_FIELDS)
     talents: list[dict[str, Any]] = []
@@ -69,8 +76,9 @@ def export_definitions(defs: ClientDefinitions) -> dict[str, Any]:
     return {
         "schema": SCHEMA,
         "exported_at": time.time(),
-        "client_tables": {"enchants": len(enchants), "talents": len(talents), "glyphs": len(glyphs), "spells": len(spells)},
+        "client_tables": {"enchants": len(enchants), "gem_properties": len(gem_properties), "talents": len(talents), "glyphs": len(glyphs), "spells": len(spells)},
         "enchants": enchants,
+        "gem_properties": gem_properties,
         "talents": talents,
         "glyphs": glyphs,
         "spells": spells,

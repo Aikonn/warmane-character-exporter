@@ -41,6 +41,7 @@ TALENT_ROW = 2
 TALENT_COLUMN = 3
 TALENT_RANK_FIRST = 4   # RankID[9] occupies fields 4..12
 TALENT_RANK_COUNT = 9
+GEMPROP_FIELDS = 5        # GemProperties.dbc: ID, EnchantID, MaxcountInv, MaxcountItem, Type (colour bit mask)
 GLYPH_FIELDS = 4         # GlyphProperties.dbc: ID, SpellID, GlyphSlotFlags, SpellIconID (UNVERIFIED)
 ITEM_FIELDS = 8
 ITEM_CLASS = 1
@@ -101,6 +102,7 @@ class ClientDefinitions:
         self._tables: dict[str, DbcTable] = {}
         self._talent_by_spell: dict[int, TalentInfo] | None = None
         self._glyph_by_spell: dict[int, GlyphInfo] | None = None
+        self._gem_by_enchant: dict[int, tuple[int, int]] | None = None
 
     def _table(self, name: str, fields: int) -> DbcTable:
         if name not in self._tables:
@@ -120,6 +122,17 @@ class ClientDefinitions:
         table = self._table("SpellItemEnchantment.dbc", ENCHANT_FIELDS)
         row = table.find(enchant_id)
         return None if row is None else table.string_at(row[ENCHANT_NAME]) or ""
+
+    def gem_properties(self, enchant_id: int) -> tuple[int, int] | None:
+        """(GemProperties id, colour bit mask) of the gem whose socketed effect is this enchant id."""
+        if self._gem_by_enchant is None:
+            table = self._table("GemProperties.dbc", GEMPROP_FIELDS)
+            self._gem_by_enchant = {}
+            for position in range(len(table)):
+                row = table.row(position)
+                if row[1]:
+                    self._gem_by_enchant.setdefault(row[1], (row[0], row[4]))
+        return self._gem_by_enchant.get(enchant_id)
 
     def spell(self, spell_id: int) -> SpellInfo | None:
         table = self._table("Spell.dbc", SPELL_FIELDS)

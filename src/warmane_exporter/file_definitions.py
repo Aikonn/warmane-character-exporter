@@ -18,6 +18,7 @@ class FileDefinitions:
         self.data = data
         self._enchants: dict[str, str] = data["enchants"]
         self._spells: dict[str, dict] = data["spells"]
+        self._gems: dict[str, list] = data.get("gem_properties", {})   # absent in exports made before gem colours
         self._talent_by_spell: dict[int, TalentInfo] = {}
         for t in data["talents"]:
             info = TalentInfo(t["id"], t["tab"], t["row"], t["column"], tuple(t["ranks"]))
@@ -27,6 +28,10 @@ class FileDefinitions:
 
     def enchant_text(self, enchant_id: int) -> str | None:
         return self._enchants.get(str(enchant_id))
+
+    def gem_properties(self, enchant_id: int) -> tuple[int, int] | None:
+        found = self._gems.get(str(enchant_id))
+        return None if found is None else (found[0], found[1])
 
     def spell(self, spell_id: int) -> SpellInfo | None:
         entry = self._spells.get(str(spell_id))

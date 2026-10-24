@@ -197,5 +197,11 @@ class AcoreItems:
             bool(row["ScalingStatDistribution"]),
         )
 
+    def gem_quality(self, gem_properties_id: int) -> int | None:
+        """Highest item quality among gem items (class 3) that use this GemProperties id."""
+        row = self._con.execute("SELECT MAX(Quality) FROM item WHERE GemProperties = ? AND class = 3",
+                                (gem_properties_id,)).fetchone()
+        return row[0]
+
     def count(self) -> int:
         return self._con.execute("SELECT COUNT(*) FROM item").fetchone()[0]
