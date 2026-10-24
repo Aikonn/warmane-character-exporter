@@ -405,6 +405,108 @@ Limitations: Layout inference is positional only; does not verify slot identity 
 Implementation consequence: Added `STANDARD_WOTLK_LAYOUT` constant and `_validate_and_infer_layout()` pure function to summary_parser.py. Function returns `layout_validation` dict containing expected_counts (with unknown: 0), observed_counts (with unknown), anchors_checked, status ("anchors_consistent" or "unverified"), issues (list of issues if unverified), and note (explanation of inference limitations). Each slot dict contains `layout_inference` subdict with inferred_slot_name (name or null), basis ("standard_wotlk_paperdoll_order"), status (inherits validation status), and optional note field for Finger/Trinket slots explaining that numbering reflects layout order only. Icon stems are captured in slot["item_reference"]["icon_stem"] as raw evidence (null if no `<img>` tag). 10 new layout-inference tests cover all validation branches: consistent layout with anchors (all 19 inferred), count mismatch (all inferred names null), anchor mismatch (all null with issue), no anchors (all null with issue), out-of-range anchors (no exception, issue recorded), unknown-group slots (unverified), explicit names never overwritten, Finger/Trinket order notes present, icon stem capture with exact assertion, icon stem capture with at least-one null and at least-one non-empty. Full suite: 106 tests pass.
 ```
 
+## 13a. Equipped-item code inventory — Aikka / Onyxia (offline, 2026-10-24)
+
+**Diagnostic command:** `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_diagnostic "local-captures\aikka-onyxia-summary-dom.html"`
+**Exit code:** 0
+
+**19-slot table (left_1..left_8, right_1..right_8, bottom_1..bottom_3):**
+
+| slot_key | inferred_slot_name | item_id | ench (raw) | gems (raw) | item status | ench status | gems status | evidence |
+|---|---|---|---|---|---|---|---|---|
+| left_1 | Head | 51178 | 3820 | 3627:3879:0 | unresolved | resolved | partial | [cavernoftime-enchantment-gem-parameter-isolation-2026-10-24](#findings-log) |
+| left_2 | Neck | 50809 | — | 3520:0:0 | unresolved | n/a | unresolved | none |
+| left_3 | Shoulder | 50449 | 3810 | 3520:3520:0 | unresolved | unresolved | unresolved | none |
+| left_4 | Back | 47256 | 3728 | — | unresolved | unresolved | n/a | none |
+| left_5 | Chest | 48063 | 3832 | 3118:3118:0 | unresolved | unresolved | unresolved | none |
+| left_6 | Shirt | — | — | — | n/a | n/a | n/a | none |
+| left_7 | Tabard | — | — | — | n/a | n/a | n/a | none |
+| left_8 | Wrist | 47588 | 2326 | 3520:0:0 | unresolved | unresolved | unresolved | none |
+| right_1 | Hands | 48067 | 3246 | 3448:0:0 | unresolved | unresolved | unresolved | none |
+| right_2 | Waist | 48054 | — | 3118:3118:0 | unresolved | n/a | unresolved | none |
+| right_3 | Legs | 51262 | 3872 | 3520:3520:0 | unresolved | unresolved | unresolved | none |
+| right_4 | Feet | 51380 | 3232 | 3520:3520:0 | unresolved | unresolved | unresolved | none |
+| right_5 | Finger 1 | 50400 | 3840 | 3448:0:0 | unresolved | unresolved | unresolved | none |
+| right_6 | Finger 2 | 49990 | 3840 | 3520:0:0 | unresolved | unresolved | unresolved | none |
+| right_7 | Trinket 1 | 50358 | — | — | unresolved | n/a | n/a | none |
+| right_8 | Trinket 2 | 45929 | — | — | unresolved | n/a | n/a | none |
+| bottom_1 | Main Hand | 48039 | 3834 | 3520:0:0 | unresolved | unresolved | unresolved | none |
+| bottom_2 | Off Hand | 45314 | — | — | unresolved | n/a | n/a | none |
+| bottom_3 | Ranged | 45713 | — | — | unresolved | n/a | n/a | none |
+
+**Status legend:**
+- `resolved`: Definition is confirmed via existing findings documented in this log.
+- `partial`: Some aspects confirmed; others unresolved (e.g., gems 3627:3879 — joint effect text only; per-gem mapping not isolated).
+- `unresolved`: No definition verification performed; identifier and namespace exist but definition unknown.
+- `n/a`: Slot is empty or parameter not applicable.
+
+**Status justifications:**
+
+- **Ench 3820 = resolved:** Confirmed via [cavernoftime-enchantment-gem-parameter-isolation-2026-10-24](#findings-log) live isolation (→ "+30 Spell Power and 20 Critical strike rating") and [evowow-enchantment-3820-manual-verification-2026-10-24](#findings-log) (manual screenshot: effect text matches). Cavernoftime isolation finding also provides evidence that ench=3820 parameter independently resolves on this item.
+- **Gems 3627:3879 = partial:** Joint effect text confirmed via [cavernoftime-enchantment-gem-parameter-isolation-2026-10-24](#findings-log) (gems=3627:3879 parameter returns two effect descriptions). Per-gem individual effect mappings NOT isolated; gem code 3627 not looked up on EvoWoW; socket-bonus activation state unknown.
+- **Item IDs = unresolved for all 19:** Layout inference is positional only; inventory-type field definitions not available from offline capture. Identifiers are observed in `item` namespace of `rel` payloads but not verified against item definition sources.
+- **All other ench/gems codes = unresolved:** No definition verification performed for these codes in existing findings.
+
+### Candidate live requests (NOT approved)
+
+The following URLs would close unresolved items. All URLs validated in offline mode using `definition_diagnostic.py` default (no --live-once flag).
+
+**Item definition requests (17 unique item IDs):**
+```
+https://wotlk.cavernoftime.com/item=45314&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=45713&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=45929&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=47256&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=47588&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=48039&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=48054&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=48063&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=48067&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=49990&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=50358&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=50400&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=50449&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=50809&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=51262&power=true      [PASS]
+https://wotlk.cavernoftime.com/item=51380&power=true      [PASS]
+```
+
+**Enchantment effect-text requests (10 unique ench codes; 3820 already resolved):**
+```
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=2326      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=3232      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=3246      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=3728      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=3810      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=3832      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=3834      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=3840      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&ench=3872      [PASS]
+```
+
+**Gem effect-text requests (5 unique gem codes; 3627 and 3879 in joint pair from table, tested individually):**
+```
+https://wotlk.cavernoftime.com/item=51178&power=true&gems=3118      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&gems=3448      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&gems=3520      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&gems=3627      [PASS]
+https://wotlk.cavernoftime.com/item=51178&power=true&gems=3879      [PASS]
+```
+
+**Summary:**
+- Total requests: 31 unique URLs
+- Per-host breakdown: wotlk.cavernoftime.com (31)
+- Validation status: All 31 URLs passed offline validation (no network requests executed)
+- URL form validation was performed in offline mode only. No --live-once requests executed. Validator rejects URLs that do not match approved Cavernoftime patterns (positive-integer item/ench IDs; nonnegative gem codes with colon separators).
+
+### Limitations
+
+- **Slot names inferred positionally; item IDs are raw values from the capture:** Layout inference assigns names from standard WotLK paperdoll order based on position; no game-data verification of inventory-type definitions.
+- **Gem codes produce joint effect text:** Cavernoftime gem= parameter returns combined gem descriptions; per-gem individual mapping not isolated from this data source.
+- **Socket bonus state unknown:** No evidence of socket-bonus activation rules or conditional effects discovered in captured data or existing findings.
+- **Ench/gem coverage incomplete:** Only Ench 3820 resolved; 9 additional ench codes and 5 gem codes remain unverified.
+
 ## 14. Open questions
 
 1. Which required fields are exposed on each realm and character?

@@ -7,8 +7,8 @@
 ## Implemented at this checkpoint
 - Minimal retrieval probe scaffold (offline plan + controlled live modes) in [src/warmane_exporter/](../src/warmane_exporter).
 - Offline rendered-DOM summary diagnostic parser (local file input only) in [summary_parser.py](../src/warmane_exporter/summary_parser.py) and [summary_diagnostic.py](../src/warmane_exporter/summary_diagnostic.py).
-- **NEW:** Offline rendered-DOM talents diagnostic parser in [talents_parser.py](../src/warmane_exporter/talents_parser.py) with full spec extraction, glyph associations, malformed-rank preservation, and tree-total validation.
-- **NEW:** Equipment slot layout inference against standard WotLK paperdoll order in [summary_parser.py](../src/warmane_exporter/summary_parser.py) with validation status, anchor consistency checking, and per-slot inference metadata.
+- Offline rendered-DOM talents diagnostic parser in [talents_parser.py](../src/warmane_exporter/talents_parser.py) with full spec extraction, glyph associations, malformed-rank preservation, and tree-total validation.
+- Equipment slot layout inference against standard WotLK paperdoll order in [summary_parser.py](../src/warmane_exporter/summary_parser.py) with validation status, anchor consistency checking, and per-slot inference metadata.
 - Fixture-based offline tests (including synthetic 1010/1015 access fixtures, synthetic summary structure, synthetic talents page, and synthetic layout scenarios) under [tests/](../tests).
 
 ## Exact local commands (use `.venv` Python explicitly)
@@ -19,13 +19,16 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 
 ## Latest verified test result
 
-**Historical — talents-parser checkpoint (Local Copilot agent run):**
-- Executed full offline test suite: **41 tests passed, 0 failed**
-- Composition: summary parser (2 tests) + transport (7 tests) + checkpoint (1 test) + identity (4 tests) + retry (3 tests) + **talents parser (24 tests)**
-- Talents parser includes 4 new regression tests for edge cases: missing rank elements, trees without tree-info, tabs without containers, glyph class reordering
-- Both real captured talent pages (spec1 + spec2) parsed correctly with all tree totals matching reported values
+**Current full-suite status (Copilot-reported local run, not independently executed by reviewer):**
+- **106 tests passed, 0 failed**
+- Composition: summary parser (12 tests) + transport (7 tests) + checkpoint (1 test) + identity (4 tests) + retry (3 tests) + talents parser (24 tests) + definition diagnostic (55 tests)
 
-**Independent Perplexity review:**
+**Historical test counts (superseded):**
+- 41 tests: talents-parser checkpoint (Local Copilot agent run)
+- 55 tests: definition-diagnostic isolated run (before full-suite integration)
+- 95 tests: full suite before final ASCII-regex and definition-diagnostic corrections
+
+**Independent Perplexity review (talents parser):**
 - Ran uploaded 24 talent-parser tests in isolation: **all 24 passed** ✓
 - Verified four acceptance-failure cases now behave correctly:
   1. Talent anchor without `talent-points` div: retained with error marker ✓
@@ -36,7 +39,7 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 
 **Offline talents-parser increment status:** Accepted after bounded review. Fixes to edge cases verified; no regressions.
 
-**NEW — Rank-discovery mechanism candidate identified:**
+**Rank-discovery mechanism candidate identified:**
 - Two controlled live Copilot HTTP requests to cavernoftime.com spell API (exact requests: `/spell=14748&power=true` and `/spell=14748`)
 - GET `/spell=14748&power=true` returned HTTP 200: Rank 1 tooltip definition ("Improved Power Word: Shield", 5% effect)
 - GET `/spell=14748` (no-redirect handler) returned HTTP 200: normal definition page with Rank 1 effect and related-spell data identifying Rank 2=spell_id 14768 and Rank 3=spell_id 14769
@@ -46,7 +49,7 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 - **Requires:** Verification across additional talents, glyph mechanism discovery, ruleset compatibility check, source access/reuse terms review
 - See [data-sources.md Finding: cavernoftime-spell-rank-discovery-2026-10-24](./data-sources.md#findings-log)
 
-**NEW — Enchantment and gem parameter isolation (Cavernoftime):**
+**Enchantment and gem parameter isolation (Cavernoftime):**
 - Five controlled item GETs to https://wotlk.cavernoftime.com/item=51178 with parameter variations.
 - Base (no params): Meta/Blue socket labels (q0 CSS).
 - Ench=3820 isolated: Adds "+30 Spell Power and 20 Critical strike rating" effect text; socket labels unchanged.
@@ -56,14 +59,14 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 - **Limitation:** Gem codes produce joint effect text; per-gem mapping not isolated. Socket bonus activation state unknown. Bonus CSS class (q0→q2) reported earlier but not confirmed in final retained-file verification.
 - See [data-sources.md Finding: cavernoftime-enchantment-gem-parameter-isolation-2026-10-24](./data-sources.md#findings-log).
 
-**NEW — EvoWoW enchantment lookup verification:**
+**EvoWoW enchantment lookup verification:**
 - One Copilot automated GET to https://wotlk.evowow.com/?enchantment=3820: HTTP 403 Forbidden (access blocked).
 - User-provided browser screenshot shows successful manual access: Enchantment ID 3820 explicit; effect "+30 Spell Power and 20 Critical strike rating" matches Cavernoftime output.
 - **Finding:** Enchantment ID namespace established via manual evidence; automated access currently blocked. EvoWoW ?enchantment= parameter historically used for both equipment enchantments and gem codes (historical main.py evidence), but gem-code namespace not yet verified.
 - **Limitation:** Automated access blocked. Gem code 3627 lookup not attempted. Related-item names do not establish unique item IDs. Source reuse terms unchecked.
 - See [data-sources.md Finding: evowow-enchantment-3820-manual-verification-2026-10-24](./data-sources.md#findings-log).
 
-**NEW — Equipment slot layout inference (offline):**
+**Equipment slot layout inference (offline):**
 - Implemented pure Python function `_validate_and_infer_layout()` in [summary_parser.py](../src/warmane_exporter/summary_parser.py) that validates equipment layout against standard WotLK paperdoll slot order.
 - **Layout schema:** Left column (8 slots): Head, Neck, Shoulder, Back, Chest, Shirt, Tabard, Wrist. Right column (8 slots): Hands, Waist, Legs, Feet, Finger 1/2, Trinket 1/2. Bottom row (3 slots): Main Hand, Off Hand, Ranged.
 - **Validation status:** "anchors_consistent" only when observed counts match expected (8/8/3 + unknown=0), at least one slot has explicit data-tooltip label, and all explicit labels match expected positions; otherwise "unverified" with issues logged. Bounds-checking prevents out-of-range anchor positions from raising exceptions; out-of-range anchors are recorded with expected_name=null, match=false, and issue noted.
@@ -72,13 +75,13 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 - **Test coverage:** 10 new tests covering consistent layout with anchors, count mismatches, anchor mismatches, no anchors, explicit names preservation, Finger/Trinket notes, icon stem capture, out-of-range anchors (no exception), and unknown-group slots. Full suite: 106 tests pass.
 - **Evidence from Aikka / Onyxia:** Captured 19 equipped items with consistent 8/8/3 layout, Shirt (left_6) and Tabard (left_7) explicit anchors matching expected positions, anchors_consistent status, all 19 slots inferred with icon stems captured (e.g., inv_helmet_156, inv_belt_52, spell_ice_rune).
 - **Limitation:** Layout inference is positional only; does not verify against item inventory-type field definitions or cross-reference with item API definitions. Inference valid only when validators confirm consistency; when unverified, all inferred_slot_name fields are null.
-- See diagnostic output in [Latest verified test result](#latest-verified-test-result-1) below.
+- See diagnostic output in [Equipment layout inference results](#equipment-layout-inference-results) below.
 
 **Milestone 0 status:** **Incomplete** — equipment slot layout now inferred offline; item-to-definition linkage, gem codes, bonus activation, and active spec remain unresolved. Layout validation scaffold provides foundation for future inventory-type verification.
 
-## Latest verified test result (Equipment Layout Inference Checkpoint)
+## Equipment layout inference results
 
-**Offline layout-inference test suite (Local machine run):**
+**Offline layout-inference test suite (Copilot-reported local run):**
 - Executed full test discovery: **106 tests passed, 0 failed** (96 previous + 10 new layout-inference tests); `tests/test_summary_parser.py`: 12 tests, OK
 - Layout inference tests: 10 scenarios covering all validation branches (consistent with anchors, count mismatch, anchor mismatch, no anchors, explicit name preservation, Finger/Trinket notes, icon stem capture, out-of-range anchors, unknown-group slots)
 - **Synthetic fixtures tested:**
@@ -132,7 +135,7 @@ Inferred 19-slot table:
 
 ## Manual rendered-DOM findings (offline)
 
-### Summary page (from previous checkpoint)
+### Summary page
 - Parsed from local rendered-DOM capture:
   - identity + guild
   - character-sheet displayed sections/values/units
@@ -142,7 +145,7 @@ Inferred 19-slot table:
   - navigation links to uncaptured sections
   - recent achievements as **partial** activity list
 
-### **NEW — Talents page**
+### Talents page
 - Offline parsed from two local rendered-DOM talent-page captures (spec1 + spec2).
 - Both captures substantively identical when normalized.
 - **Spec definitions:** Specs identified via `data-spec` DOM attributes (Spec 0=Discipline, Spec 1=Holy). Both specs extracted regardless of visibility state (hidden spec 1 correctly parsed).
@@ -158,7 +161,7 @@ Inferred 19-slot table:
 - **Active spec:** NOT determinable from rendered DOM. Tab UI selection state and display visibility do not indicate in-game active spec.
 - **Unresolved:** Talent effect text (selected-rank bonuses), glyph effect descriptions, and external definition resolution remain outstanding.
 
-### **NEW — Talent and glyph definitions (Cavernoftime + manual verification)**
+### Talent and glyph definitions (Cavernoftime + manual verification)
 - Automated Cavernoftime probes (checkpoint) successfully fetched /spell=14748 and /spell=14748&power=true; Rank 1 definition retrieved and related-spell rank-ID mappings (14768→Rank 2, 14769→Rank 3) identified.
 - **Manual verification (user screenshots + Perplexity visual inspection):**
   - Spell 14769 (Improved Power Word: Shield, Rank 3): Effect = "Increases the damage absorbed by your Power Word: Shield by 15%." ✓
@@ -171,7 +174,7 @@ Inferred 19-slot table:
 - **Finding:** Rank 3 talent effect and one glyph effect manually verified. Rank 2 effect, general talent/glyph coverage, automated reliability, ruleset compatibility, and source terms remain unresolved.
 - See [data-sources.md Finding: cavernoftime-spell-rank-discovery-2026-10-24](./data-sources.md#findings-log) and [Finding: cavernoftime-spell-automated-access-denial-2026-10-24](./data-sources.md#findings-log).
 
-### **NEW — Definition-source diagnostic tool (offline + --live-once)**
+### Definition-source diagnostic tool (offline + --live-once)
 - **Implemented:** Minimal diagnostic in [src/warmane_exporter/definition_diagnostic.py](../src/warmane_exporter/definition_diagnostic.py) with reusable transport safeguards.
 - **Behavior:** 
   - Default (no args): Offline URL validation and planning only; zero network requests.
@@ -200,8 +203,8 @@ Inferred 19-slot table:
 
 ## Local capture files (kept local, git-ignored)
 - `local-captures\aikka-onyxia-summary-dom.html`
-- **NEW:** `local-captures\aikka-onyxia-talents-spec1-dom.html`
-- **NEW:** `local-captures\aikka-onyxia-talents-spec2-dom.html`
+- `local-captures\aikka-onyxia-talents-spec1-dom.html`
+- `local-captures\aikka-onyxia-talents-spec2-dom.html`
 
 ## Open gaps before Milestone 0 completion
 - Reliable automated access to Warmane character pages.
@@ -212,14 +215,22 @@ Inferred 19-slot table:
 
 ## Next task (if approved)
 
-**No next implementation or live investigation is approved yet.**
+**Equipped-item code inventory added to data-sources.md (offline). Live verification of candidate requests NOT approved.**
 
-Proposed next bounded task (not approved): offline gem-code evidence summary from existing findings, OR plan for inventory-type verification of the 19 equipped items (would require live-request approval).
+See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./data-sources.md#13a-equipped-item-code-inventory--aikka--onyxia-offline-2026-10-24) for:
+- 19-row table (slot_key, inferred_slot_name, item_id, raw ench/gems, status fields, evidence anchors)
+- 31 candidate URLs (17 item definitions, 9 unresolved enchantment codes (3820 already resolved), 5 gem codes)
+- All URLs passed offline validation; no network requests executed
+- Limitations: Layout inference only, gem codes produce joint effect text, socket bonus state unknown
 
-**Proposed next session workflow:**
-1. Review remaining Milestone 0 gaps (see section below).
-2. Propose one bounded offline or live investigation for user approval.
-3. Document scope, safeguards, and expected findings before execution.
+**Remaining Milestone 0 gaps (see [Open gaps before Milestone 0 completion](#open-gaps-before-milestone-0-completion)):**
+1. Reliable automated access to Warmane character pages.
+2. Equipment-slot identity verification (requires item inventory-type definitions).
+3. Talent/glyph effect text retrieval.
+4. External definition resolution/mapping.
+5. Progression coverage beyond summary activity snippets.
+
+**Proposed next bounded task (not approved):** bounded live check of a small subset of the 31 candidate URLs via definition_diagnostic --live-once, pending source-terms review.
 
 **Resolved items (do not revisit):**
 - ~~Talent tree-total mismatches~~ → Parser defects, now fixed. All six trees in both real captures match their reported totals.
