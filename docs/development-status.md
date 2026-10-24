@@ -441,3 +441,9 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 - Gems: one gem per line as "+23 Spell Power (epic red)" (quality from AzerothCore gem items, colour from GemProperties.dbc, now part of the definitions export: re-run definition_export once). Empty sockets show "<no gem>". On the belt, the gem beyond the belt's own sockets is shown in the Enchant column as "Belt buckle: ...".
 - GearScore (gearscore.py): formula of the GearScoreLite family (TacoTip version, https://github.com/anzz1/TacoTip/blob/master/gearscore.lua): per item floor(((ilvl - A) / B) x slot weight x 1.8618), sum over all items except shirt and tabard, hunter and Titan's Grip adjustments, no penalty for missing enchants. Shown with the average item level and per item. Real check: Aikka@Onyxia item level 249, GearScore 5546 (item levels from AzerothCore).
 - "Other dungeon and raid statistics" is one collapsed block placed before the achievements; the achievement table shows "earned / total" and a rounded percentage.
+
+
+## Item effects and belt buckle
+
+- Item use / equip / proc effects: spell ids come from AzerothCore item_template (spellid_N, spelltrigger_N); the text is the client's rendered spell description, exported by definition_export. Rebuild the item database (acore_cli fetch does it from the stored dump) and re-run definition_export once to get them.
+- Belt: a gem beyond the belt's own sockets is the belt buckle gem; the Enchant column shows "Eternal Belt Buckle" and the gem stays in the Gems column. The armory link carries no enchant for the buckle, so it is inferred from the extra gem.
