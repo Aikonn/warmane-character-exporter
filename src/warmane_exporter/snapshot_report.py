@@ -45,7 +45,7 @@ def check_snapshot(snapshot: dict[str, Any]) -> tuple[list[str], bool]:
         warnings = html_data.get("client_warnings") or []
         lines.append(f"  html equipment: {len(slots)} items, layout={layout}, slot_check={dict(checks)}, "
                      f"client_warnings={len(warnings)}")
-        if layout != "anchors_consistent" or checks.get("mismatch") or warnings:
+        if layout not in ("anchors_consistent", "item_types_consistent") or checks.get("mismatch") or warnings:
             ok = False
         if json_data:
             html_ids = sorted(i for i in (_item_id(s) for s in slots) if i is not None)
