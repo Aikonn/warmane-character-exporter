@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from .config import ConfigError, find_config_path, load_config, resolve_wow_client_dir
+from .client_definitions import ClientDefinitions
 from .dbc_parser import DbcError, DbcTable
 from .mpq_reader import ClientData, MPQError
 
@@ -56,6 +57,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--locale", default="enUS")
     parser.add_argument("--id", action="append", default=[], metavar="NAME=KEY",
                         help="Print the row whose field 0 equals KEY, e.g. Spell.dbc=14769")
+    parser.add_argument("--enchant", type=int, action="append", default=[], metavar="ID",
+                        help="Print SpellItemEnchantment text for ID (repeatable)")
+    parser.add_argument("--spell", type=int, action="append", default=[], metavar="ID",
+                        help="Print spell name, rank and description for ID (repeatable)")
+    parser.add_argument("--item", type=int, action="append", default=[], metavar="ID",
+                        help="Print item class, subclass and inventory type for ID (repeatable)")
     parser.add_argument("names", nargs="*", help="DBC names (default: a small set)")
     args = parser.parse_args(argv)
 
@@ -76,8 +83,19 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Error: --id expects NAME=KEY, got {item!r}", file=sys.stderr)
                 return 1
             lookups.append((name, int(key)))
-        names = args.names or ([] if lookups else DEFAULT_DBCS)
+        compact = args.enchant or args.spell or args.item
+        names = args.names or ([] if lookups or compact else DEFAULT_DBCS)
         try:
+            if compact:
+                defs = ClientDefinitions(client)
+                for key in args.enchant:
+                    print(f"enchant {key}: {defs.enchant_text(key)!r}")
+                for key in args.spell:
+                    info = defs.spell(key)
+                    print(f"spell {key}: " + (f"{info.name!r} {info.rank!r} {info.description!r}" if info else "None"))
+                for key in args.item:
+                    info = defs.item(key)
+                    print(f"item {key}: " + (f"class {info.item_class} subclass {info.item_subclass} slot {info.inventory_type_name}" if info else "None"))
             for name in names:
                 loaded = _load(client, name)
                 if loaded:
@@ -95,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"[NOKEY] {name} has no row with key {key}")
                     else:
                         _print_row(loaded[0], row, f"{name} key {key} (from {loaded[1].name})")
-        except MPQError as exc:
+        except (MPQError, DbcError) as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
     return 0
