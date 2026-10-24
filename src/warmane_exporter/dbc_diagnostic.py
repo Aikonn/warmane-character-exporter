@@ -61,6 +61,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Print SpellItemEnchantment text for ID (repeatable)")
     parser.add_argument("--spell", type=int, action="append", default=[], metavar="ID",
                         help="Print spell name, rank and description for ID (repeatable)")
+    parser.add_argument("--talent", type=int, action="append", default=[], metavar="SPELL_ID",
+                        help="Print talent rank spell IDs for any rank spell ID (repeatable)")
     parser.add_argument("--item", type=int, action="append", default=[], metavar="ID",
                         help="Print item class, subclass and inventory type for ID (repeatable)")
     parser.add_argument("names", nargs="*", help="DBC names (default: a small set)")
@@ -83,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Error: --id expects NAME=KEY, got {item!r}", file=sys.stderr)
                 return 1
             lookups.append((name, int(key)))
-        compact = args.enchant or args.spell or args.item
+        compact = args.enchant or args.spell or args.item or args.talent
         names = args.names or ([] if lookups or compact else DEFAULT_DBCS)
         try:
             if compact:
@@ -93,6 +95,11 @@ def main(argv: list[str] | None = None) -> int:
                 for key in args.spell:
                     info = defs.spell(key)
                     print(f"spell {key}: " + (f"{info.name!r} {info.rank!r} {info.description!r}" if info else "None"))
+                for key in args.talent:
+                    info = defs.talent_for_spell(key)
+                    print(f"talent via spell {key}: " + (
+                        f"talent {info.talent_id} tab {info.tab_id} row {info.row} col {info.column} ranks {list(info.rank_spell_ids)}"
+                        if info else "None"))
                 for key in args.item:
                     info = defs.item(key)
                     print(f"item {key}: " + (f"class {info.item_class} subclass {info.item_subclass} slot {info.inventory_type_name}" if info else "None"))

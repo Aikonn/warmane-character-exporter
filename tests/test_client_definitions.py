@@ -47,6 +47,19 @@ class DefinitionsTests(unittest.TestCase):
         self.assertEqual((it.item_class, it.item_subclass, it.inventory_type_name), (4, 1, "head"))
         self.assertIsNone(defs.item(2))
 
+    def test_talent_ranks(self) -> None:
+        talent = build_dbc([
+            _row(23, {0: 100, 1: 7, 2: 1, 3: 2, 4: 14748, 5: 14768, 6: 14769}),
+            _row(23, {0: 101, 1: 7, 2: 0, 3: 0, 4: 555}),
+        ])
+        defs = ClientDefinitions(self._client({"DBFilesClient\\Talent.dbc": talent}))
+        info = defs.talent_for_spell(14768)
+        self.assertEqual(info.talent_id, 100)
+        self.assertEqual(info.rank_spell_ids, (14748, 14768, 14769))
+        self.assertEqual((info.tab_id, info.row, info.column), (7, 1, 2))
+        self.assertEqual(defs.talent_for_spell(555).rank_spell_ids, (555,))
+        self.assertIsNone(defs.talent_for_spell(1))
+
     def test_wrong_layout_and_missing_table(self) -> None:
         client = self._client({"DBFilesClient\\Item.dbc": build_dbc([(1, 2, 3)])})
         defs = ClientDefinitions(client)

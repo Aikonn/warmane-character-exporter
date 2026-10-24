@@ -3,6 +3,7 @@
 Field indexes verified against the real client on 2026-10-24:
   SpellItemEnchantment.dbc (38 fields): name enUS = 14
   Spell.dbc (234 fields): name enUS = 136, rank enUS = 153, description enUS = 170
+  Talent.dbc (23 fields, UNVERIFIED until run on a real client): tab = 1, row = 2, column = 3, rank spell IDs = 4..12
   Item.dbc (8 fields): class = 1, subclass = 2, inventory type = 6
 Item names are NOT in 3.3.5a DBCs (they live in the item cache), so they are not resolved here.
 """
@@ -20,6 +21,12 @@ SPELL_FIELDS = 234
 SPELL_NAME = 136
 SPELL_RANK = 153
 SPELL_DESCRIPTION = 170
+TALENT_FIELDS = 23
+TALENT_TAB = 1
+TALENT_ROW = 2
+TALENT_COLUMN = 3
+TALENT_RANK_FIRST = 4   # RankID[9] occupies fields 4..12
+TALENT_RANK_COUNT = 9
 ITEM_FIELDS = 8
 ITEM_CLASS = 1
 ITEM_SUBCLASS = 2
@@ -44,6 +51,15 @@ class SpellInfo:
 
 
 @dataclass(frozen=True)
+class TalentInfo:
+    talent_id: int
+    tab_id: int
+    row: int
+    column: int
+    rank_spell_ids: tuple[int, ...]   # rank 1..N, zero slots removed
+
+
+@dataclass(frozen=True)
 class ItemInfo:
     item_id: int
     item_class: int
@@ -61,6 +77,7 @@ class ClientDefinitions:
     def __init__(self, client: ClientData) -> None:
         self._client = client
         self._tables: dict[str, DbcTable] = {}
+        self._talent_by_spell: dict[int, TalentInfo] | None = None
 
     def _table(self, name: str, fields: int) -> DbcTable:
         if name not in self._tables:
@@ -99,3 +116,19 @@ class ClientDefinitions:
         if row is None:
             return None
         return ItemInfo(item_id, row[ITEM_CLASS], row[ITEM_SUBCLASS], row[ITEM_INVENTORY_TYPE])
+
+    def talent_for_spell(self, spell_id: int) -> TalentInfo | None:
+        """Talent whose rank list contains spell_id (any rank)."""
+        if self._talent_by_spell is None:
+            table = self._table("Talent.dbc", TALENT_FIELDS)
+            index: dict[int, TalentInfo] = {}
+            for position in range(len(table)):
+                row = table.row(position)
+                ranks = tuple(
+                    s for s in row[TALENT_RANK_FIRST : TALENT_RANK_FIRST + TALENT_RANK_COUNT] if s
+                )
+                info = TalentInfo(row[0], row[TALENT_TAB], row[TALENT_ROW], row[TALENT_COLUMN], ranks)
+                for s in ranks:
+                    index[s] = info
+            self._talent_by_spell = index
+        return self._talent_by_spell.get(spell_id)
