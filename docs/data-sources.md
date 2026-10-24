@@ -318,20 +318,39 @@ Implementation consequence: Added offline talents-capture parser (talents_parser
 
 ```text
 Finding ID: cavernoftime-spell-rank-discovery-2026-10-24
-Observed UTC: Exact observation time not retained
-Character / realm / source: Aikka / Onyxia / cavernoftime.com spell definition API (discovered during offline capture analysis)
+Observed UTC: 2026-10-24 (Copilot controlled requests + user manual screenshots; no embedded timestamps)
+Character / realm / source: Aikka / Onyxia / cavernoftime.com spell definition API
 Question: How are multi-rank talent effects retrieved? Can selected-rank definitions be resolved from captured talent spell IDs?
-Method and request count: Two controlled live HTTP requests (redirects allowed on first, explicitly disabled on second). No retries, 30-second timeout, response cap 256 KiB (first) / 512 KiB (second).
+Method and request count: 
+  Automated: Two controlled live HTTP requests. (1) GET /spell=14748&power=true (redirects allowed; 30-second timeout, 256 KiB cap). (2) GET /spell=14748 (explicit no-redirect handler; 30-second timeout, 512 KiB cap). Both HTTP 200. No retries after success.
+  Manual: User-provided browser screenshots of /spell=14769 (normal page) and /spell=55679 (normal page).
 Result:
-  (1) GET https://wotlk.cavernoftime.com/spell=14748&power=true (HTTP 200, text/html) returned Rank 1 tooltip: "Improved Power Word: Shield" with 5% effect. Redirect history and exact request count unverified due to automatic redirect handling.
-  (2) GET https://wotlk.cavernoftime.com/spell=14748 (HTTP 200, text/html, explicit no-redirect handler) returned normal definition page with Rank 1 effect and related-spell data array: `[{name:'@Improved Power Word: Shield',rank:'Rank 2',"cat":-2,id:14768},{name:'@Improved Power Word: Shield',rank:'Rank 3',"cat":-2,id:14769},{name:'@Improved Power Word: Shield',rank:'',id:24191}]`. This identifies Rank 2 as spell 14768, Rank 3 as spell 14769; entry 24191 has no rank label (unranked related spell, not a rank mapping).
-Evidence / fixture: Live probe results recorded; no fixture created (live response content untrusted for redistribution). Rank 1 definition text and spell IDs for Rank 2/3 extracted from API responses.
-Limitations: Candidate mechanism observed for ONE talent (14748 with 1/3 selected). Higher-rank effects remain unverified (spell=14768 and spell=14769 not yet fetched). General applicability across all talents unknown. Unranked entry (24191) shows that not all "See Also" entries are rank mappings. Source access/reuse licensing terms remain unchecked. User observation: zero-rank talents (points_spent=0) display Rank 1 tooltips; this does not resolve selected-rank effects for unselected talent nodes. Glyph effect resolution mechanism unknown.
-Implementation consequence: Establishes a candidate rank-discovery route for talents: (1) extract spell ID from talent href; (2) fetch Cavernoftime spell page; (3) parse page for related spell entries to identify adjacent rank IDs; (4) fetch each rank's spell ID to retrieve rank-specific definition. Requires verification across additional talents, glyph mechanism discovery, ruleset compatibility check, and source licensing review before adoption.
+  Automated /spell=14748&power=true: HTTP 200, text/html. Rank 1 tooltip: "Improved Power Word: Shield, Rank 1. Increases the damage absorbed by your Power Word: Shield by 5%."
+  Automated /spell=14748: HTTP 200, text/html. Normal definition page; related-spell data identifies Rank 2 as spell 14768, Rank 3 as spell 14769. Unranked entry spell 24191 present in "See Also" (not a rank mapping).
+  Manual screenshot /spell=14769: "Improved Power Word: Shield, Rank 3". Full effect: "Increases the damage absorbed by your Power Word: Shield by 15%."
+  Manual screenshot /spell=55679: "Glyph of Flash Heal". Full effect: "Reduces the mana cost of your Flash Heal by 10%."
+Evidence / fixture: Live probe results (Rank 1 definition, rank-ID mappings) extracted from automated responses. User manual screenshots document Rank 3 definition and one glyph definition. Perplexity visually inspected user screenshots.
+Limitations: 
+  Automated: ONE talent (14748 Rank 1) verified; Rank 2/3 effects not yet fetched via automation.
+  Manual: Rank 3 definition and one glyph definition observed; Rank 2 effect, general coverage across other talents/glyphs, and automated reliability remain unresolved.
+  Ruleset compatibility for Rank 3 and glyph effects not established. Unranked entry (24191) shows not all "See Also" entries are rank mappings; heuristic for filtering rank entries not established. Source access/reuse licensing terms remain unchecked. Glyph parameter sensitivity (&power=true vs. normal page) not established.
+Implementation consequence: Establishes candidate rank-discovery route for talents: (1) extract spell ID from talent href; (2) fetch Cavernoftime spell page; (3) parse page for related spell entries to identify adjacent rank IDs; (4) fetch each rank's spell ID to retrieve rank-specific definition. Rank 3 (14769) and one glyph (55679) definitions manually confirmed. Automated access and full coverage remain unresolved; ruleset compatibility and source terms require verification.
 ```
 
 ```text
-Finding ID: cavernoftime-enchantment-gem-parameter-isolation-2026-10-24
+Finding ID: cavernoftime-spell-automated-access-denial-2026-10-24
+Observed UTC: 2026-10-24 02:45 GMT
+Character / realm / source: Talent 14769, Glyph 55679 / cavernoftime.com
+Question: Do higher-rank talent effects and glyph definitions remain retrievable via automated Cavernoftime spell page fetches after successful earlier probes?
+Method and request count: Two sequential GET requests (stdlib urllib.urlopen, 30-second timeout, 512 KiB+ cap, 3-second inter-request delay): (1) /spell=14769 (normal page); (2) /spell=55679&power=true (tooltip form). Default urllib behavior allowed redirects; redirect history and actual underlying request count not retained.
+Result: Both requests returned HTTP 403 Forbidden. No response body content retrieved. User-Agent header was "Python-urllib/Investigation" (differed from earlier successful probes).
+Evidence / fixture: Request metadata and HTTP response codes only; no response content to file.
+Limitations: 
+  Cause unresolved: Cannot determine whether blocking is due to IP-based access control, session state, specific header requirements, rate limiting, or other factors.
+  Changed condition: User-Agent header differed from earlier successful probes (checkpoint used unspecified headers; this attempt used "Python-urllib/Investigation").
+  Second request should not have run following first request's access denial.
+  Earlier checkpoint documented successful /spell=14748 and /spell=14748&power=true fetches; those findings remain valid within their recorded scope.
+Implementation consequence: Cavernoftime automated access currently unavailable for these spell IDs. Manual verification (user screenshots) provides the definitions; automated retrieval route is blocked pending investigation of access conditions or alternative sources.
 Observed UTC: 2026-10-24 (Copilot retained-file verification; no embedded timestamp)
 Character / realm / source: Item 51178 / Cavernoftime item tooltip API
 Question: Do enchantment (ench=) and gem codes (gems=) parameters independently resolve effect text? How do individual parameters contribute to equipped-instance tooltips?

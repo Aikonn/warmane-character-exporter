@@ -18,7 +18,7 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 
 ## Latest verified test result
 
-**Local Copilot agent run:**
+**Historical — talents-parser checkpoint (Local Copilot agent run):**
 - Executed full offline test suite: **41 tests passed, 0 failed**
 - Composition: summary parser (2 tests) + transport (7 tests) + checkpoint (1 test) + identity (4 tests) + retry (3 tests) + **talents parser (24 tests)**
 - Talents parser includes 4 new regression tests for edge cases: missing rank elements, trees without tree-info, tabs without containers, glyph class reordering
@@ -62,7 +62,7 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 - **Limitation:** Automated access blocked. Gem code 3627 lookup not attempted. Related-item names do not establish unique item IDs. Source reuse terms unchecked.
 - See [data-sources.md Finding: evowow-enchantment-3820-manual-verification-2026-10-24](./data-sources.md#findings-log).
 
-**Milestone 0 status:** **Incomplete** — equipment-to-definition chain partially explored; gem codes, bonus activation, and active spec remain unresolved.
+**Milestone 0 status:** **Incomplete** — equipment-to-definition chain partially explored; gem codes, bonus activation, and active spec remain unresolved. Definition-source diagnostic scaffold now available for bounded future investigations.
 
 ## Access finding (automated retrieval)
 - One approved automated request to `Aikka / Onyxia / summary` returned:
@@ -99,10 +99,45 @@ $env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m warmane_exporter.summary_di
 - **Active spec:** NOT determinable from rendered DOM. Tab UI selection state and display visibility do not indicate in-game active spec.
 - **Unresolved:** Talent effect text (selected-rank bonuses), glyph effect descriptions, and external definition resolution remain outstanding.
 
+### **NEW — Talent and glyph definitions (Cavernoftime + manual verification)**
+- Automated Cavernoftime probes (checkpoint) successfully fetched /spell=14748 and /spell=14748&power=true; Rank 1 definition retrieved and related-spell rank-ID mappings (14768→Rank 2, 14769→Rank 3) identified.
+- **Manual verification (user screenshots + Perplexity visual inspection):**
+  - Spell 14769 (Improved Power Word: Shield, Rank 3): Effect = "Increases the damage absorbed by your Power Word: Shield by 15%." ✓
+  - Spell 55679 (Glyph of Flash Heal): Effect = "Reduces the mana cost of your Flash Heal by 10%." ✓
+- **Automated access attempt (this checkpoint):** Two sequential GETs to /spell=14769 and /spell=55679&power=true with default urllib behavior (allowed redirects; 30-second timeout; 3-second inter-request delay).
+  - Result: Both HTTP 403 Forbidden. No response content.
+  - User-Agent header was "Python-urllib/Investigation" (differed from checkpoint probes).
+  - Cause unresolved (IP blocking, session state, header requirements, rate limiting unknown). Second request should not have run after first access denial.
+  - Earlier successful fetches remain valid; source automation reliability remains uncertain.
+- **Finding:** Rank 3 talent effect and one glyph effect manually verified. Rank 2 effect, general talent/glyph coverage, automated reliability, ruleset compatibility, and source terms remain unresolved.
+- See [data-sources.md Finding: cavernoftime-spell-rank-discovery-2026-10-24](./data-sources.md#findings-log) and [Finding: cavernoftime-spell-automated-access-denial-2026-10-24](./data-sources.md#findings-log).
+
+### **NEW — Definition-source diagnostic tool (offline + --live-once)**
+- **Implemented:** Minimal diagnostic in [src/warmane_exporter/definition_diagnostic.py](../src/warmane_exporter/definition_diagnostic.py) with reusable transport safeguards.
+- **Behavior:** 
+  - Default (no args): Offline URL validation and planning only; zero network requests.
+  - `--live-once` flag: One controlled HTTP GET with zero retries, respects persisted cooldowns, blocks redirects, 131 KiB body cap, 30-second timeout.
+- **URL validation:** HTTPS only; approved hosts (wotlk.cavernoftime.com, wotlk.evowow.com); explicit approved path/query forms with strict parameter whitelisting.
+  - Spell/item/enchantment IDs: Positive integers only `[1-9][0-9]*` (no zero, no leading zeros).
+  - Gem codes: Nonnegative integers with colon separators `[0-9]+(?::[0-9]+)*` (allows zero placeholders).
+  - Rejects: Scheme-less URLs, semicolon parameters, non-ASCII digits, control characters, credentials, non-default ports, fragments.
+- **Output:** JSON diagnostic with HTTP status, classification, Content-Type, body-truncation flag, and 500-character excerpt from response (same response, never re-fetched).
+- **Test coverage:** 55 tests (offline tests + URL validation rejection/acceptance + body-excerpt capping + main() integration mocking):
+  - URL validation: 29 tests (schemes, hosts, IDs, gem codes, control characters, zero-ID rejection, semicolon rejection, non-ASCII digits)
+  - Body excerpt: 4 tests (short/exact-limit/exceeds/empty)
+  - Offline subprocess: 2 tests (zero HTTP calls in default mode, validation error handling)
+  - Main integration: 5 tests (offline zero-calls, live-once success with exact excerpt matching and call count, rate-limit/transient no-retry, cooldown blocking)
+  - Results: **55 tests passed, exit code 0** (final Copilot-reported result after ASCII-regex and test correction).
+  - Earlier full-suite result: **95 tests passed** (before final small corrections).
+- **Implementation note:** One earlier integration test unintentionally attempted live network access; removed and replaced with mocked HTTP coverage to maintain offline-first design.
+- **Review:** Perplexity reviewed initial uploaded [definition_diagnostic.py](../src/warmane_exporter/definition_diagnostic.py) and [test_definition_diagnostic.py](../tests/test_definition_diagnostic.py); final ASCII-regex pattern updates and test enhancements were Copilot-reported, not independently executed by reviewer.
+- **Status:** Accepted after review. Reusable transport scaffold for future definition-source probes (spell, item, enchantment, gem) now available.
+
 ### Limitations
 - Rendered-DOM captures may include JavaScript-generated elements or cached tooltip snippets.
 - Captures do not prove full progression/achievement/statistics coverage.
 - Recent achievements are partial activity list, not complete progression evidence.
+- **Automated retrieval reliability unresolved:** Cavernoftime HTTP 403 responses in this session; earlier checkpoint probes succeeded. Cause unknown. Diagnostic tool available for future investigation but safeguards do not resolve source-access blocking.
 
 ## Local capture files (kept local, git-ignored)
 - `local-captures\aikka-onyxia-summary-dom.html`

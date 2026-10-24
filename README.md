@@ -62,6 +62,27 @@ python -m warmane_exporter.summary_diagnostic "local-captures\aikka-onyxia-summa
 
 Output is a diagnostic parse result for feasibility investigation, not the final exporter schema/report.
 
+### Definition-source diagnostic (Cavernoftime, EvoWoW)
+
+To inspect a definition-source URL (spell, item, enchantment) with transport safeguards:
+
+```text
+python -m warmane_exporter.definition_diagnostic "https://wotlk.cavernoftime.com/spell=14769"
+```
+
+Default is offline validation and planning only (no network request). Approved URLs and hosts:
+
+- `wotlk.cavernoftime.com`: `/spell=<id>`, `/spell=<id>&power=true`, `/item=<id>`, `/item=<id>&power=true`, `/item=<id>&power=true&ench=<code>`, `/item=<id>&power=true&gems=<codes>`, `/item=<id>&power=true&ench=<code>&gems=<codes>`
+- `wotlk.evowow.com`: `/?enchantment=<id>`
+
+To execute one live request with zero retries:
+
+```text
+python -m warmane_exporter.definition_diagnostic "https://wotlk.cavernoftime.com/spell=14769" --live-once
+```
+
+`--live-once` respects existing host cooldowns but disables retries, does not follow redirects, and reads responses with a 131 KiB body limit and 30-second timeout. Output is a JSON diagnostic including HTTP status, Content-Type, classification, body truncation, and a 500-character excerpt of the response body.
+
 ## Why this project exists
 
 Character evaluation needs more than a list of equipped item names. It needs item effects, gems, enchantments, talents, glyphs, character-sheet values, and evidence of dungeon/raid progression.
