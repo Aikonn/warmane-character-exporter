@@ -103,7 +103,7 @@ class HtmlTests(unittest.TestCase):
         self.assertNotIn("Ulduar <10>", html)  # raw armory text is never injected
         self.assertNotIn("<h1>A<b>", html)
         self.assertNotIn("<script", html)
-        self.assertEqual(html.count("http"), 3)   # only the item links; no scripts, styles or images are loaded from the web
+        self.assertEqual(html.count("http"), 5)   # the item links plus the armory link (href and text); no scripts, styles or images are loaded from the web
 
     def test_minimal_report_does_not_crash(self):
         html = render_html(build_pve_report({"identity": {"name": "X", "realm": "Icecrown"}, "missing_sections": ["statistics"]}))

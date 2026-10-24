@@ -53,3 +53,11 @@ class PveSubsetTests(unittest.TestCase):
             self.assertTrue(0 < len(subset) < len(everything))
         self.assertEqual(len(collect.categories_for("achievements", False)), 13)
         self.assertEqual(len(collect.categories_for("statistics", False)), 9)
+
+
+class ArmoryLinkTests(unittest.TestCase):
+    def test_link_under_title(self):
+        from warmane_exporter.pve_report import _armory_link
+        self.assertEqual(_armory_link({"name": "Aikka", "realm": "Onyxia"}),
+                         '<p>Armory: <a href="https://armory.warmane.com/character/Aikka/Onyxia/summary">https://armory.warmane.com/character/Aikka/Onyxia/summary</a></p>')
+        self.assertEqual(_armory_link({"name": "X", "realm": "Nowhere"}), "")

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from .gearscore import character_score
+from .snapshot import character_page_url
 from .report import BELT_BUCKLE
 from .identity import SUPPORTED_REALMS
 
@@ -437,6 +438,14 @@ def _other_section(pve: dict[str, Any]) -> str:
     return "".join(out)
 
 
+def _armory_link(ident: dict[str, Any]) -> str:
+    try:
+        url = character_page_url(str(ident.get("name") or ""), str(ident.get("realm") or ""), "summary")
+    except ValueError:
+        return ""
+    return f'<p>Armory: <a href="{_e(url)}">{_e(url)}</a></p>'
+
+
 def render_html(pve: dict[str, Any]) -> str:
     report = pve["report"]
     ident = report["identity"]
@@ -451,6 +460,7 @@ def render_html(pve: dict[str, Any]) -> str:
     parts = [
         f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{_e(title)}</title><style>{CSS}</style></head><body>",
         f"<h1>{_e(ident.get('name'))} - {_e(ident.get('realm'))}</h1>",
+        _armory_link(ident),
         f"<p>Level {_e(ident.get('level'))} {_e(ident.get('race'))} {_e(ident.get('class'))} ({_e(ident.get('faction'))}), "
         f"guild: {_e(ident.get('guild') or 'none')}. Achievement points: {_e(ident.get('achievement_points'))}.</p>",
         f"<p class=\"muted\">Data from the Warmane armory, snapshot taken {_e(when)}. This is a read-only record of the character as it is, "
