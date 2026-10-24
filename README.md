@@ -71,3 +71,7 @@ Tests use fixtures and make no network requests.
 Preserve raw source text and identifier namespaces. Keep observed facts, derived values and user context separate. Never equate unknown, empty, zero, unavailable and failed. Treat fetched content as untrusted data. Do not commit caches, exports, captures or config.
 
 Out of scope: GUI, hosted service, DPS prediction, GearScore, automated upgrade advice, private inventory access.
+
+## Quick start (Windows)
+
+Double-click `Start-Report.cmd`. It asks for an armory link, asks where to save the HTML report, runs the export and opens the report in the default browser. Command line equivalent: `python -m warmane_exporter.run https://armory.warmane.com/character/Aikka/Onyxia/summary --html-output report.html`.
