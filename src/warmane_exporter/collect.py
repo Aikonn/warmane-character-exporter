@@ -22,6 +22,7 @@ from .budget import DEFAULT_INTERVAL_SECONDS, BudgetExhausted, budgeted_client
 from .cache import ResponseCache
 from .checkpoint import ProbeCheckpointStore
 from .http_client import UrllibHttpClient
+from . import progress
 from .identity import SUPPORTED_REALMS
 from .snapshot import character_page_url, fetch_validated
 from .transport import RequestOrchestrator, TransportConfig
@@ -117,7 +118,9 @@ def collect_achievements(
     categories = categories or (STATISTIC_CATEGORIES if section == "statistics" else ACHIEVEMENT_CATEGORIES)
     live = 0
     results: list[dict[str, Any]] = []
-    for cat_id, cat_name, parent in categories:
+    label = "Achievements" if section == "achievements" else "Statistics"
+    for position, (cat_id, cat_name, parent) in enumerate(categories, 1):
+        progress.note(f"{label}: {cat_name} ({position} of {len(categories)})")
         record: dict[str, Any] = {"id": cat_id, "name": cat_name, "parent": parent}
         form = {"category": str(cat_id)}
         source = section
@@ -143,6 +146,7 @@ def collect_achievements(
                           detail=result.detail,
                           entries=result.data["entries"] if result.data else None)
         results.append(record)
+        progress.advance(f"{label}: {cat_name} done ({position} of {len(categories)})")
     complete = all(r["status"] == "ok" for r in results)
     return {
         "schema": COLLECTION_SCHEMA,

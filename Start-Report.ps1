@@ -45,7 +45,7 @@ function Find-Python {
 
 function Read-Link {
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = "Warmane PvE report"
+    $form.Text = "Warmane Character Exporter"
     $form.StartPosition = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
     $form.MaximizeBox = $false
@@ -77,17 +77,16 @@ function Read-Link {
     $form.AcceptButton = $ok
     $form.CancelButton = $cancel
     $form.Controls.AddRange(@($label, $box, $hint, $ok, $cancel))
-    $form.TopMost = $true
     while ($true) {
         if ($form.ShowDialog() -ne "OK") { return $null }
         if ($box.Text -match $pattern) { return $box.Text.Trim() }
-        Show-Message "That does not look like a Warmane armory character link." "Warmane PvE report" "Warning"
+        Show-Message "That does not look like a Warmane armory character link." "Warmane Character Exporter" "Warning"
     }
 }
 
 $python = Find-Python
 if (-not $python) {
-    Show-Message "Python was not found. Expected .tools\python312\python.exe in the project folder." "Warmane PvE report" "Error"
+    Show-Message "Python was not found. Expected .tools\python312\python.exe in the project folder." "Warmane Character Exporter" "Error"
     exit 1
 }
 
@@ -96,7 +95,7 @@ if (-not $Link) {
     if (-not $Link) { exit 0 }
 }
 if ($Link -notmatch $pattern) {
-    Show-Message "Not an armory character link: $Link" "Warmane PvE report" "Error"
+    Show-Message "Not an armory character link: $Link" "Warmane Character Exporter" "Error"
     exit 2
 }
 $charName = $Matches[1]
@@ -126,42 +125,74 @@ $env:PYTHONIOENCODING = "utf-8"
 $arguments = '-m warmane_exporter.run "{0}" --html-output "{1}"' -f $Link, $Output
 if ($Offline) { $arguments += " --offline" }
 
+$script:cancelled = $false
 $wait = New-Object System.Windows.Forms.Form
-$wait.Text = "Warmane PvE report"
+$wait.Text = "Warmane Character Exporter"
 $wait.StartPosition = "CenterScreen"
 $wait.FormBorderStyle = "FixedDialog"
-$wait.ControlBox = $false
-$wait.ClientSize = New-Object System.Drawing.Size(460, 90)
+$wait.MaximizeBox = $false
+$wait.ClientSize = New-Object System.Drawing.Size(520, 150)
 $title = New-Object System.Windows.Forms.Label
 $title.Text = "Creating the report for $charName ($charRealm)"
 $title.Location = New-Object System.Drawing.Point(12, 12)
 $title.AutoSize = $true
+$percentLabel = New-Object System.Windows.Forms.Label
+$percentLabel.Text = "0%"
+$percentLabel.Font = New-Object System.Drawing.Font("Segoe UI", 22)
+$percentLabel.Location = New-Object System.Drawing.Point(12, 36)
+$percentLabel.Size = New-Object System.Drawing.Size(120, 44)
 $status = New-Object System.Windows.Forms.Label
-$status.Text = "Starting. Requests are spaced 3 seconds apart, this can take a few minutes."
-$status.Location = New-Object System.Drawing.Point(12, 40)
-$status.Size = New-Object System.Drawing.Size(436, 40)
-$wait.Controls.AddRange(@($title, $status))
-$wait.TopMost = $true
+$status.Text = "Starting"
+$status.Location = New-Object System.Drawing.Point(140, 46)
+$status.Size = New-Object System.Drawing.Size(368, 40)
+$elapsedLabel = New-Object System.Windows.Forms.Label
+$elapsedLabel.Text = "Elapsed 0:00"
+$elapsedLabel.ForeColor = [System.Drawing.Color]::Gray
+$elapsedLabel.Location = New-Object System.Drawing.Point(12, 100)
+$elapsedLabel.Size = New-Object System.Drawing.Size(496, 40)
+$wait.Controls.AddRange(@($title, $percentLabel, $status, $elapsedLabel))
+$wait.Add_FormClosing({
+    param($sender, $e)
+    if ($script:process -and -not $script:process.HasExited) {
+        $answer = [System.Windows.Forms.MessageBox]::Show("Stop the export? Data already fetched is kept, so a new run continues where this one stopped.", "Warmane Character Exporter", "YesNo", "Question")
+        if ($answer -eq "Yes") { $script:cancelled = $true; try { $script:process.Kill() } catch { } } else { $e.Cancel = $true }
+    }
+})
 $wait.Show()
+$env:WARMANE_PROGRESS = "1"
+$clock = [System.Diagnostics.Stopwatch]::StartNew()
 
-$process = Start-Process -FilePath $python -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden `
+$script:process = Start-Process -FilePath $python -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden `
     -RedirectStandardOutput $logOut -RedirectStandardError $logErr -PassThru
+$process = $script:process
 $null = $process.Handle   # keeps the exit code readable after the process ends
 $tick = 0
+$lastText = "Starting"
 while (-not $process.HasExited) {
     [System.Windows.Forms.Application]::DoEvents()
-    Start-Sleep -Milliseconds 150
+    if ($script:cancelled) { break }
+    Start-Sleep -Milliseconds 100
     $tick++
-    if ($tick % 7 -eq 0 -and (Test-Path $logOut)) {
+    if ($tick % 3 -eq 0 -and (Test-Path $logOut)) {
         try {
-            $steps = @(Get-Content $logOut -Encoding UTF8 -ErrorAction Stop | Where-Object { $_ -like "-- *" })
-            if ($steps.Count -gt 0) { $status.Text = "Step: " + $steps[-1].Substring(3) + " (see launcher.log for details)" }
+            $lines = @(Get-Content $logOut -Tail 40 -Encoding UTF8 -ErrorAction Stop | Where-Object { $_ -like "PROGRESS|*" })
+            if ($lines.Count -gt 0) {
+                $parts = $lines[-1].Split("|", 3)
+                $percentLabel.Text = $parts[1] + "%"
+                $lastText = $parts[2]
+            }
         } catch { }
     }
+    $seconds = [int]$clock.Elapsed.TotalSeconds
+    $dots = "." * (1 + ($tick / 3) % 4)
+    $status.Text = $lastText
+    $elapsedLabel.Text = ("Working{0}  elapsed {1}:{2:00}. Requests to Warmane are spaced 3 seconds apart, so this takes a while. The window can be minimized or placed behind other windows." -f $dots, [math]::Floor($seconds / 60), ($seconds % 60))
 }
 $process.WaitForExit()
 $code = $process.ExitCode
+$script:process = $null
 $wait.Close()
+if ($script:cancelled) { exit 0 }
 
 if ($code -eq 0 -and (Test-Path $Output)) {
     if (-not $NoOpen) { Start-Process -FilePath $Output }
@@ -172,5 +203,5 @@ $tail = @()
 foreach ($file in $logOut, $logErr) {
     if (Test-Path $file) { $tail += Get-Content $file -Tail 12 -Encoding UTF8 }
 }
-Show-Message ("The report could not be created (exit code {0}).`n`n{1}`n`nFull log: {2}" -f $code, ($tail -join "`n"), $logOut) "Warmane PvE report" "Error"
+Show-Message ("The report could not be created (exit code {0}).`n`n{1}`n`nFull log: {2}" -f $code, ($tail -join "`n"), $logOut) "Warmane Character Exporter" "Error"
 exit 1
