@@ -596,3 +596,13 @@ Status: verified by 4 live GET requests (user-approved, one per character, 15 s 
 - Both realms and both characters answered (Bezduse 16 items, Aikka@Icecrown 17 items; empty professions/pvpteams/guild appear as [] or "").
 - Request cost: 1 request per character for JSON basics; HTML summary and talents pages are still needed for enchants, gems, talents and glyphs.
 - Not yet probed live: achievements, statistics, HTML pages from a plain HTTP client (earlier scripted request got Cloudflare 1010).
+
+### Finding: achievements-statistics-structure-2026-10-24
+
+Status: verified by 3 further live requests (user-approved; achievements page GET, one category POST, statistics page GET; 12 s apart; user's Chrome; no blocks). Total live requests this session: 7. Raw captures in git-ignored local-captures/.
+
+- Achievements page (/character/<Name>/<Realm>/achievements) shows per-category totals only (Aikka@Onyxia: 323 / 1058; General 24/54, Quests 5/49, Exploration 3/70, PvP 14/166, Dungeons and Raids 249/458, Professions 6/75, Reputation 12/45, World Events 4/141, Feats of Strength 6). Each category is loaded by POST to the same URL with form field category=<id> and returns JSON {"content": "<html>"}.
+- Top-level category ids: General 92, Quests 96, Exploration 97, Player vs. Player 95, Dungeons and Raids 168; subcategories use the same POST with a subcategory id (for example Quests: Classic 14861, TBC 14862, WotLK 14863). Full id list is in the page's data-category and data-subcategory attributes. Professions, Reputation, World Events and Feats ids still to be read.
+- Category 92 response (about 30 KB, 54 achievements): each entry has id (id="ach6"), points, icon URL, title, description and a date ("Earned MM/DD/YYYY"). Whether unearned entries are included, and the exact markup for them, needs checking in the saved file.
+- Statistics page (/statistics): sidebar categories with ids (Character 130, Combat 141, Kills 128, Deaths 122, Quests 133, Dungeons and Raids 14807, Skills 132, Travel 134, Social 131, Player vs. Player 21, with subcategories) and a name-and-value summary list; unset values appear as "- -".
+- Estimated full export cost for one character via the site: about 9 achievement POSTs plus statistics category loads, in addition to the pages already known. Needs a throttled, resumable run; do not fetch all at once.
