@@ -36,7 +36,7 @@ python -m warmane_exporter.budget
 ## Responsible access
 
 - Plain HTTP with a fixed browser-like User-Agent; no rotation, no evasion.
-- Requests are sequential, 3 s apart, within a daily budget (default 500, `python -m warmane_exporter.budget --set N`).
+- Requests are sequential, 1 s apart, within a daily budget (default 500, `python -m warmane_exporter.budget --set N`).
 - Error pages are detected and never cached as data; the tool stops on the first error.
 - Static reference pages go to the local `library/` folder and are reused.
 

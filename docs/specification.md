@@ -264,7 +264,7 @@ Rate limiting is an expected operating condition. A user-provided screenshot sho
 
 These are conservative project defaults to validate, not known Warmane limits:
 
-- Minimum host request interval: 3 seconds.
+- Minimum host request interval: 1 second (owner decision; was 3).
 - Rate-limit cooldowns without server guidance: 60, 120, then 240 seconds, with nonnegative jitter up to 20 percent.
 - Maximum automatic rate-limit retries: 3 per host per run; successes do not reset the run-wide budget.
 - Connection timeout: 10 seconds; read timeout: 30 seconds.

@@ -80,6 +80,20 @@ STATISTIC_CATEGORIES: tuple[tuple[int, str, int | None], ...] = (
 )
 
 
+# What the PvE report reads (pve_report.py): raid and dungeon achievements (parent 168 and its children),
+# statistics 14807 (entered/completed), the six WotLK/TBC/Classic instance categories, 125 (deaths in
+# dungeons) and 130 (Emblems and Badges). Everything else is only needed for a full export (--full).
+PVE_ACHIEVEMENT_IDS = frozenset({168, 14808, 14805, 14806, 14921, 14922, 14923, 14961, 14962, 15001, 15002, 15041, 15042})
+PVE_STATISTIC_IDS = frozenset({14807, 14821, 14822, 14823, 14963, 15021, 15062, 125, 130})
+
+
+def categories_for(section: str, full: bool) -> tuple[tuple[int, str, int | None], ...]:
+    """Categories to fetch for a section: all of them with full=True, otherwise only those the PvE report uses."""
+    allc = STATISTIC_CATEGORIES if section == "statistics" else ACHIEVEMENT_CATEGORIES
+    wanted = PVE_STATISTIC_IDS if section == "statistics" else PVE_ACHIEVEMENT_IDS
+    return allc if full else tuple(c for c in allc if c[0] in wanted)
+
+
 def _validate_statistics(text: str) -> dict[str, Any]:
     return {"entries": parse_statistics_response(text)}
 
@@ -189,6 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cache-dir", default=".warmane-cache")
     parser.add_argument("--limit", type=int, default=None, help="maximum live requests this run")
     parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL_SECONDS)
+    parser.add_argument("--full", action="store_true", help="all categories instead of only those the PvE report uses")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--refresh", action="store_true")
@@ -206,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
             args.name, args.realm, cache, orchestrator, budgeted_client(cache_dir),
             limit=args.limit, dry_run=args.dry_run, offline=args.offline, refresh=args.refresh,
             reject_dir=cache_dir / "rejected", section=args.section,
+            categories=categories_for(args.section, args.full),
         )
     except (ValueError, CategoryError) as exc:
         print(f"Error: {exc}", file=sys.stderr)

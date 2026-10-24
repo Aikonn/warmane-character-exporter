@@ -3,11 +3,11 @@
 python -m warmane_exporter.run NAME REALM          one character
 python -m warmane_exporter.run LINK                an armory link, e.g. https://armory.warmane.com/character/Aikka/Onyxia/summary
 python -m warmane_exporter.run --all               Aikka and Bezduse on Onyxia and Icecrown
-Options: --html-output FILE (copy the PvE report there), --refresh (ignore the 24 h cache), --offline (no requests, only rebuild the export)
+Options: --full (all achievement and statistic categories; the default fetches only what the PvE report uses), --html-output FILE (copy the PvE report there), --refresh (ignore the 24 h cache), --offline (no requests, only rebuild the export)
 
 Steps per character: snapshot, reputation page, mounts page, achievements, statistics, export.
 Every live request is counted against the daily budget (python -m warmane_exporter.budget) and
-spaced 3 s apart. The run stops at the first failing step; run it again to continue, because
+spaced 1 s apart. The run stops at the first failing step; run it again to continue, because
 everything already fetched is served from the cache.
 """
 
@@ -24,16 +24,17 @@ from .identity import parse_character_link
 ALL_CHARACTERS = (("Aikka", "Onyxia"), ("Aikka", "Icecrown"), ("Bezduse", "Onyxia"), ("Bezduse", "Icecrown"))
 
 
-def steps(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool) -> list[tuple[str, object, list[str]]]:
+def steps(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool, full: bool = False) -> list[tuple[str, object, list[str]]]:
     common = ["--cache-dir", cache_dir]
     flags = (["--refresh"] if refresh else []) + (["--offline"] if offline else [])
+    coll_flags = flags + (["--full"] if full else [])
     plan: list[tuple[str, object, list[str]]] = []
     if not offline:
         plan.append(("snapshot", snapshot.main, [name, realm, *common, *flags]))
         for view in ("reputation", "mounts-and-companions"):
             plan.append((view, discover.main, [name, realm, view, *common] + (["--refresh"] if refresh else [])))
         for section in ("achievements", "statistics"):
-            plan.append((section, collect.main, [name, realm, "--section", section, *common, *flags]))
+            plan.append((section, collect.main, [name, realm, "--section", section, *common, *coll_flags]))
     plan.append(("export", export.main, [name, realm, *common]))
     return plan
 
@@ -46,15 +47,15 @@ STEP_TEXT = {
 }
 
 
-def step_units(label: str) -> int:
+def step_units(label: str, full: bool = False) -> int:
     """Progress units of a step; the achievement and statistics steps count one per category and report it themselves."""
-    return {"snapshot": 3, "achievements": len(collect.ACHIEVEMENT_CATEGORIES), "statistics": len(collect.STATISTIC_CATEGORIES)}.get(label, 1)
+    return {"snapshot": 3, "achievements": len(collect.categories_for("achievements", full)), "statistics": len(collect.categories_for("statistics", full))}.get(label, 1)
 
 
-def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool) -> bool:
+def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool, full: bool = False) -> bool:
     print(f"== {name}@{realm}")
-    plan = steps(name, realm, cache_dir, refresh, offline)
-    progress.start(sum(step_units(label) for label, _, _ in plan), f"Starting {name} ({realm})")
+    plan = steps(name, realm, cache_dir, refresh, offline, full)
+    progress.start(sum(step_units(label, full) for label, _, _ in plan), f"Starting {name} ({realm})")
     for label, entry, argv in plan:
         print(f"-- {label}")
         progress.note(STEP_TEXT.get(label, label))
@@ -63,7 +64,7 @@ def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline:
             print(f"Stopped at step '{label}' (exit code {code}). Run the same command again to continue.")
             return False
         if label not in ("achievements", "statistics"):
-            progress.advance(f"{STEP_TEXT.get(label, label)}: done", step_units(label))
+            progress.advance(f"{STEP_TEXT.get(label, label)}: done", step_units(label, full))
     return True
 
 
@@ -76,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cache-dir", default=".warmane-cache")
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--full", action="store_true", help="fetch all achievement and statistic categories, not only those the PvE report uses")
     args = parser.parse_args(argv)
     if args.all:
         targets = ALL_CHARACTERS
@@ -94,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.html_output and len(targets) != 1:
         parser.error("--html-output works with one character")
     for name, realm in targets:
-        if not run_character(name, realm, args.cache_dir, args.refresh, args.offline):
+        if not run_character(name, realm, args.cache_dir, args.refresh, args.offline, args.full):
             return 1
         if args.html_output:
             source = Path(args.cache_dir) / "exports" / f"{name.lower()}-{realm.lower()}-pve.html"

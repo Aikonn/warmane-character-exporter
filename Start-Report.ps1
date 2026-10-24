@@ -186,7 +186,7 @@ while (-not $process.HasExited) {
     $seconds = [int]$clock.Elapsed.TotalSeconds
     $dots = "." * (1 + ($tick / 3) % 4)
     $status.Text = $lastText
-    $elapsedLabel.Text = ("Working{0}  elapsed {1}:{2:00}. Requests to Warmane are spaced 3 seconds apart, so this takes a while. The window can be minimized or placed behind other windows." -f $dots, [math]::Floor($seconds / 60), ($seconds % 60))
+    $elapsedLabel.Text = ("Working{0}  elapsed {1}:{2:00}. Requests to Warmane are spaced 1 second apart, so this takes a while. The window can be minimized or placed behind other windows." -f $dots, [math]::Floor($seconds / 60), ($seconds % 60))
 }
 $process.WaitForExit()
 $code = $process.ExitCode
