@@ -72,7 +72,13 @@ function Install-Python {
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         New-Item -ItemType Directory -Force -Path (Join-Path $root ".tools") | Out-Null
-        Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+        $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+        if ($curl) {
+            & $curl.Source -sS -L -m 300 -o $zip $url
+            if ($LASTEXITCODE -ne 0) { throw "curl failed with exit code $LASTEXITCODE" }
+        } else {
+            Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+        }
         if (Test-Path $target) { Remove-Item -Recurse -Force $target }
         Expand-Archive -Path $zip -DestinationPath $target -Force
         Remove-Item $zip -Force
