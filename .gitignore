@@ -14,4 +14,11 @@ tests/fixtures/captures/last-live-response-sanitized.json
 .warmane-cache/
 
 .tools/
-library/
+library/*
+!library/definitions/
+library/definitions/*
+!library/definitions/client-export.json
+!library/acore/
+library/acore/*
+!library/acore/items.db
+dist/
