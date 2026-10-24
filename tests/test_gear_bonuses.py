@@ -1,7 +1,7 @@
 import unittest
 
 from warmane_exporter.client_definitions import parse_conditions
-from warmane_exporter.gear_bonuses import analyze, parse_bonus, requirements_met
+from warmane_exporter.gear_bonuses import analyze, set_bonuses, parse_bonus, requirements_met
 
 
 def gem(text, color, **extra):
@@ -62,6 +62,15 @@ class BonusTests(unittest.TestCase):
         item = {"slot": "Head", "sockets": ["red"], "socket_bonus": "+4 Spell Power", "gem_details": [{"id": 0, "empty": True}]}
         analyze([item])
         self.assertFalse(item["socket_bonus_info"]["active"])
+
+    def test_set_bonuses(self):
+        info = {"id": 9, "name": "Test Raiment", "size": 5,
+                "bonuses": [{"threshold": 2, "text": "A"}, {"threshold": 4, "text": "B"}]}
+        equipment = [{"set": info}, {"set": info}, {"set": info}, {"set": None}]
+        result = set_bonuses(equipment)
+        self.assertEqual(len(result), 1)
+        self.assertEqual((result[0]["equipped"], [b["active"] for b in result[0]["bonuses"]]), (3, [True, False]))
+        self.assertEqual(set_bonuses([{}]), [])
 
 
 if __name__ == "__main__":

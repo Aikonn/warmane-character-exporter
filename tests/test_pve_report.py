@@ -64,6 +64,9 @@ class HtmlTests(unittest.TestCase):
             "identity": {"name": "A<b>", "realm": "Onyxia", "level": 80, "race": "Blood Elf", "class": "Priest", "faction": "Horde",
                          "guild": None, "achievement_points": 10},
             "snapshot_time": 1792846391, "active_specialization": "unknown (not exposed by Warmane)",
+            "set_bonuses": [{"name": "Zabra's Raiment", "size": 5, "equipped": 3, "bonuses": [
+                {"threshold": 2, "text": "Prayer of Mending +20%.", "active": True},
+                {"threshold": 4, "text": "Divine Aegis +10%.", "active": False}]}],
             "bonus_totals": {"Stamina": 5, "Spell Power": 30},
             "equipment": [
                 {"slot": "Head", "item_id": 1, "name": "Hood", "quality": "epic", "item_level": 264, "stats": [["stamina", 5]],
@@ -94,7 +97,7 @@ class HtmlTests(unittest.TestCase):
         self.assertEqual([r["name"] for r in pve["currencies"]], ["Emblems of Frost acquired"])
         self.assertEqual(len(pve["achievement_groups"]), 1)
         html = render_html(pve)
-        for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "&lt;no gem&gt;", "+12 Spell Power (epic yellow)", "Eternal Belt Buckle", "Equip: Your spell casts have a chance to grant 304 mana per 5 sec for 15 sec.", "Base stats and special effects", "Socket bonus (inactive): +9 Stamina", "Total base stat bonuses", "<td>Spell Power</td><td>+30</td>", "https://wotlk.cavernoftime.com/item=1", "GearScore", "Penance", "Do the thing",
+        for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "&lt;no gem&gt;", "+12 Spell Power (epic yellow)", "Eternal Belt Buckle", "Equip: Your spell casts have a chance to grant 304 mana per 5 sec for 15 sec.", "Base stats and special effects", "Socket bonus (inactive): +9 Stamina", "Total base stat bonuses", "Zabra&#x27;s Raiment (3/5)", "(2) Set: Prayer of Mending +20%. (active)", '<span class="off">(4) Set: Divine Aegis +10%. (inactive)</span>', '<span class="off">Socket bonus (inactive): +9 Stamina</span>', "<td>Spell Power</td><td>+30</td>", "https://wotlk.cavernoftime.com/item=1", "GearScore", "Penance", "Do the thing",
                        "Sindragosa", "heroic", "Warning: some armory kill counts", "Argent Crusade", "Wind Rider", "2026-"):
             self.assertIn(needle, html)
         self.assertNotIn("Ulduar <10>", html)  # raw armory text is never injected

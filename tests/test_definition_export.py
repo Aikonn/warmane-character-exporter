@@ -37,6 +37,12 @@ class FakeDefs:
             return FakeTable([(5, 200, 1, 0)])
         raise KeyError(name)
 
+    def gem_requirements(self, enchant_id):
+        return None
+
+    def item_sets(self):
+        return [{"id": 9, "name": "Test Raiment", "items": [11, 12, 13], "bonuses": [[2, 100], [3, 101]]}]
+
     def spell(self, sid):
         return {100: SpellInfo(100, "Talent", "Rank 1", "Does $s1"), 101: SpellInfo(101, "Talent", "Rank 2", "Does $s1"),
                 200: SpellInfo(200, "Glyph of X", "", "Bad $x")}.get(sid)
@@ -58,7 +64,7 @@ class ExportTests(unittest.TestCase):
 
     def test_export_content(self):
         self.assertEqual(self.data["enchants"], {"3820": "+30 Spell Power", "3627": "+20 Crit"})
-        self.assertEqual(self.data["client_tables"], {"enchants": 2, "gem_properties": 2, "enchant_conditions": 0, "talents": 1, "glyphs": 1, "spells": 3})
+        self.assertEqual(self.data["client_tables"], {"enchants": 2, "gem_properties": 2, "enchant_conditions": 0, "item_sets": 1, "talents": 1, "glyphs": 1, "spells": 3})
         self.assertIn("render_error", self.data["spells"]["200"])
         self.assertTrue(self.data["spells"]["101"]["rendered_unresolved"])
 

@@ -452,3 +452,8 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 
 - gear_bonuses.py: socket bonus active when every socket holds a gem of fitting colour (extra buckle/blacksmith gems ignored); meta gem active when its SpellItemEnchantmentCondition is met by the gem colours of the whole equipped set (orange = red + yellow etc.). Conditions come from the client export (enchant_conditions, 49 rows). That DBC is packed (64-byte records, header says 31 fields), parsed in client_definitions.parse_conditions.
 - Stat totals are parsed from the client's texts (plain '+N Stat' parts only); percent effects, procs and weapon enchants are not counted. Item armor is included, inactive socket bonuses and inactive metas are not.
+
+## Set bonuses
+
+- Not taken from the armory tooltip (it does not evaluate them). Static data: set id of each item from AzerothCore item_template (itemset), set name, piece count and bonus spells with thresholds from ItemSet.dbc (exported into client-export.json as item_sets, 475 sets), bonus text from the client's rendered spell description.
+- The report counts equipped items per set id (all difficulty variants of a set share one id) and marks each bonus active when the count reaches its threshold. Inactive set bonuses, socket bonuses and meta gems are gray.

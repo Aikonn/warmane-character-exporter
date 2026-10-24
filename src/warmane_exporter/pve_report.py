@@ -178,7 +178,7 @@ CSS = """
 body{font-family:Segoe UI,Arial,sans-serif;max-width:1100px;margin:1.5em auto;padding:0 1em;color:#111;line-height:1.4}
 h1{border-bottom:2px solid #444;padding-bottom:.2em} h2{margin-top:1.8em;border-bottom:1px solid #999}
 table{border-collapse:collapse;margin:.6em 0;font-size:.92em} th,td{border:1px solid #bbb;padding:.25em .6em;text-align:left;vertical-align:top}
-th{background:#eee} td.n{text-align:right} .muted{color:#555} .note{background:#f6f6f0;border-left:4px solid #aa8;padding:.4em .8em}
+th{background:#eee} td.n{text-align:right} .muted{color:#555} .off{color:#888} .note{background:#f6f6f0;border-left:4px solid #aa8;padding:.4em .8em}
 .warn{background:#fde8e8;border:1px solid #c33;border-left:6px solid #b00;color:#600;padding:.5em .9em;margin:.6em 0}
 details{margin:.4em 0} details.big{margin-top:1.8em;border-bottom:1px solid #999} details.big>summary{list-style-position:inside} details.big>summary>h2{display:inline;margin:0;border:0} summary{cursor:pointer}
 """
@@ -220,6 +220,25 @@ def _bonus_text(value: int) -> str:
     return f"+{value}"
 
 
+def _off(text: str) -> Html:
+    return Html(f'<span class="off">{_e(text)}</span>')
+
+
+def _set_html(report: dict[str, Any]) -> str:
+    sets = report.get("set_bonuses") or []
+    if not sets:
+        return ""
+    parts = ["<h3>Set bonuses</h3>"]
+    for entry in sets:
+        lines = [f"<b>{_e(entry['name'])} ({entry['equipped']}/{entry['size']})</b>"]
+        for b in entry["bonuses"]:
+            state = "active" if b["active"] else "inactive"
+            line = _e(f"({b['threshold']}) Set: {b['text'] or 'text unavailable'} ({state})")
+            lines.append(line if b["active"] else f'<span class="off">{line}</span>')
+        parts.append("<p>" + "<br>".join(lines) + "</p>")
+    return "".join(parts)
+
+
 def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
     rows = []
     for e in report.get("equipment", []):
@@ -232,14 +251,15 @@ def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
         info = e.get("socket_bonus_info")
         if info:
             state = {True: "active", False: "inactive"}.get(info["active"], "unknown")
-            lines.append(f"Socket bonus ({state}): {info['text']}")
+            line = f"Socket bonus ({state}): {info['text']}"
+            lines.append(_off(line) if info["active"] is False else line)
         lines.extend(f"{x['trigger']}: {x['text']}" for x in e.get("effects") or [])
         # base stats stay on one line, everything after them starts on a new line
         stat_count = len(lines) - len(e.get("effects") or []) - (1 if info else 0)
         if stat_count > 1:
             lines[:stat_count] = [", ".join(lines[:stat_count])]
         if e.get("gem_lines") is not None and (e.get("gem_lines") or e.get("sockets") is not None):
-            gems = list(e["gem_lines"])
+            gems = [_off(g) if g.endswith("(inactive)") else g for g in e["gem_lines"]]
         else:
             gems = list(e.get("gems") or [])
         enchant = [e["enchant"]] if e.get("enchant") else []
@@ -275,7 +295,7 @@ def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
         note = (f'<p class="muted">Average item level and GearScore not calculated: item level data is missing for '
                 f'{score["unknown_items"]} item(s). Run the AzerothCore fetch and rebuild the snapshot.</p>')
     return ("<h2 id=\"gear\">Equipment</h2>"
-            + _table(["Slot", "Item", "Quality", "Item level", "GearScore", "Base stats and special effects", "Enchant", "Gems"], rows) + note + totals_html)
+            + _table(["Slot", "Item", "Quality", "Item level", "GearScore", "Base stats and special effects", "Enchant", "Gems"], rows) + _set_html(report) + note + totals_html)
 
 
 def _spec_section(report: dict[str, Any]) -> str:

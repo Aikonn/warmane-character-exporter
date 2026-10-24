@@ -97,6 +97,38 @@ class DefinitionsTests(unittest.TestCase):
         self.assertEqual(effects, [{"trigger": "Equip", "spell": 77, "text": "Grants 304 mana per 5 sec."}])
         self.assertTrue(any("spell 78 has no description" in w for w in out["client_warnings"]))
 
+    def test_item_set_from_item_template(self):
+        from test_acore_items import _COLUMNS
+        from warmane_exporter.spell_text import Rendered
+        rows = []
+        for entry in (5, 6, 7):
+            row = _row(entry, f"Piece{entry}", inv=1, sockets=(0, 0, 0))
+            row[_COLUMNS.index("itemset")] = 9
+            rows.append(row)
+        path = self.lib / "acore" / "sets.db"
+        build_database(_sql(rows), path)
+
+        class Texts:
+            def item_set(self, set_id):
+                return {"id": 9, "name": "Test Raiment", "items": [5], "bonuses": [[2, 77], [4, 78]]} if set_id == 9 else None
+            def render_spell_description(self, spell_id):
+                return Rendered("Bonus text.", False) if spell_id == 77 else None
+            def spell(self, spell_id):
+                return None
+            def enchant_text(self, enchant_id):
+                return None
+
+        defs = Definitions(acore=AcoreItems(path), file=Texts())
+        self.addCleanup(defs.close)
+        summary = self._summary([])
+        summary["equipment"]["slots"][0]["item_reference"]["namespaces"]["item"] = "5"
+        out = enrich_summary_result(summary, defs)
+        info = out["equipment"]["slots"][0]["client"]["set"]
+        self.assertEqual((info["name"], info["size"]), ("Test Raiment", 1))
+        self.assertEqual(info["bonuses"][0], {"threshold": 2, "spell": 77, "text": "Bonus text."})
+        self.assertIsNone(info["bonuses"][1]["text"])
+        self.assertTrue(any("set bonus spell 78" in w for w in out["client_warnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()

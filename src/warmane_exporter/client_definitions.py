@@ -11,6 +11,7 @@ Item names are NOT in 3.3.5a DBCs (they live in the item cache), so they are not
 from __future__ import annotations
 
 import struct
+from typing import Any
 from dataclasses import dataclass
 
 from .dbc_parser import DbcError, DbcTable
@@ -42,6 +43,10 @@ TALENT_COLUMN = 3
 TALENT_RANK_FIRST = 4   # RankID[9] occupies fields 4..12
 TALENT_RANK_COUNT = 9
 ENCHANT_CONDITION = 34      # SpellItemEnchantment.dbc: id of the SpellItemEnchantmentCondition row (meta gem requirements)
+ITEMSET_FIELDS = 53          # ItemSet.dbc: ID, name[17], item[17], bonus spell[8], threshold[8], skill, rank
+ITEMSET_ITEMS = 18
+ITEMSET_SPELLS = 35
+ITEMSET_THRESHOLDS = 43
 GEMPROP_FIELDS = 5        # GemProperties.dbc: ID, EnchantID, MaxcountInv, MaxcountItem, Type (colour bit mask)
 GLYPH_FIELDS = 4         # GlyphProperties.dbc: ID, SpellID, GlyphSlotFlags, SpellIconID (UNVERIFIED)
 ITEM_FIELDS = 8
@@ -129,6 +134,7 @@ class ClientDefinitions:
         self._glyph_by_spell: dict[int, GlyphInfo] | None = None
         self._gem_by_enchant: dict[int, tuple[int, int]] | None = None
         self._conditions: dict[int, list[list[int]]] | None = None
+        self._sets: dict[int, dict[str, Any]] | None = None
 
     def _table(self, name: str, fields: int) -> DbcTable:
         if name not in self._tables:
@@ -172,6 +178,26 @@ class ClientDefinitions:
                 raise DbcError("SpellItemEnchantmentCondition.dbc not found in client archives")
             self._conditions = parse_conditions(found[0])
         return self._conditions.get(row[ENCHANT_CONDITION])
+
+    def item_sets(self) -> list[dict[str, Any]]:
+        """Every item set: id, name, item ids, bonus spell ids with their piece thresholds."""
+        table = self._table("ItemSet.dbc", ITEMSET_FIELDS)
+        sets = []
+        for position in range(len(table)):
+            row = table.row(position)
+            bonuses = [[row[ITEMSET_THRESHOLDS + i], row[ITEMSET_SPELLS + i]] for i in range(8) if row[ITEMSET_SPELLS + i]]
+            items = [i for i in row[ITEMSET_ITEMS: ITEMSET_ITEMS + 17] if i]
+            if row[0]:
+                sets.append({"id": row[0], "name": table.string_at(row[1]) or "", "items": items, "bonuses": sorted(bonuses)})
+        return sets
+
+    def item_set(self, set_id: int) -> dict[str, Any] | None:
+        if self._sets is None:
+            try:
+                self._sets = {s["id"]: s for s in self.item_sets()}
+            except DbcError:   # table missing in this client: the export file may still know the sets
+                self._sets = {}
+        return self._sets.get(set_id)
 
     def spell(self, spell_id: int) -> SpellInfo | None:
         table = self._table("Spell.dbc", SPELL_FIELDS)
