@@ -184,9 +184,10 @@ while (-not $process.HasExited) {
         } catch { }
     }
     $seconds = [int]$clock.Elapsed.TotalSeconds
-    $dots = "." * (1 + ($tick / 3) % 4)
+    $pos = [math]::Abs((($tick / 3) % 10) - 5)   # 0..5..1, moves left and right
+    $track = (0..5 | ForEach-Object { if ($_ -eq $pos) { "o" } else { "." } }) -join " "
     $status.Text = $lastText
-    $elapsedLabel.Text = ("Working{0}  elapsed {1}:{2:00}. Requests to Warmane are spaced 1 second apart, so this takes a while. The window can be minimized or placed behind other windows." -f $dots, [math]::Floor($seconds / 60), ($seconds % 60))
+    $elapsedLabel.Text = ("Working  {0}`r`nElapsed {1}:{2:00}. Requests to Warmane are spaced 1 second apart, so this takes a while. The window can be minimized or placed behind other windows." -f $track, [math]::Floor($seconds / 60), ($seconds % 60))
 }
 $process.WaitForExit()
 $code = $process.ExitCode
