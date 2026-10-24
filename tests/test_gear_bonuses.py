@@ -1,6 +1,6 @@
 import unittest
 
-from warmane_exporter.client_definitions import condition_rows
+from warmane_exporter.client_definitions import parse_conditions
 from warmane_exporter.gear_bonuses import analyze, parse_bonus, requirements_met
 
 
@@ -27,10 +27,13 @@ class BonusTests(unittest.TestCase):
         self.assertTrue(requirements_met([[4, 3, 3, 0]], counts))          # more blue than yellow
         self.assertIsNone(requirements_met([[4, 9, 0, 2]], counts))
 
-    def test_condition_rows(self):
-        row = [31, 3, 2, 0, 0, 0] + [0] * 5 + [5, 5, 0, 0, 0] + [0] * 5 + [2, 1, 0, 0, 0] + [1, 0, 0, 0, 0]
-        self.assertEqual(condition_rows(row), [[3, 5, 0, 2], [2, 5, 0, 1]])
-        self.assertIsNone(condition_rows(None))
+    def test_parse_conditions(self):
+        import struct
+        def record(cid, colors, comps, compare, values):
+            pad = lambda x: list(x) + [0] * (5 - len(x))
+            return struct.pack("<I5B5I5B5B5I5B", cid, *pad(colors), *[0] * 5, *pad(comps), *pad(compare), *pad(values), *[0] * 5)
+        data = b"WDBC" + struct.pack("<IIII", 2, 31, 64, 1) + record(31, [3, 2], [5, 5], [], [2, 1]) + record(34, [2], [3], [4], []) + b"\0"
+        self.assertEqual(parse_conditions(data), {31: [[3, 5, 0, 2], [2, 5, 0, 1]], 34: [[2, 3, 4, 0]]})
 
     def test_analyze(self):
         meta = gem("+32 Stamina and 2% Increased Armor Value from Items", "meta", requirements=[[4, 5, 0, 2]])

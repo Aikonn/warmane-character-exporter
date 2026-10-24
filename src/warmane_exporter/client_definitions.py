@@ -42,7 +42,6 @@ TALENT_COLUMN = 3
 TALENT_RANK_FIRST = 4   # RankID[9] occupies fields 4..12
 TALENT_RANK_COUNT = 9
 ENCHANT_CONDITION = 34      # SpellItemEnchantment.dbc: id of the SpellItemEnchantmentCondition row (meta gem requirements)
-CONDITION_FIELDS = 31      # SpellItemEnchantmentCondition.dbc: ID + 5 x (colour, operand, comparator, compare colour, value, logic)
 GEMPROP_FIELDS = 5        # GemProperties.dbc: ID, EnchantID, MaxcountInv, MaxcountItem, Type (colour bit mask)
 GLYPH_FIELDS = 4         # GlyphProperties.dbc: ID, SpellID, GlyphSlotFlags, SpellIconID (UNVERIFIED)
 ITEM_FIELDS = 8
@@ -96,12 +95,28 @@ class ItemInfo:
         return INVENTORY_TYPES.get(self.inventory_type, f"unknown({self.inventory_type})")
 
 
-def condition_rows(row) -> list[list[int]] | None:
-    """Rows of one SpellItemEnchantmentCondition record (columns: colour[5], operand[5], comparator[5], compare colour[5], value[5])."""
-    if row is None:
-        return None
-    found = [[row[1 + i], row[11 + i], row[16 + i], row[21 + i]] for i in range(5) if row[1 + i]]
-    return found or None
+CONDITION_RECORD = struct.Struct("<I5B5I5B5B5I5B")   # packed, no padding: id, colour[5], operand[5], comparator[5], compare colour[5], value[5], logic[5]
+
+
+def parse_conditions(data: bytes) -> dict[int, list[list[int]]]:
+    """SpellItemEnchantmentCondition.dbc: {condition id: [[colour, comparator, compare colour, value], ...]}.
+
+    This table is packed (its header claims 31 four-byte fields but the records are 64 bytes), so it
+    cannot go through DbcTable.
+    """
+    if data[:4] != b"WDBC":
+        raise DbcError(f"Invalid DBC magic: {data[:4]!r}")
+    count, _fields, size, _strings = struct.unpack_from("<IIII", data, 4)
+    if size != CONDITION_RECORD.size:
+        raise DbcError(f"SpellItemEnchantmentCondition.dbc record size {size}, expected {CONDITION_RECORD.size}")
+    found: dict[int, list[list[int]]] = {}
+    for position in range(count):
+        row = CONDITION_RECORD.unpack_from(data, 20 + position * size)
+        colour, comparator, compare, value = row[1:6], row[11:16], row[16:21], row[21:26]
+        rows = [[colour[i], comparator[i], compare[i], value[i]] for i in range(5) if colour[i]]
+        if rows:
+            found[row[0]] = rows
+    return found
 
 
 class ClientDefinitions:
@@ -113,6 +128,7 @@ class ClientDefinitions:
         self._talent_by_spell: dict[int, TalentInfo] | None = None
         self._glyph_by_spell: dict[int, GlyphInfo] | None = None
         self._gem_by_enchant: dict[int, tuple[int, int]] | None = None
+        self._conditions: dict[int, list[list[int]]] | None = None
 
     def _table(self, name: str, fields: int) -> DbcTable:
         if name not in self._tables:
@@ -150,7 +166,12 @@ class ClientDefinitions:
         row = table.find(enchant_id)
         if row is None or not row[ENCHANT_CONDITION]:
             return None
-        return condition_rows(self._table("SpellItemEnchantmentCondition.dbc", CONDITION_FIELDS).find(row[ENCHANT_CONDITION]))
+        if self._conditions is None:
+            found = self._client.read("DBFilesClient\\SpellItemEnchantmentCondition.dbc")
+            if found is None:
+                raise DbcError("SpellItemEnchantmentCondition.dbc not found in client archives")
+            self._conditions = parse_conditions(found[0])
+        return self._conditions.get(row[ENCHANT_CONDITION])
 
     def spell(self, spell_id: int) -> SpellInfo | None:
         table = self._table("Spell.dbc", SPELL_FIELDS)
