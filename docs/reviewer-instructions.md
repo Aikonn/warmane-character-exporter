@@ -55,3 +55,7 @@ Implementation rules for Copilot live in .github/copilot-instructions.md.
 - Handoff prompt: project folder, checkpoint commit, and
   "read docs/reviewer-instructions.md and docs/development-status.md".
 - Do not rely on assistant memory for project decisions.
+
+## Reviewer Python (offline runs)
+
+The reviewer account cannot launch the user venv. A git-ignored embeddable Python 3.12 lives in .tools/python312 (its sitecustomize.py works around the restricted temp-dir ACL; set TEMP and TMP to .tools/tmp). Run: .tools\python312\python.exe -m unittest discover -s tests. Used only for offline work; live requests and pushes stay with the user.
