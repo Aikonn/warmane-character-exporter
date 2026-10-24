@@ -22,11 +22,11 @@ Project: Warmane Character Exporter (repo Aikonn/warmane-character-exporter, loc
 
 ## State
 
-Export works end to end for Aikka and Bezduse on Onyxia and Icecrown (python -m warmane_exporter.run NAME REALM). Spell, enchant and gem texts currently come from the local game client files (MPQ/DBC). Known gaps: socket structure, active spec, conditional spell text.
+Export works end to end for Aikka and Bezduse on Onyxia and Icecrown (python -m warmane_exporter.run NAME REALM). Spell, enchant and gem texts currently come from the local game client files (MPQ/DBC). Known gaps: active spec, conditional spell text. Item facts and socket structure now come from the AzerothCore item database (python -m warmane_exporter.acore_cli fetch, then verify) through definitions.py; the game client is optional and still the only source of enchant, gem, spell, talent and glyph texts.
 
 ## Backlog
 
-1. Source of static definitions that does not need the game client (see the plan in the latest development-status update).
+1. Client-independent texts for enchants and gems. Open finding: the armory item tooltips load from wotlk.cavernoftime.com (rel="item=ID&ench=..&gems=.."), not from a Warmane endpoint, so the earlier plan of Warmane tooltips is unverified; Cavernoftime terms were never reviewed and it blocked automated access before. Options: review its terms, or find a SpellItemEnchantment name list with a clear licence. Then the client-versus-online comparison.
 2. PvE report profile with dungeon and raid progression grouping.
 3. Direct URL command (warmane-export URL).
 4. Comparison of exports over time.
