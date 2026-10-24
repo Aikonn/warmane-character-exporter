@@ -683,3 +683,14 @@ Status: verified by user-run enrich_summary_diagnostic on the three batch-2 capt
 - Bug found and fixed: the Bezduse captures showed no inferred slot names (slot check = None). Cause: Warmane labels the empty off-hand slot "Off-Hand", the layout table expects "Off Hand", so the anchor check failed and inference was disabled. Label comparison now ignores case and hyphen/space differences (summary_parser._labels_match, unit tested). Re-verification of the Bezduse captures is pending (user-run).
 - Layout facts: a two-hand weapon occupies Main Hand and leaves Off Hand empty (empty slot carries data-tooltip="Off-Hand"); a death knight sigil sits in the Ranged slot (relic inventory type).
 - Same slot-label strictness was the only blocker; item IDs and enchant/gem payloads parsed identically across Priest, Death Knight and Paladin.
+
+
+### Finding: achievements-subcategories-are-separate-2026-10-24
+
+Status: verified by 3 further live requests (achievements page, POST category=96, POST category=14861; 12 s apart; user's Chrome; no blocks). Total live requests this session: 16.
+
+- Subcategory ids are posted in the same field (the page calls loadAchievements(subcategoryId) with a POST of category=<id>).
+- A top-level category response does NOT contain its subcategories: category 96 (Quests) returned 19 entries (14 locked); subcategory 14861 (Quests, Classic) returned 5 entries (all locked). The page header says Quests has 49 achievements, so the remainder lives in the other subcategories.
+- Consequence: a full achievement export needs one POST per top-level category plus one per subcategory: 9 top-level plus about 42 subcategories, so roughly 50 achievement requests per character.
+- Revised total per character: about 1 JSON, 1 summary, 1 to 2 talents, 1 achievements page, about 50 achievement POSTs, 1 statistics page, up to about 30 statistics POSTs, so up to about 85 requests. At a polite pace of one request every 10 to 15 seconds this is 15 to 20 minutes per character. A full export must be explicit, throttled, cached and resumable, and never run on a schedule without a user action.
+- Open: whether the header total is the sum of the top-level and subcategory entries (needs a second subcategory sample to confirm; not required for feasibility).
