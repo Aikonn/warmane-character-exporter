@@ -21,6 +21,21 @@ class CharacterIdentity:
     view: str
 
 
+def parse_character_link(text: str) -> CharacterIdentity:
+    """Lenient version for pasted links: surrounding spaces or quotes, http, no scheme, no view, trailing slash, query."""
+    link = text.strip().strip("\"'<>").strip()
+    if not link:
+        raise ValueError("No link given.")
+    if "://" not in link:
+        link = "https://" + link
+    parsed = urlparse(link)
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) == 3 and parts[0].lower() == "character":
+        parts.append("summary")
+    path = "/" + "/".join(parts)
+    return parse_character_url(f"https://{parsed.netloc}{path}")
+
+
 def parse_character_url(url: str) -> CharacterIdentity:
     parsed = urlparse(url)
     if parsed.scheme != "https":
