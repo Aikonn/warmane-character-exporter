@@ -27,6 +27,10 @@ class Definitions:
     def source_names(self) -> list[str]:
         return [n for n, s in (("client", self.client), ("acore", self.acore)) if s is not None]
 
+    def close(self) -> None:
+        if self.acore is not None:
+            self.acore.close()
+
     # item facts -------------------------------------------------------
     def item(self, item_id: int) -> ItemInfo | None:
         if self.client is not None:
