@@ -80,8 +80,8 @@ class Definitions:
     def gem_requirements(self, enchant_id: int):
         return self._first("gem_requirements", enchant_id)
 
-    def item_set_for_item(self, item_id: int):
-        return self._first("item_set_for_item", item_id)
+    def item_set(self, set_id: int):
+        return self._first("item_set", set_id)
 
     def spell(self, spell_id: int):
         return self._first("spell", spell_id)

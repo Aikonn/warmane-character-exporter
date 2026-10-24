@@ -115,14 +115,14 @@ def _spell_text(defs: Any, spell_id: int) -> str | None:
     return text or None
 
 
-def _set_info(defs: Any, item_set: dict[str, Any], slot_key: Any, warnings: list[str]) -> dict[str, Any]:
+def _set_info(defs: Any, item_set: dict[str, Any], size: int, slot_key: Any, warnings: list[str]) -> dict[str, Any]:
     bonuses = []
     for threshold, spell_id in item_set["bonuses"]:
         text = _spell_text(defs, spell_id)
         if text is None:
             warnings.append(f"{slot_key}: set bonus spell {spell_id} has no description (run definition_export again)")
         bonuses.append({"threshold": threshold, "spell": spell_id, "text": text})
-    return {"id": item_set["id"], "name": item_set["name"], "size": len(item_set["items"]), "bonuses": bonuses}
+    return {"id": item_set["id"], "name": item_set["name"], "size": size, "bonuses": bonuses}
 
 
 def enrich_talents_result(result: dict[str, Any], defs: ClientDefinitions) -> dict[str, Any]:
@@ -186,9 +186,6 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
                         f"{slot.get('slot_key')}: item {item_id} is {info.inventory_type_name}, "
                         f"inferred slot is {inferred}"
                     )
-        item_set = defs.item_set_for_item(item_id) if (item_id is not None and hasattr(defs, "item_set_for_item")) else None
-        if item_set:
-            client["set"] = _set_info(defs, item_set, slot.get("slot_key"), warnings)
         acore_fn = getattr(defs, "acore_item", None)
         acore = acore_fn(item_id) if (acore_fn and item_id is not None) else None
         if acore is not None:
@@ -207,6 +204,10 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
                 "armor": acore.armor,
                 "socket_bonus": defs.enchant_text(acore.socket_bonus_enchant_id) if acore.socket_bonus_enchant_id else None,
             }
+            item_set = defs.item_set(acore.itemset) if acore.itemset else None
+            if item_set:
+                size = defs.acore.set_size(acore.itemset) if getattr(defs, "acore", None) is not None else 0
+                client["set"] = _set_info(defs, item_set, size or len(item_set["items"]), slot.get("slot_key"), warnings)
             effects = _item_effects(defs, acore, slot.get("slot_key"), warnings)
             if effects:
                 client["acore"]["effects"] = effects

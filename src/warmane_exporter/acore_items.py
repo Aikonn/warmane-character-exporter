@@ -167,6 +167,7 @@ class AcoreItem:
     gem_properties_id: int
     scaling: bool                     # heirloom-style scaling stats: stat values are not fixed
     armor: int = 0
+    itemset: int = 0
     spells: tuple[tuple[int, int], ...] = ()   # (spell id, trigger) pairs; trigger 0 use, 1 equip, 2 chance on hit
 
     @property
@@ -199,6 +200,7 @@ class AcoreItems:
             row["ItemLevel"], row["RequiredLevel"], stats, sockets, row["socketBonus"], row["GemProperties"],
             bool(row["ScalingStatDistribution"]),
             row["armor"],
+            row["itemset"],
             self._spells(row),
         )
 
@@ -207,6 +209,10 @@ class AcoreItems:
         if "spellid_1" not in row.keys():   # database built before item effects were kept
             return ()
         return tuple((row[f"spellid_{i}"], row[f"spelltrigger_{i}"]) for i in range(1, 6) if row[f"spellid_{i}"])
+
+    def set_size(self, set_id: int) -> int:
+        """Number of items that name this item set."""
+        return self._con.execute("SELECT COUNT(*) FROM item WHERE itemset = ?", (set_id,)).fetchone()[0]
 
     def has_effects(self) -> bool:
         return any(r[1] == "spellid_1" for r in self._con.execute("PRAGMA table_info(item)"))

@@ -134,7 +134,7 @@ class ClientDefinitions:
         self._glyph_by_spell: dict[int, GlyphInfo] | None = None
         self._gem_by_enchant: dict[int, tuple[int, int]] | None = None
         self._conditions: dict[int, list[list[int]]] | None = None
-        self._set_by_item: dict[int, dict[str, Any]] | None = None
+        self._sets: dict[int, dict[str, Any]] | None = None
 
     def _table(self, name: str, fields: int) -> DbcTable:
         if name not in self._tables:
@@ -187,17 +187,17 @@ class ClientDefinitions:
             row = table.row(position)
             bonuses = [[row[ITEMSET_THRESHOLDS + i], row[ITEMSET_SPELLS + i]] for i in range(8) if row[ITEMSET_SPELLS + i]]
             items = [i for i in row[ITEMSET_ITEMS: ITEMSET_ITEMS + 17] if i]
-            if items:
+            if row[0]:
                 sets.append({"id": row[0], "name": table.string_at(row[1]) or "", "items": items, "bonuses": sorted(bonuses)})
         return sets
 
-    def item_set_for_item(self, item_id: int) -> dict[str, Any] | None:
-        if self._set_by_item is None:
+    def item_set(self, set_id: int) -> dict[str, Any] | None:
+        if self._sets is None:
             try:
-                self._set_by_item = {i: s for s in self.item_sets() for i in s["items"]}
+                self._sets = {s["id"]: s for s in self.item_sets()}
             except DbcError:   # table missing in this client: the export file may still know the sets
-                self._set_by_item = {}
-        return self._set_by_item.get(item_id)
+                self._sets = {}
+        return self._sets.get(set_id)
 
     def spell(self, spell_id: int) -> SpellInfo | None:
         table = self._table("Spell.dbc", SPELL_FIELDS)
