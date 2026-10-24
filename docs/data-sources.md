@@ -706,3 +706,12 @@ Status: verified by user-run requests from the project's own Python (urllib, bro
 - Windows PowerShell 5.1 under the reviewer sandbox account failed with a closed connection (environment issue, not a site block); the exporter should use Python, not PowerShell, for requests.
 - Approximate total live requests this session: 25, no rate limit hit. Pacing used: 12 to 15 s between requests. A conservative default of at least 10 s with jitter is kept for the exporter.
 - Probe script: scripts/probe_plain_http.py (3 requests, 15 s apart).
+
+
+### Finding: first-live-snapshot-2026-10-24
+
+Status: verified by a user-run snapshot of Aikka@Onyxia (2 live HTML requests plus a fresh JSON cache entry; no blocks).
+
+- The existing HTML summary and talents parsers, built on rendered-DOM captures, accept the raw HTML a plain HTTP client receives. Both sections validated without changes.
+- Offline consistency: layout anchors_consistent, 17 equipped items with slot_check ok for all, 0 client warnings; item IDs equal the JSON endpoint's; talents 2 specs x 3 trees, 0 warnings; reported tree totals (57/14/0 and 18/53/0) equal the JSON point splits. The snapshot file was about 245 KB.
+- Tool: python -m warmane_exporter.snapshot_report FILE.json repeats these cross-checks offline for any saved snapshot.
