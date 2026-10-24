@@ -148,11 +148,15 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{stem}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     (out_dir / f"{stem}.md").write_text(render_full_markdown(report), encoding="utf-8")
+    from .pve_report import write_html
+
+    html_path = write_html(report, out_dir / f"{stem}-pve.html")
     print(f"snapshot: {snapshot_path.name}")
     print(f"missing sections: {report['missing_sections'] or 'none'}")
     if "achievements" in report:
         print(f"achievement points match armory: {report['achievements']['points_match_armory']}")
     print(f"saved: {out_dir / (stem + '.md')}")
+    print(f"saved: {html_path}")
     return 0
 
 
