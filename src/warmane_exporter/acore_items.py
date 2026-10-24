@@ -116,6 +116,7 @@ KEEP = (
     ["entry", "class", "subclass", "name", "Quality", "InventoryType", "ItemLevel", "RequiredLevel",
      "AllowableClass", "AllowableRace", "bonding", "itemset", "socketBonus", "GemProperties", "VerifiedBuild",
      "StatsCount", "ScalingStatDistribution", "ScalingStatValue", "armor", "delay", "MaxDurability"]
+    + [f"spellid_{i}" for i in range(1, 6)] + [f"spelltrigger_{i}" for i in range(1, 6)]
     + [f"stat_type{i}" for i in range(1, 11)] + [f"stat_value{i}" for i in range(1, 11)]
     + [f"socketColor_{i}" for i in range(1, 4)] + [f"socketContent_{i}" for i in range(1, 4)]
 )
@@ -165,6 +166,7 @@ class AcoreItem:
     socket_bonus_enchant_id: int      # SpellItemEnchantment id, 0 = none
     gem_properties_id: int
     scaling: bool                     # heirloom-style scaling stats: stat values are not fixed
+    spells: tuple[tuple[int, int], ...] = ()   # (spell id, trigger) pairs; trigger 0 use, 1 equip, 2 chance on hit
 
     @property
     def quality_name(self) -> str:
@@ -195,7 +197,27 @@ class AcoreItems:
             row["entry"], row["name"], row["class"], row["subclass"], row["Quality"], row["InventoryType"],
             row["ItemLevel"], row["RequiredLevel"], stats, sockets, row["socketBonus"], row["GemProperties"],
             bool(row["ScalingStatDistribution"]),
+            self._spells(row),
         )
+
+    @staticmethod
+    def _spells(row) -> tuple[tuple[int, int], ...]:
+        if "spellid_1" not in row.keys():   # database built before item effects were kept
+            return ()
+        return tuple((row[f"spellid_{i}"], row[f"spelltrigger_{i}"]) for i in range(1, 6) if row[f"spellid_{i}"])
+
+    def has_effects(self) -> bool:
+        return any(r[1] == "spellid_1" for r in self._con.execute("PRAGMA table_info(item)"))
+
+    def effect_spell_ids(self) -> set[int]:
+        """Spell ids of use / equip / proc effects on weapons and armor of uncommon quality or better."""
+        try:
+            rows = self._con.execute(
+                "SELECT " + ", ".join(f"spellid_{i}" for i in range(1, 6)) + " FROM item WHERE class IN (2, 4) AND Quality >= 2"
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return set()
+        return {v for row in rows for v in row if v}
 
     def gem_quality(self, gem_properties_id: int) -> int | None:
         """Highest item quality among gem items (class 3) that use this GemProperties id."""

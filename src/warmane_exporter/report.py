@@ -32,23 +32,26 @@ def gem_line(gem: dict[str, Any]) -> str:
     return f"{text} ({tags})" if tags else text
 
 
-def gem_columns(slot_name: str | None, gems: list[dict[str, Any]], sockets: list[str] | None) -> tuple[list[str], str | None]:
-    """Lines for the gem column and the belt buckle gem. Empty sockets show as <no gem>.
+BELT_BUCKLE = "Eternal Belt Buckle"
 
-    Positions beyond the item's own sockets hold an extra socket gem; on the belt that is the belt buckle.
+
+def gem_columns(slot_name: str | None, gems: list[dict[str, Any]], sockets: list[str] | None) -> tuple[list[str], bool]:
+    """Lines for the gem column and whether the item carries a belt buckle. Empty sockets show as <no gem>.
+
+    A gem beyond the item's own sockets sits in an extra socket; on the belt that socket is the belt buckle,
+    so the belt is marked as having the buckle enchant while the gem stays in the gem column.
     Without socket data (no item database) only the filled gems are listed.
     """
     lines: list[str] = []
-    buckle = None
+    buckle = False
     for index, gem in enumerate(gems):
         filled = bool(gem.get("text")) or (gem.get("id") and not gem.get("empty"))
         if sockets is not None and index < len(sockets):
             lines.append(gem_line(gem) if filled else "<no gem>")
         elif filled:
-            if slot_name == "Waist" and buckle is None and sockets is not None:
-                buckle = gem_line(gem)
-            else:
-                lines.append(gem_line(gem))
+            lines.append(gem_line(gem))
+            if slot_name == "Waist" and sockets is not None:
+                buckle = True
     return lines, buckle
 
 
@@ -85,6 +88,7 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
             "enchant": (client.get("enchant") or {}).get("text"),
             "gems": gems,
             "gem_slots_seen": total_gems,
+            "effects": (client.get("acore") or {}).get("effects") or [],
             "item_level": (client.get("acore") or {}).get("item_level"),
             "stats": (client.get("acore") or {}).get("stats"),
             "scaling_stats": (client.get("acore") or {}).get("scaling_stats"),

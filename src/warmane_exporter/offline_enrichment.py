@@ -84,6 +84,28 @@ def _enrich_glyph(glyph: dict[str, Any], defs: ClientDefinitions, warnings: list
         warnings.append(f"glyph spell {spell_id}: no GlyphProperties row")
 
 
+EFFECT_LABELS = {0: "Use", 1: "Equip", 2: "Chance on hit"}
+
+
+def _item_effects(defs: Any, acore: Any, slot_key: Any, warnings: list[str]) -> list[dict[str, Any]]:
+    """Use / equip / proc effects of an item with the client's own spell description."""
+    effects = []
+    for spell_id, trigger in acore.spells:
+        label = EFFECT_LABELS.get(trigger)
+        if label is None:
+            continue
+        rendered = defs.render_spell_description(spell_id)
+        text = rendered.text if rendered is not None else None
+        if not text:
+            info = defs.spell(spell_id)
+            text = info.description if info is not None else None
+        if not text:
+            warnings.append(f"{slot_key}: {label.lower()} effect spell {spell_id} has no description (run definition_export again)")
+            continue
+        effects.append({"trigger": label, "spell": spell_id, "text": text})
+    return effects
+
+
 def enrich_talents_result(result: dict[str, Any], defs: ClientDefinitions) -> dict[str, Any]:
     """Return a deep copy of a parse_talents_capture_* result with "client" data added."""
     enriched = copy.deepcopy(result)
@@ -161,6 +183,9 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
                 "sockets_empty": max(len(acore.sockets) - filled, 0),
                 "scaling_stats": acore.scaling,
             }
+            effects = _item_effects(defs, acore, slot.get("slot_key"), warnings)
+            if effects:
+                client["acore"]["effects"] = effects
             if filled > len(acore.sockets):
                 warnings.append(
                     f"{slot.get('slot_key')}: {filled} gems but AzerothCore lists {len(acore.sockets)} sockets "
