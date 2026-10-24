@@ -296,3 +296,10 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 
 - snapshot.py: python -m warmane_exporter.snapshot NAME REALM [--refresh] [--offline] [--allow-stale] [--no-client]. Fetches the JSON summary, HTML summary and talents page (at most 3 live requests, 10 s apart, none when cached), validates each with its parser, optionally enriches from the local client files, and writes .warmane-cache/snapshots/<name>-<realm>-<time>.json (schema character-snapshot/0). Each section reports status, origin and observation time and fails independently; rejected bodies are kept in .warmane-cache/rejected/ for debugging and never enter the cache.
 - Untested assumption being checked by the first live run: the HTML parsers were built on rendered-DOM captures; raw HTTP HTML may differ (for example if the page builds parts with scripts). A rejected section shows exactly where.
+
+
+## Update: snapshot validation on all four characters (2026-10-24)
+
+- Live snapshots of Aikka and Bezduse on Onyxia and Icecrown (3 requests each, 10 s apart, no rate limit, no errors) all pass snapshot_report: raw-HTTP HTML parses with the existing parsers, 16-17 equipped items with slot checks ok, item ids equal the JSON endpoint, 2 talent specs each with 0 warnings and point totals equal to the JSON splits. Death Knight (16 items, sigil in Ranged) and Icecrown pages need no parser changes.
+- Milestone 1 is functionally complete (transport, cache, fetch, snapshot). Next: Markdown and JSON character report from a snapshot (Milestone 2), then achievements/statistics fetch.
+
