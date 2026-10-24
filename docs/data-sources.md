@@ -575,3 +575,12 @@ Status: verified against the real capture aikka-onyxia-talents-spec1-dom.html an
 - Limitation: spell descriptions are raw templates ($s1, $d, $/1000;s1, conditionals). Rendering numeric values needs Spell.dbc effect and duration data and is not implemented; do not present raw templates as final tooltip text.
 - Limitation: the capture shows which talents have points; the in-game active spec cannot be determined from the capture.
 
+### Finding: equipment-offline-enrichment-2026-10-24
+
+Status: verified against the real capture aikka-onyxia-summary-dom.html and the local 3.3.5a client (user-run output).
+
+- 17 equipped items: each item ID resolved in Item.dbc and its inventory type fit the layout-inferred paperdoll slot (head, neck, shoulder, back, chest/robe, wrist, hands, waist, legs, feet, finger x2, trinket x2, main-hand, held-in-off-hand, ranged). This independently supports the standard-order slot inference.
+- Every ench= code and every nonzero gems= code resolved as a SpellItemEnchantment ID (examples: 3520 = "+23 Spell Power", 3118 = "+12 Spell Power", 3728 = "Darkglow Embroidery"). client_warnings: 0.
+- Gem code 0 is reported as an empty position. The rel payload always lists three positions, so "empty" cannot distinguish an unfilled socket from a socket that does not exist; the number of real sockets is unknown (it needs item socket data, which is not in Item.dbc).
+- Not available offline: item names, item quality, socket count and socket bonus, item stats.
+

@@ -262,3 +262,7 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - enrich_diagnostic on the real Aikka capture: all talents and glyphs resolved, 0 client warnings, glyph slot types agree. Full suite: 128 tests passed (user-run).
 - Open for Milestone 0: equipment item names (not in DBCs), socket bonuses, tooltip value rendering ($s1 tokens), achievements/statistics enumeration, field-availability matrix, ruleset compatibility check, request counts.
 
+## Update: equipment verified offline (2026-10-24)
+- enrich_summary_diagnostic on the real Aikka summary capture: 17/17 items slot-consistent, all enchants and gems resolved, 0 warnings. Full suite: 129 tests passed (user-run).
+- Offline client data now covers talents, glyphs, spells, enchants, gems and item slot types. Remaining Milestone 0 gaps are Warmane-side or need other sources: item names/quality/sockets, achievements and statistics enumeration, field-availability matrix across both realms and four debug characters, ruleset compatibility, request counts. Live Warmane requests need user approval.
+
