@@ -398,3 +398,11 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 - Gives, without the client: item name, quality, slot, item level, stats, socket colours and socket bonus enchant id (this closes the socket structure gap).
 - Still needs the client or another source: texts of enchants, gems and socket bonuses (SpellItemEnchantment ids are not in item_template), and spell, talent and glyph descriptions. Warmane item tooltips are the planned source for the enchant and gem texts.
 - Next batches: (2) swappable definition source (client or local cache) wired into enrichment and report, with socket structure shown; (3) Warmane item tooltips into the Library, plus a startup check comparing client and online values.
+
+
+## Update: swappable definition source (2026-10-24)
+
+- definitions.py: one Definitions object over two optional sources, the game client and the local AzerothCore item database (library/acore/items.db). Item facts prefer the client, then AzerothCore; texts (enchant, gem, spell, talent, glyph) come from the client only until the tooltip source exists. Unknown values stay unresolved.
+- snapshot.py loads both (the client is now optional; a missing client no longer disables item enrichment) and prints which sources are active.
+- Enrichment adds client.acore per equipped item: name, quality, item level, stats, socket colours, socket bonus enchant id, filled and empty socket counts. Gems beyond the listed sockets produce a warning (extra sockets such as a belt buckle). The report marks empty sockets.
+- 192 tests pass. Next: batch 3, Warmane item tooltips into the Library (needs a live probe on the PC, which the cloud session cannot reliably do) and the client-versus-online comparison.
