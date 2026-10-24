@@ -662,3 +662,14 @@ Status legend: verified = seen in real data; partial = seen for some characters 
 ### Proposed next step
 
 Complete the remaining Milestone 0 gaps with a small second live batch (under 10 requests): Aikka@Icecrown and Bezduse HTML summary pages, one statistics category POST, and the remaining achievement category ids. Then build sanitized fixtures from saved captures and close Milestone 0 for review.
+
+
+### Finding: live-batch-2-2026-10-24
+
+Status: verified by 6 further live requests through the user's Chrome (3 HTML summary pages, achievements page, statistics page, one statistics POST; 12 s apart; no blocks). Total live requests this session: 13. Rendered DOM saved git-ignored as local-captures/<name>-<realm>-summary-dom.html.
+
+- HTML summary pages loaded for Bezduse@Onyxia, Bezduse@Icecrown and Aikka@Icecrown. Item link counts (16, 16, 17) equal the JSON API equipment counts for the same characters. Offline enrichment run on these captures is pending (user-run).
+- Complete achievement category ids (POST field category, subcategory ids as listed by the page): General 92; Quests 96 (14861 Classic, 14862 TBC, 14863 WotLK); Exploration 97 (14777 Eastern Kingdoms, 14778 Kalimdor, 14779 Outland, 14780 Northrend); Player vs. Player 95 (165 Arena, 14801 AV, 14802 AB, 14803 EotS, 14804 WSG, 14881 SotA, 14901 Wintergrasp, 15003 IoC); Dungeons and Raids 168 (14808, 14805, 14806, 14921, 14922, 14923, 14961, 14962, 15001, 15002, 15041, 15042); Professions 169 (170 Cooking, 171 Fishing, 172 First Aid); Reputation 201 (14864, 14865, 14866); World Events 155 (160, 187, 159, 163, 161, 162, 158, 14981, 156, 14941); Feats of Strength 81. Full list saved locally in aikka-onyxia-achievement-categories.json.
+- Whether a top-level category POST already returns its subcategories' entries is not yet established (category 92 has no subcategories). The first test on a category with subcategories decides whether a full export needs about 9 or about 50 achievement requests.
+- Statistics: POST with the same category field works (category=130 returned a JSON {"content": html} with a Description/Value table, about 2 KB; values such as "Talent tree respecs 8"). The statistics sidebar has about 30 category and subcategory ids, so a full statistics export is about 10 to 30 requests per character.
+- Revised request estimate per character: roughly 30 to 90 requests depending on subcategory behaviour. Needs throttling, caching and resumability; a full export of four characters should be an explicit, user-triggered, slow run.
