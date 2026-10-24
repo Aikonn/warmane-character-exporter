@@ -7,5 +7,7 @@ __pycache__/
 venv/
 
 .warmane-probe-checkpoint.json
+warmane-character-exporter.config
+src/*.egg-info/
 local-captures/
 tests/fixtures/captures/last-live-response-sanitized.json

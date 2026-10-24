@@ -1,0 +1,9 @@
+# Copy this file to `warmane-character-exporter.config` and adjust paths per machine.
+
+[default]
+# Ordered list of WoW 3.3.5a client directories.
+# The first existing directory wins.
+wow_client_dirs = ['C:\Games\World of Warcraft 3.3.5a']
+
+[machines.EXAMPLE-PC]
+wow_client_dirs = ['E:\Games\World of Warcraft 3.3.5a']
