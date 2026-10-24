@@ -447,3 +447,8 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 
 - Item use / equip / proc effects: spell ids come from AzerothCore item_template (spellid_N, spelltrigger_N); the text is the client's rendered spell description, exported by definition_export. Rebuild the item database (acore_cli fetch does it from the stored dump) and re-run definition_export once to get them.
 - Belt: a gem beyond the belt's own sockets is the belt buckle gem; the Enchant column shows "Eternal Belt Buckle" and the gem stays in the Gems column. The armory link carries no enchant for the buckle, so it is inferred from the extra gem.
+
+## Socket bonuses, meta gems, stat totals
+
+- gear_bonuses.py: socket bonus active when every socket holds a gem of fitting colour (extra buckle/blacksmith gems ignored); meta gem active when its SpellItemEnchantmentCondition is met by the gem colours of the whole equipped set (orange = red + yellow etc.). Conditions come from the client export (enchant_conditions, 49 rows). That DBC is packed (64-byte records, header says 31 fields), parsed in client_definitions.parse_conditions.
+- Stat totals are parsed from the client's texts (plain '+N Stat' parts only); percent effects, procs and weapon enchants are not counted. Item armor is included, inactive socket bonuses and inactive metas are not.
