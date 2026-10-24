@@ -27,6 +27,7 @@ TALENT_ROW = 2
 TALENT_COLUMN = 3
 TALENT_RANK_FIRST = 4   # RankID[9] occupies fields 4..12
 TALENT_RANK_COUNT = 9
+GLYPH_FIELDS = 4         # GlyphProperties.dbc: ID, SpellID, GlyphSlotFlags, SpellIconID (UNVERIFIED)
 ITEM_FIELDS = 8
 ITEM_CLASS = 1
 ITEM_SUBCLASS = 2
@@ -60,6 +61,13 @@ class TalentInfo:
 
 
 @dataclass(frozen=True)
+class GlyphInfo:
+    glyph_id: int
+    spell_id: int
+    slot_flags: int   # 0 = major, 1 = minor (to be cross-checked against captures)
+
+
+@dataclass(frozen=True)
 class ItemInfo:
     item_id: int
     item_class: int
@@ -78,6 +86,7 @@ class ClientDefinitions:
         self._client = client
         self._tables: dict[str, DbcTable] = {}
         self._talent_by_spell: dict[int, TalentInfo] | None = None
+        self._glyph_by_spell: dict[int, GlyphInfo] | None = None
 
     def _table(self, name: str, fields: int) -> DbcTable:
         if name not in self._tables:
@@ -132,3 +141,12 @@ class ClientDefinitions:
                     index[s] = info
             self._talent_by_spell = index
         return self._talent_by_spell.get(spell_id)
+
+    def glyph_for_spell(self, spell_id: int) -> GlyphInfo | None:
+        if self._glyph_by_spell is None:
+            table = self._table("GlyphProperties.dbc", GLYPH_FIELDS)
+            self._glyph_by_spell = {}
+            for position in range(len(table)):
+                row = table.row(position)
+                self._glyph_by_spell[row[1]] = GlyphInfo(row[0], row[1], row[2])
+        return self._glyph_by_spell.get(spell_id)
