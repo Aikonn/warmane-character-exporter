@@ -694,3 +694,15 @@ Status: verified by 3 further live requests (achievements page, POST category=96
 - Consequence: a full achievement export needs one POST per top-level category plus one per subcategory: 9 top-level plus about 42 subcategories, so roughly 50 achievement requests per character.
 - Revised total per character: about 1 JSON, 1 summary, 1 to 2 talents, 1 achievements page, about 50 achievement POSTs, 1 statistics page, up to about 30 statistics POSTs, so up to about 85 requests. At a polite pace of one request every 10 to 15 seconds this is 15 to 20 minutes per character. A full export must be explicit, throttled, cached and resumable, and never run on a schedule without a user action.
 - Open: whether the header total is the sum of the top-level and subcategory entries (needs a second subcategory sample to confirm; not required for feasibility).
+
+
+### Finding: plain-http-works-2026-10-24
+
+Status: verified by user-run requests from the project's own Python (urllib, browser-like User-Agent and Accept-Language headers) and Windows curl.
+
+- JSON endpoint: Python 200 (1601 bytes) and curl 200, identical to the browser response.
+- HTML summary page: 200, 31607 bytes, 17 item links (matches the browser capture). Talents page: 200, 72135 bytes, 6 data-spec markers. Achievements category POST (category=92 with X-Requested-With, Referer, Origin headers): 200, 30346 bytes, identical size to the browser response, JSON with a content key.
+- Therefore a plain HTTP client works for JSON, HTML and POST requests when it sends a browser-like User-Agent. The earlier 403 error 1010 came from default client headers. No cookies or browser were needed for these requests.
+- Windows PowerShell 5.1 under the reviewer sandbox account failed with a closed connection (environment issue, not a site block); the exporter should use Python, not PowerShell, for requests.
+- Approximate total live requests this session: 25, no rate limit hit. Pacing used: 12 to 15 s between requests. A conservative default of at least 10 s with jitter is kept for the exporter.
+- Probe script: scripts/probe_plain_http.py (3 requests, 15 s apart).

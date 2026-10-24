@@ -4,7 +4,7 @@ Purpose: summarize what the source investigation established, what it did not, a
 
 ## Verdict
 
-Milestone 0 is feasible for every data area, with one blocking design question (how HTML pages are fetched) and several documented gaps. It is ready for reviewer sign-off once the fetch strategy is chosen.
+Milestone 0 is feasible for every data area, with several documented gaps. The fetch strategy is settled (plain HTTP). It is ready for reviewer sign-off.
 
 ## What is established
 
@@ -26,7 +26,7 @@ Milestone 0 is feasible for every data area, with one blocking design question (
 
 ## Access finding
 
-Plain scripted HTTP to the HTML pages was blocked earlier (Cloudflare 1010 and a 1015 rate limit). Browser requests worked. Whether the JSON endpoint accepts a plain HTTP client was not tested.
+Plain scripted HTTP to the HTML pages was blocked earlier (Cloudflare 1010 and a 1015 rate limit). Browser requests worked. A plain Python client with a browser-like User-Agent later worked for all request types (see data-sources.md, plain-http-works).
 
 ## Cost
 
@@ -38,15 +38,11 @@ Up to about 85 requests per character for a complete export (see data-sources.md
 2. Use the JSON endpoint for basics and item names, the HTML pages only for enchants, gems, slots, talents and glyphs.
 3. Drop item quality, socket data and active-spec detection from the first release, or mark them as optional and unavailable.
 4. Make complete achievement and statistics export an opt-in, slow mode.
-5. Fetch strategy for HTML pages (decision pending): see below.
+5. Fetch strategy: plain HTTP from Python with browser-like headers (verified).
 
-## Fetch strategy options
+## Fetch strategy (decided)
 
-- A. User-assisted browser capture: the tool provides a small script or instructions to save pages from the user's own logged-in-free browser into a folder; the exporter parses local files. Lowest risk, most manual.
-- B. Browser-driven fetcher (an automated local browser with human-like pacing) run by the user. Automated, but needs a browser dependency and may break with site changes.
-- C. Plain HTTP for JSON only, plus option A for HTML. Needs one more test of the JSON endpoint without a browser.
-
-Recommendation: C, falling back to A. Option B only if the user wants fully automatic exports.
+Decision: plain HTTP from Python with browser-like headers (option C extended). Verified 2026-10-24 for the JSON endpoint, HTML summary and talents pages, and achievements POST; no browser or manual capture is needed. Manual capture (option A) remains a fallback if the site starts blocking. Keep requests slow (at least 10 s with jitter), cached and resumable, and stop on any 403, 429 or Cloudflare error page.
 
 ## Next after sign-off
 
