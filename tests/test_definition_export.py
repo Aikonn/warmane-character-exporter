@@ -29,6 +29,8 @@ class FakeDefs:
         if name == "SpellItemEnchantment.dbc":
             return FakeTable([tuple([3820] + [0] * 13 + [1] + [0] * 23), tuple([3627] + [0] * 13 + [2] + [0] * 23)],
                              {1: "+30 Spell Power", 2: "+20 Crit"})
+        if name == "GemProperties.dbc":
+            return FakeTable([(1, 3520, 0, 0, 2), (2, 3118, 0, 0, 6), (3, 0, 0, 0, 1)])
         if name == "Talent.dbc":
             return FakeTable([tuple([7, 41, 2, 1, 100, 101] + [0] * 7 + [0] * 10)])
         if name == "GlyphProperties.dbc":
@@ -56,7 +58,7 @@ class ExportTests(unittest.TestCase):
 
     def test_export_content(self):
         self.assertEqual(self.data["enchants"], {"3820": "+30 Spell Power", "3627": "+20 Crit"})
-        self.assertEqual(self.data["client_tables"], {"enchants": 2, "talents": 1, "glyphs": 1, "spells": 3})
+        self.assertEqual(self.data["client_tables"], {"enchants": 2, "gem_properties": 2, "talents": 1, "glyphs": 1, "spells": 3})
         self.assertIn("render_error", self.data["spells"]["200"])
         self.assertTrue(self.data["spells"]["101"]["rendered_unresolved"])
 
@@ -87,6 +89,20 @@ class ExportTests(unittest.TestCase):
         defs = Definitions(Client(), None, FileDefinitions(self.root / "definitions" / "client-export.json"))
         self.assertEqual(defs.enchant_text(3820), "client text")
         self.assertEqual(defs.talent_for_spell(100).talent_id, 7)  # falls through to the file
+
+    def test_gem_info_colour_and_quality(self):
+        from test_acore_items import _COLUMNS, _row, _sql
+        from warmane_exporter.acore_items import build_database
+        row = _row(40113, "Runed Cardinal Ruby", quality=4)
+        row[_COLUMNS.index("class")], row[_COLUMNS.index("GemProperties")] = 3, 1
+        cheap = _row(39999, "Runed Scarlet Ruby", quality=3)
+        cheap[_COLUMNS.index("class")], cheap[_COLUMNS.index("GemProperties")] = 3, 1
+        build_database(_sql([row, cheap]), self.root / "acore" / "items.db")
+        defs = load_definitions(None, self.root)
+        self.addCleanup(defs.close)
+        self.assertEqual(defs.gem_info(3520), {"color": "red", "quality": "epic"})
+        self.assertEqual(defs.gem_info(3118), {"color": "orange", "quality": None})   # no gem item known
+        self.assertIsNone(defs.gem_info(1))
 
     def test_wrong_schema_rejected(self):
         bad = self.root / "bad.json"
