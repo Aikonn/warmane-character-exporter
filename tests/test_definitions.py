@@ -68,6 +68,35 @@ class DefinitionsTests(unittest.TestCase):
         text = render_markdown(build_report(snap))
         self.assertIn("2 empty socket(s)", text)
 
+    def test_item_effects_from_spell_descriptions(self):
+        from test_acore_items import _COLUMNS
+        from warmane_exporter.spell_text import Rendered
+        row = _row(5, "Dust", inv=12, sockets=(0, 0, 0))
+        row[_COLUMNS.index("spellid_1")], row[_COLUMNS.index("spelltrigger_1")] = 77, 1
+        row[_COLUMNS.index("spellid_2")], row[_COLUMNS.index("spelltrigger_2")] = 78, 0
+        row[_COLUMNS.index("class")] = 4
+        path = self.lib / "acore" / "effects.db"
+        build_database(_sql([row]), path)
+
+        class Texts:
+            def render_spell_description(self, spell_id):
+                return Rendered("Grants 304 mana per 5 sec.", False) if spell_id == 77 else None
+            def spell(self, spell_id):
+                return None
+            def __getattr__(self, name):
+                return lambda key: None
+
+        defs = Definitions(acore=AcoreItems(path), file=Texts())
+        self.addCleanup(defs.close)
+        self.assertEqual(defs.acore_item(5).spells, ((77, 1), (78, 0)))
+        self.assertEqual(defs.acore.effect_spell_ids(), {77, 78})
+        summary = self._summary(["0"])
+        summary["equipment"]["slots"][0]["item_reference"]["namespaces"]["item"] = "5"
+        out = enrich_summary_result(summary, defs)
+        effects = out["equipment"]["slots"][0]["client"]["acore"]["effects"]
+        self.assertEqual(effects, [{"trigger": "Equip", "spell": 77, "text": "Grants 304 mana per 5 sec."}])
+        self.assertTrue(any("spell 78 has no description" in w for w in out["client_warnings"]))
+
 
 if __name__ == "__main__":
     unittest.main()

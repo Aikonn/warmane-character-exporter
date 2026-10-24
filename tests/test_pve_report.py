@@ -67,10 +67,10 @@ class HtmlTests(unittest.TestCase):
             "equipment": [
                 {"slot": "Head", "item_id": 1, "name": "Hood", "quality": "epic", "item_level": 264, "stats": [["stamina", 5]],
                  "enchant": "+30 Spell Power", "gems": ["+10 All Stats"], "sockets_empty": 1, "transmog": "", "inventory_type": "head",
-                 "sockets": ["meta", "blue"], "gem_lines": ["+10 All Stats (epic blue)", "<no gem>"], "buckle": None},
+                 "sockets": ["meta", "blue"], "gem_lines": ["+10 All Stats (epic blue)", "<no gem>"], "buckle": False, "effects": []},
                 {"slot": "Waist", "item_id": 3, "name": "Belt", "quality": "epic", "item_level": 245, "stats": [], "enchant": None,
-                 "gems": [], "inventory_type": "waist", "sockets": ["yellow"], "gem_lines": ["+12 Spell Power (epic yellow)"],
-                 "buckle": "+12 Spell Power (epic red)"},
+                 "gems": [], "inventory_type": "waist", "sockets": ["yellow"], "gem_lines": ["+12 Spell Power (epic yellow)", "+12 Spell Power (epic red)"],
+                 "buckle": True, "effects": [{"trigger": "Equip", "spell": 9, "text": "Your spell casts have a chance to grant 304 mana per 5 sec for 15 sec."}]},
                 {"slot": "Shirt", "item_id": 2, "name": "Shirt", "quality": "common", "item_level": 1, "stats": [], "gems": []}],
             "specializations": [{"label": "Discipline", "split": [57, 14, 0], "glyphs": [], "talent_detail": [
                 {"tree": "Discipline", "points": 57, "talents": [{"name": "Penance", "spent": 1, "max": 1, "description": "Heals"}]}]}],
@@ -93,7 +93,7 @@ class HtmlTests(unittest.TestCase):
         self.assertEqual([r["name"] for r in pve["currencies"]], ["Emblems of Frost acquired"])
         self.assertEqual(len(pve["achievement_groups"]), 1)
         html = render_html(pve)
-        for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "&lt;no gem&gt;", "+12 Spell Power (epic yellow)", "Belt buckle: +12 Spell Power (epic red)", "GearScore", "Penance", "Do the thing",
+        for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "&lt;no gem&gt;", "+12 Spell Power (epic yellow)", "Eternal Belt Buckle", "Equip: Your spell casts have a chance to grant 304 mana per 5 sec for 15 sec.", "Special effects", "GearScore", "Penance", "Do the thing",
                        "Sindragosa", "heroic", "Warning: some armory kill counts", "Argent Crusade", "Wind Rider", "2026-"):
             self.assertIn(needle, html)
         self.assertNotIn("Ulduar <10>", html)  # raw armory text is never injected
@@ -148,12 +148,12 @@ class GemColumnTests(unittest.TestCase):
         red = {"text": "+23 Spell Power", "id": 3520, "quality": "epic", "color": "red"}
         empty = {"id": 0, "empty": True}
         lines, buckle = gem_columns("Waist", [red, red, empty], ["yellow"])
-        self.assertEqual((lines, buckle), (["+23 Spell Power (epic red)"], "+23 Spell Power (epic red)"))
+        self.assertEqual((lines, buckle), (["+23 Spell Power (epic red)", "+23 Spell Power (epic red)"], True))
         lines, buckle = gem_columns("Head", [red, empty, empty], ["meta", "blue"])
-        self.assertEqual((lines, buckle), (["+23 Spell Power (epic red)", "<no gem>"], None))
+        self.assertEqual((lines, buckle), (["+23 Spell Power (epic red)", "<no gem>"], False))
         lines, buckle = gem_columns("Hands", [{"text": "+9 Stamina", "id": 1}, red, empty], ["red"])
         self.assertEqual(lines, ["+9 Stamina", "+23 Spell Power (epic red)"])      # extra socket, no tags known
-        self.assertEqual(gem_columns("Waist", [red, red], None), (["+23 Spell Power (epic red)", "+23 Spell Power (epic red)"], None))
+        self.assertEqual(gem_columns("Waist", [red, red], None), (["+23 Spell Power (epic red)", "+23 Spell Power (epic red)"], False))
 
 
 class SuspectTests(unittest.TestCase):
@@ -171,8 +171,8 @@ class SuspectTests(unittest.TestCase):
         html = render_html(build_pve_report(HtmlTests("test_content_and_escaping").report if False else _full_report()))
         self.assertNotIn("Bosses killed per instance and mode", html)
         self.assertIn("<details open>", html)
-        self.assertLess(html.index("WotLK raid progression"), html.index("Other dungeon and raid statistics</b>"))
-        self.assertLess(html.index("Other dungeon and raid statistics</b>"), html.index("WotLK raid achievements</h2>"))
+        self.assertLess(html.index("WotLK raid progression"), html.index("Other dungeon and raid statistics</h2>"))
+        self.assertLess(html.index("Other dungeon and raid statistics</h2>"), html.index("WotLK raid achievements</h2>"))
         self.assertNotIn("Collapsed by default", html)
         self.assertIn("<th>Percent</th>", html)
         self.assertIn("1 / 2", html)

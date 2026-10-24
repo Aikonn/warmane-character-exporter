@@ -9,7 +9,8 @@ _COLUMNS = ["entry", "class", "subclass", "name", "Quality", "InventoryType", "I
             "AllowableClass", "AllowableRace", "bonding", "itemset", "socketBonus", "GemProperties", "VerifiedBuild",
             "StatsCount", "ScalingStatDistribution", "ScalingStatValue", "armor", "delay", "MaxDurability"] \
     + [f"stat_type{i}" for i in range(1, 11)] + [f"stat_value{i}" for i in range(1, 11)] \
-    + [f"socketColor_{i}" for i in range(1, 4)] + [f"socketContent_{i}" for i in range(1, 4)]
+    + [f"socketColor_{i}" for i in range(1, 4)] + [f"socketContent_{i}" for i in range(1, 4)] \
+    + [f"spellid_{i}" for i in range(1, 6)] + [f"spelltrigger_{i}" for i in range(1, 6)]
 
 
 def _sql(rows):

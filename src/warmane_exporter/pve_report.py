@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from .gearscore import character_score
+from .report import BELT_BUCKLE
 from .identity import SUPPORTED_REALMS
 
 # Statistics categories that hold boss kill rows, in display order: (id, heading).
@@ -179,7 +180,7 @@ h1{border-bottom:2px solid #444;padding-bottom:.2em} h2{margin-top:1.8em;border-
 table{border-collapse:collapse;margin:.6em 0;font-size:.92em} th,td{border:1px solid #bbb;padding:.25em .6em;text-align:left;vertical-align:top}
 th{background:#eee} td.n{text-align:right} .muted{color:#555} .note{background:#f6f6f0;border-left:4px solid #aa8;padding:.4em .8em}
 .warn{background:#fde8e8;border:1px solid #c33;border-left:6px solid #b00;color:#600;padding:.5em .9em;margin:.6em 0}
-details{margin:.4em 0} details.big{margin-top:1.8em;border-bottom:1px solid #999} details.big>summary{font-size:1.5em;font-weight:bold} summary{cursor:pointer}
+details{margin:.4em 0} details.big{margin-top:1.8em;border-bottom:1px solid #999} details.big>summary{list-style-position:inside} details.big>summary>h2{display:inline;margin:0;border:0} summary{cursor:pointer}
 """
 
 
@@ -216,13 +217,14 @@ def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
             gems = list(e.get("gems") or [])
         enchant = [e["enchant"]] if e.get("enchant") else []
         if e.get("buckle"):
-            enchant.append(f"Belt buckle: {e['buckle']}")
+            enchant.append(BELT_BUCKLE)
         item = f"{e.get('name') or '?'} ({e.get('item_id')})"
         if e.get("transmog"):
             item += f", transmog: {e['transmog']}"
         item_score_value = score["per_item"].get(e.get("slot"))
         rows.append([e.get("slot"), item, e.get("quality") or "?", e.get("item_level") if e.get("item_level") is not None else "?",
-                     item_score_value if item_score_value is not None else "", stats, enchant, gems])
+                     item_score_value if item_score_value is not None else "", stats,
+                     [f"{x['trigger']}: {x['text']}" for x in e.get("effects") or []], enchant, gems])
     note = ""
     if score["gearscore"] is not None:
         extra = f" Adjustments applied: {', '.join(score['adjustments'])}." if score["adjustments"] else ""
@@ -237,7 +239,7 @@ def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
         note = (f'<p class="muted">Average item level and GearScore not calculated: item level data is missing for '
                 f'{score["unknown_items"]} item(s). Run the AzerothCore fetch and rebuild the snapshot.</p>')
     return ("<h2 id=\"gear\">Equipment</h2>"
-            + _table(["Slot", "Item", "Quality", "Item level", "GearScore", "Base stats", "Enchant", "Gems"], rows) + note)
+            + _table(["Slot", "Item", "Quality", "Item level", "GearScore", "Base stats", "Special effects", "Enchant", "Gems"], rows) + note)
 
 
 def _spec_section(report: dict[str, Any]) -> str:
@@ -313,7 +315,7 @@ def _progress_section(progress: dict[str, Any]) -> str:
 
 def _other_content_section(progress: dict[str, Any]) -> str:
     """Collapsed sections: WotLK dungeons, older content, counters, deaths. Placed last in the report."""
-    out = ["<details id=\"other\" class=\"big\"><summary><b>Other dungeon and raid statistics</b></summary>",
+    out = ["<details id=\"other\" class=\"big\"><summary><h2>Other dungeon and raid statistics</h2></summary>",
            "<p class=\"muted\">The armory warning above applies here too (* marks suspect heroic counts).</p>"]
     if progress["wotlk_dungeons"]:
         out.append("<details><summary><b>WotLK dungeons</b></summary>" + "".join(_instance_table(i) for i in progress["wotlk_dungeons"]) + "</details>")

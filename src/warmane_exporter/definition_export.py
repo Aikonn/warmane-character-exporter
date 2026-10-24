@@ -3,6 +3,7 @@
 python -m warmane_exporter.definition_export [--output library/definitions/client-export.json]
 
 After the export the tool needs no game client: FileDefinitions reads this file.
+The export also holds the effect spells of weapons and armor listed in the local item database (trinket procs, ring effects).
 Content: every SpellItemEnchantment name (enchants, gems, socket bonuses), the gem colour of each gem effect, every talent with its
 rank spells, every glyph, and name / rank / description / rendered description of the spells those
 reference. Unresolvable template parts stay flagged (rendered_unresolved), never guessed.
@@ -15,7 +16,7 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from .client_definitions import (
     ENCHANT_FIELDS, ENCHANT_NAME, GEMPROP_FIELDS, GLYPH_FIELDS, TALENT_COLUMN, TALENT_FIELDS, TALENT_RANK_COUNT,
@@ -26,7 +27,7 @@ SCHEMA = "client-export/1"
 DEFAULT_OUTPUT = Path("library/definitions/client-export.json")
 
 
-def export_definitions(defs: ClientDefinitions) -> dict[str, Any]:
+def export_definitions(defs: ClientDefinitions, extra_spell_ids: Iterable[int] = ()) -> dict[str, Any]:
     enchant_table = defs._table("SpellItemEnchantment.dbc", ENCHANT_FIELDS)
     enchants: dict[str, str] = {}
     for position in range(len(enchant_table)):
@@ -57,6 +58,7 @@ def export_definitions(defs: ClientDefinitions) -> dict[str, Any]:
         glyphs.append({"id": row[0], "spell": row[1], "flags": row[2]})
         spell_ids.add(row[1])
 
+    spell_ids.update(extra_spell_ids)
     spells: dict[str, dict[str, Any]] = {}
     for spell_id in sorted(spell_ids):
         info = defs.spell(spell_id)
@@ -95,7 +97,16 @@ def main(argv: list[str] | None = None) -> int:
 
     data_dir = resolve_wow_client_dir(load_config(find_config_path(None))) / "Data"
     with ClientData(data_dir) as client:
-        data = export_definitions(ClientDefinitions(client))
+        extra: set[int] = set()
+        acore_db = Path("library/acore/items.db")
+        if acore_db.exists():
+            from .acore_items import AcoreItems
+            items = AcoreItems(acore_db)
+            try:
+                extra = items.effect_spell_ids()
+            finally:
+                items.close()
+        data = export_definitions(ClientDefinitions(client), extra)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(data, ensure_ascii=False, indent=0), encoding="utf-8")
     spells = data["spells"].values()
