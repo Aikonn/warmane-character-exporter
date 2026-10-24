@@ -564,3 +564,14 @@ Status: verified offline against the local 3.3.5a client (user-run output).
 
 - Talent.dbc (23 fields): tab = field 1, row = 2, column = 3, rank spell IDs = fields 4..12 (zero = unused).
 - Spells 14748, 14768 and 14769 all resolve to talent 343 (tab 201, row 2, column 2) with ranks [14748, 14768, 14769]. This matches the earlier Cavernoftime rank discovery for Improved Power Word: Shield, so live rank discovery is no longer needed.
+
+### Finding: talents-and-glyphs-offline-enrichment-2026-10-24
+
+Status: verified against the real capture aikka-onyxia-talents-spec1-dom.html and the local 3.3.5a client (user-run output).
+
+- Both specs in the capture: every talent resolved to a client talent (Discipline 28/28, Holy 27/27, Shadow 27/27 per spec), with rank spell IDs and the selected-rank description.
+- All 11 glyphs resolved by spell ID; GlyphProperties.dbc slot flags (0 major, 1 minor) agreed with the capture category for every glyph. GlyphProperties.dbc has 4 fields: ID, SpellID, GlyphSlotFlags, SpellIconID.
+- client_warnings: 0. The capture's source_spell_id works as a talent rank spell ID and as a glyph spell ID.
+- Limitation: spell descriptions are raw templates ($s1, $d, $/1000;s1, conditionals). Rendering numeric values needs Spell.dbc effect and duration data and is not implemented; do not present raw templates as final tooltip text.
+- Limitation: the capture shows which talents have points; the in-game active spec cannot be determined from the capture.
+

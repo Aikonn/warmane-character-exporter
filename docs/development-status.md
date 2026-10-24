@@ -257,3 +257,8 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - Local machine config created for HALL10K (git-ignored). Full suite: 126 tests passed (user-run).
 - Open: item names and socket bonuses are not in DBCs; rank mapping for talents (rank N spell IDs) may be resolvable from Spell.dbc/Talent.dbc offline and should be the next check; wire definitions into the probe output.
 - Talent rank mapping verified offline (talent 343 via 14748/14768/14769). Live Cavernoftime rank discovery is superseded. Next: glyph lookup (glyph spell to GlyphProperties) and wiring definitions into the talents parser output.
+
+## Update: talents and glyphs verified offline (2026-10-24)
+- enrich_diagnostic on the real Aikka capture: all talents and glyphs resolved, 0 client warnings, glyph slot types agree. Full suite: 128 tests passed (user-run).
+- Open for Milestone 0: equipment item names (not in DBCs), socket bonuses, tooltip value rendering ($s1 tokens), achievements/statistics enumeration, field-availability matrix, ruleset compatibility check, request counts.
+
