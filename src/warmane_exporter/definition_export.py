@@ -66,6 +66,9 @@ def export_definitions(defs: ClientDefinitions, extra_spell_ids: Iterable[int] =
         glyphs.append({"id": row[0], "spell": row[1], "flags": row[2]})
         spell_ids.add(row[1])
 
+    item_sets = defs.item_sets()
+    for item_set in item_sets:
+        spell_ids.update(spell for _, spell in item_set["bonuses"])
     spell_ids.update(extra_spell_ids)
     spells: dict[str, dict[str, Any]] = {}
     for spell_id in sorted(spell_ids):
@@ -86,10 +89,11 @@ def export_definitions(defs: ClientDefinitions, extra_spell_ids: Iterable[int] =
     return {
         "schema": SCHEMA,
         "exported_at": time.time(),
-        "client_tables": {"enchants": len(enchants), "gem_properties": len(gem_properties), "enchant_conditions": len(enchant_conditions), "talents": len(talents), "glyphs": len(glyphs), "spells": len(spells)},
+        "client_tables": {"enchants": len(enchants), "gem_properties": len(gem_properties), "enchant_conditions": len(enchant_conditions), "item_sets": len(item_sets), "talents": len(talents), "glyphs": len(glyphs), "spells": len(spells)},
         "enchants": enchants,
         "gem_properties": gem_properties,
         "enchant_conditions": enchant_conditions,
+        "item_sets": item_sets,
         "talents": talents,
         "glyphs": glyphs,
         "spells": spells,

@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .gear_bonuses import analyze
+from .gear_bonuses import analyze, set_bonuses
 
 
 def _section_data(snapshot: dict[str, Any], name: str) -> dict[str, Any]:
@@ -86,6 +86,7 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
             "slot": slot_name,
             "inventory_type": (client.get("item") or {}).get("inventory_type"),
             "gem_details": gem_details,
+            "set": client.get("set"),
             "armor": (client.get("acore") or {}).get("armor"),
             "socket_bonus": (client.get("acore") or {}).get("socket_bonus"),
             "buckle": buckle,
@@ -141,6 +142,7 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
         "equipment": equipment,
         "bonus_totals": bonuses["totals"],
         "bonus_warnings": bonuses["warnings"],
+        "set_bonuses": set_bonuses(equipment),
         "specializations": specs,
         "active_specialization": "unknown (not exposed by Warmane)",
         "professions": html.get("professions") if html.get("professions") is not None else summary.get("professions"),

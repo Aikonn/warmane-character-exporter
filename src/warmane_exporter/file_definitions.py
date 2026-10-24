@@ -20,6 +20,10 @@ class FileDefinitions:
         self._spells: dict[str, dict] = data["spells"]
         self._gems: dict[str, list] = data.get("gem_properties", {})   # absent in exports made before gem colours
         self._conditions: dict[str, list] = data.get("enchant_conditions", {})   # absent in older exports
+        self._set_by_item: dict[int, dict] = {}
+        for item_set in data.get("item_sets", []):   # absent in older exports
+            for item_id in item_set["items"]:
+                self._set_by_item[item_id] = item_set
         self._talent_by_spell: dict[int, TalentInfo] = {}
         for t in data["talents"]:
             info = TalentInfo(t["id"], t["tab"], t["row"], t["column"], tuple(t["ranks"]))
@@ -36,6 +40,9 @@ class FileDefinitions:
 
     def gem_requirements(self, enchant_id: int) -> list[list[int]] | None:
         return self._conditions.get(str(enchant_id))
+
+    def item_set_for_item(self, item_id: int) -> dict | None:
+        return self._set_by_item.get(item_id)
 
     def spell(self, spell_id: int) -> SpellInfo | None:
         entry = self._spells.get(str(spell_id))

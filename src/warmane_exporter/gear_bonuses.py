@@ -158,3 +158,19 @@ def analyze(equipment: list[dict[str, Any]]) -> dict[str, Any]:
     ordered = {k: totals[k] for k in PRIMARY if k in totals}
     ordered.update({k: totals[k] for k in sorted(totals) if k not in PRIMARY})
     return {"totals": ordered, "warnings": warnings}
+
+
+def set_bonuses(equipment: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Item sets on the equipped armor with every bonus marked active (enough pieces worn) or inactive."""
+    sets: dict[int, dict[str, Any]] = {}
+    for item in equipment:
+        info = item.get("set")
+        if not info:
+            continue
+        entry = sets.setdefault(info["id"], {"name": info["name"], "size": info["size"], "equipped": 0, "bonuses": info["bonuses"]})
+        entry["equipped"] += 1
+    result = []
+    for entry in sets.values():
+        entry["bonuses"] = [{**b, "active": entry["equipped"] >= b["threshold"]} for b in entry["bonuses"]]
+        result.append(entry)
+    return sorted(result, key=lambda e: e["name"])

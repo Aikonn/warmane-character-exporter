@@ -106,6 +106,25 @@ def _item_effects(defs: Any, acore: Any, slot_key: Any, warnings: list[str]) -> 
     return effects
 
 
+def _spell_text(defs: Any, spell_id: int) -> str | None:
+    rendered = defs.render_spell_description(spell_id)
+    text = rendered.text if rendered is not None else None
+    if not text:
+        info = defs.spell(spell_id)
+        text = info.description if info is not None else None
+    return text or None
+
+
+def _set_info(defs: Any, item_set: dict[str, Any], slot_key: Any, warnings: list[str]) -> dict[str, Any]:
+    bonuses = []
+    for threshold, spell_id in item_set["bonuses"]:
+        text = _spell_text(defs, spell_id)
+        if text is None:
+            warnings.append(f"{slot_key}: set bonus spell {spell_id} has no description (run definition_export again)")
+        bonuses.append({"threshold": threshold, "spell": spell_id, "text": text})
+    return {"id": item_set["id"], "name": item_set["name"], "size": len(item_set["items"]), "bonuses": bonuses}
+
+
 def enrich_talents_result(result: dict[str, Any], defs: ClientDefinitions) -> dict[str, Any]:
     """Return a deep copy of a parse_talents_capture_* result with "client" data added."""
     enriched = copy.deepcopy(result)
@@ -167,6 +186,9 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
                         f"{slot.get('slot_key')}: item {item_id} is {info.inventory_type_name}, "
                         f"inferred slot is {inferred}"
                     )
+        item_set = defs.item_set_for_item(item_id) if (item_id is not None and hasattr(defs, "item_set_for_item")) else None
+        if item_set:
+            client["set"] = _set_info(defs, item_set, slot.get("slot_key"), warnings)
         acore_fn = getattr(defs, "acore_item", None)
         acore = acore_fn(item_id) if (acore_fn and item_id is not None) else None
         if acore is not None:
