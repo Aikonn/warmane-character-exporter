@@ -291,3 +291,8 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - fetch.py: python -m warmane_exporter.fetch NAME REALM [--refresh] [--offline] [--allow-stale] [--cache-dir DIR]. Fresh cache (15 minutes) is used without a request; error pages and invalid JSON never replace valid cache; stale data is used only with --allow-stale or --offline and is labeled stale-cache. At most one live request per run. Cache and transport state live in git-ignored .warmane-cache/.
 - RequestOrchestrator.skip_completed=False for the fetch command, since the cache (not the probe checkpoint) decides whether a request is needed; cooldowns still persist.
 - Next: HTML summary fetch (enchants, gems, slots) and talents fetch using the same cache, then combine JSON + HTML + client definitions into the first character snapshot.
+
+## Update: snapshot command (2026-10-24)
+
+- snapshot.py: python -m warmane_exporter.snapshot NAME REALM [--refresh] [--offline] [--allow-stale] [--no-client]. Fetches the JSON summary, HTML summary and talents page (at most 3 live requests, 10 s apart, none when cached), validates each with its parser, optionally enriches from the local client files, and writes .warmane-cache/snapshots/<name>-<realm>-<time>.json (schema character-snapshot/0). Each section reports status, origin and observation time and fails independently; rejected bodies are kept in .warmane-cache/rejected/ for debugging and never enter the cache.
+- Untested assumption being checked by the first live run: the HTML parsers were built on rendered-DOM captures; raw HTTP HTML may differ (for example if the page builds parts with scripts). A rejected section shows exactly where.
