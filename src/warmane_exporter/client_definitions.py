@@ -134,6 +134,7 @@ class ClientDefinitions:
         self._glyph_by_spell: dict[int, GlyphInfo] | None = None
         self._gem_by_enchant: dict[int, tuple[int, int]] | None = None
         self._conditions: dict[int, list[list[int]]] | None = None
+        self._set_by_item: dict[int, dict[str, Any]] | None = None
 
     def _table(self, name: str, fields: int) -> DbcTable:
         if name not in self._tables:
@@ -189,6 +190,11 @@ class ClientDefinitions:
             if items:
                 sets.append({"id": row[0], "name": table.string_at(row[1]) or "", "items": items, "bonuses": sorted(bonuses)})
         return sets
+
+    def item_set_for_item(self, item_id: int) -> dict[str, Any] | None:
+        if self._set_by_item is None:
+            self._set_by_item = {i: s for s in self.item_sets() for i in s["items"]}
+        return self._set_by_item.get(item_id)
 
     def spell(self, spell_id: int) -> SpellInfo | None:
         table = self._table("Spell.dbc", SPELL_FIELDS)
