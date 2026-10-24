@@ -86,7 +86,7 @@ function Read-Link {
 
 $python = Find-Python
 if (-not $python) {
-    Show-Message "Python was not found. Expected .tools\python312\python.exe in the project folder." "Warmane Character Exporter" "Error"
+    Show-Message "Python was not found. Download the ready-to-run zip (it includes Python) from the Releases page of https://github.com/Aikonn/warmane-character-exporter and start it from the extracted folder." "Warmane Character Exporter" "Error"
     exit 1
 }
 

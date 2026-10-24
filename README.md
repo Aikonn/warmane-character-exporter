@@ -2,6 +2,14 @@
 
 A local Python tool that exports a Warmane character (Onyxia, Icecrown) into a self-contained report for PvE discussion in any AI chat. The exporter itself uses no AI, no paid service and no Warmane credentials.
 
+## Download and run (Windows)
+
+1. Open the [Releases page](https://github.com/Aikonn/warmane-character-exporter/releases/latest) and download `warmane-character-exporter-windows.zip`.
+2. Extract it anywhere (for example the Desktop). Python is included; nothing to install, no game client and no configuration needed.
+3. Double-click `Start-Report.cmd`, paste an armory link (for example `https://armory.warmane.com/character/Aikka/Onyxia/summary`), choose where to save, and the report opens in the browser.
+
+If Windows SmartScreen warns about the script, choose More info, then Run anyway. A run takes a few minutes and uses about 28 requests of the daily budget.
+
 ## Status
 
 Working end to end. For each character the tool collects the armory summary, equipment, talents and glyphs, professions, reputation, mounts and companions, all achievements and all statistics, then writes one JSON and one Markdown export. Spell, enchant and gem texts come from the game client files (offline). Unresolved fields are labeled, never guessed.
