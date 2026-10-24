@@ -4,6 +4,35 @@ import re
 from html import unescape
 from pathlib import Path
 
+# Standard WotLK paperdoll equipment slot order
+STANDARD_WOTLK_LAYOUT = {
+    "left": [
+        "Head",
+        "Neck",
+        "Shoulder",
+        "Back",
+        "Chest",
+        "Shirt",
+        "Tabard",
+        "Wrist",
+    ],
+    "right": [
+        "Hands",
+        "Waist",
+        "Legs",
+        "Feet",
+        "Finger 1",
+        "Finger 2",
+        "Trinket 1",
+        "Trinket 2",
+    ],
+    "bottom": [
+        "Main Hand",
+        "Off Hand",
+        "Ranged",
+    ],
+}
+
 
 def parse_summary_capture_file(path: Path) -> dict[str, object]:
     html = path.read_text(encoding="utf-8")
@@ -195,6 +224,12 @@ def _parse_equipment(html: str) -> dict[str, object]:
                 "raw_rel": unescape(rel_match.group(1)),
                 "namespaces": rel_payload,
             }
+            # Extract icon stem from img src
+            img_match = re.search(r'<img[^>]+src="[^"]*?([^"/]+)\.(?:png|jpg|jpeg|gif)"', chunk)
+            if img_match:
+                slot["item_reference"]["icon_stem"] = img_match.group(1)
+            else:
+                slot["item_reference"]["icon_stem"] = None
             slot["ambiguity_note"] = "No explicit textual slot name in this markup; layout position preserved."
             slots.append(slot)
             continue
@@ -202,7 +237,9 @@ def _parse_equipment(html: str) -> dict[str, object]:
         slot["ambiguity_note"] = "Slot markup was present but item/empty markers were not recognized."
         slots.append(slot)
 
-    return {"slots": slots}
+    equipment = {"slots": slots}
+    equipment["layout_validation"] = _validate_and_infer_layout(slots)
+    return equipment
 
 
 def _parse_rel_payload(rel_payload: str) -> dict[str, object]:
@@ -226,6 +263,111 @@ def _parse_rel_payload(rel_payload: str) -> dict[str, object]:
         "gems": gems_raw,
         "gem_positions": gem_positions,
     }
+
+
+def _validate_and_infer_layout(slots: list[dict[str, object]]) -> dict[str, object]:
+    """
+    Validate equipment layout against standard WotLK paperdoll order and add per-slot inference.
+    
+    Returns a layout_validation dict containing:
+    - expected_counts: {left: 8, right: 8, bottom: 3, unknown: 0}
+    - observed_counts: actual slot counts per group
+    - anchors_checked: slots with explicit labels and their match status
+    - status: "anchors_consistent" or "unverified" with issues
+    - note: explanation of layout inference limitations
+    """
+    # Count slots by group
+    observed_counts: dict[str, int] = {"left": 0, "right": 0, "bottom": 0, "unknown": 0}
+    for slot in slots:
+        group = slot.get("evidence", {}).get("group", "unknown")
+        if group in observed_counts:
+            observed_counts[group] += 1
+    
+    expected_counts = {"left": 8, "right": 8, "bottom": 3, "unknown": 0}
+    
+    # Collect anchors (slots with explicit labels)
+    anchors_checked: list[dict[str, object]] = []
+    for slot in slots:
+        slot_name = slot.get("slot_name")
+        if slot_name is not None:  # Has explicit label
+            group = slot.get("evidence", {}).get("group")
+            index = slot.get("evidence", {}).get("index_in_group")
+            
+            # Bounds-check the index against layout
+            if group not in STANDARD_WOTLK_LAYOUT or index is None or index < 1 or index > len(STANDARD_WOTLK_LAYOUT[group]):
+                # Out-of-range anchor
+                anchors_checked.append({
+                    "slot_key": slot.get("slot_key"),
+                    "explicit_label": slot_name,
+                    "expected_name": None,
+                    "match": False,
+                })
+            else:
+                expected_name = STANDARD_WOTLK_LAYOUT[group][index - 1]
+                match = slot_name == expected_name
+                anchors_checked.append({
+                    "slot_key": slot.get("slot_key"),
+                    "explicit_label": slot_name,
+                    "expected_name": expected_name,
+                    "match": match,
+                })
+    
+    # Determine validation status
+    counts_match = observed_counts == expected_counts
+    anchors_all_match = all(a["match"] for a in anchors_checked) if anchors_checked else False
+    has_anchors = len(anchors_checked) > 0
+    has_unknown = observed_counts.get("unknown", 0) > 0
+    
+    validation_status = "anchors_consistent" if (counts_match and has_anchors and anchors_all_match and not has_unknown) else "unverified"
+    
+    issues: list[str] = []
+    if not counts_match:
+        issues.append(f"Slot count mismatch: expected {expected_counts}, observed {observed_counts}")
+    if has_unknown:
+        issues.append(f"Found {observed_counts['unknown']} slots in unknown group (before any item-left/right/bottom)")
+    if not has_anchors:
+        issues.append("No slots with explicit labels found")
+    if anchors_checked and not anchors_all_match:
+        mismatches = [a for a in anchors_checked if not a["match"]]
+        for m in mismatches:
+            if m["expected_name"] is None:
+                issues.append(f"Anchor {m['slot_key']}: explicit '{m['explicit_label']}' at out-of-range position")
+            else:
+                issues.append(f"Anchor {m['slot_key']}: explicit '{m['explicit_label']}' != expected '{m['expected_name']}'")
+    
+    # Add layout inference to each slot
+    for slot in slots:
+        group = slot.get("evidence", {}).get("group")
+        index = slot.get("evidence", {}).get("index_in_group")
+        
+        if validation_status == "anchors_consistent" and group in STANDARD_WOTLK_LAYOUT and index is not None:
+            inferred_name = STANDARD_WOTLK_LAYOUT[group][index - 1]
+            slot["layout_inference"] = {
+                "inferred_slot_name": inferred_name,
+                "basis": "standard_wotlk_paperdoll_order",
+                "status": "anchors_consistent",
+            }
+            # Add notes for Finger and Trinket slots about numbering
+            if "Finger" in inferred_name or "Trinket" in inferred_name:
+                slot["layout_inference"]["note"] = f"{inferred_name} numbering reflects layout order only; does not imply which finger/trinket slot in game-logic terms"
+        else:
+            slot["layout_inference"] = {
+                "inferred_slot_name": None,
+                "basis": "standard_wotlk_paperdoll_order",
+                "status": "unverified",
+            }
+    
+    return {
+        "expected_counts": expected_counts,
+        "observed_counts": observed_counts,
+        "anchors_checked": anchors_checked,
+        "status": validation_status,
+        "issues": issues if issues else None,
+        "note": "Layout inference is based on standard WotLK paperdoll order, not source-declared slot identity. "
+                "Inference is valid only when layout is consistent (8/8/3 with matching anchors). "
+                "Verification against item inventory-type definitions is pending.",
+    }
+
 
 
 def _parse_specializations(html: str) -> list[dict[str, object]]:
