@@ -370,3 +370,11 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - library.py: local Library of static reference pages (items, gems, enchants...), git-ignored folder library/, one file per page plus index.jsonl (url, time, sha256, version); get_or_fetch fetches only on a miss. Nothing is fetched into it yet; a third-party item source still needs a terms review before any request.
 - run.py: python -m warmane_exporter.run NAME REALM or --all runs snapshot, reputation, mounts, achievements, statistics and export in order, stops at the first failing step and resumes from the cache.
 
+
+
+## Update: item quality found in the armory page (2026-10-24)
+
+- Correction: item quality is present in the character page markup as the CSS class icon-quality<N> (0 poor to 7 heirloom) on every equipped item; the earlier note that quality was unavailable was wrong. summary_parser now stores quality and quality_name per item and the report shows it. Rebuilt for all four characters from cache with no new requests.
+- Still unavailable from the armory: socket structure (the rel gems field always lists three positions, 0 meaning no gem, without telling an empty socket from no socket), active spec, reliable profession skill values.
+- GitHub Copilot: the account has Copilot Pro with cloud agent and CLI enabled, but the reviewer's GitHub connection rejects agent tasks and has no token for the Copilot CLI, so code generation is not offloaded.
+

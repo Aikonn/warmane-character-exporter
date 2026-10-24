@@ -230,6 +230,10 @@ def _parse_equipment(html: str) -> dict[str, object]:
                 slot["item_reference"]["icon_stem"] = img_match.group(1)
             else:
                 slot["item_reference"]["icon_stem"] = None
+            quality_match = re.search(r"icon-quality(\d)", chunk)
+            quality = int(quality_match.group(1)) if quality_match else None
+            slot["item_reference"]["quality"] = quality
+            slot["item_reference"]["quality_name"] = QUALITY_NAMES.get(quality)
             slot["ambiguity_note"] = "No explicit textual slot name in this markup; layout position preserved."
             slots.append(slot)
             continue
@@ -240,6 +244,9 @@ def _parse_equipment(html: str) -> dict[str, object]:
     equipment = {"slots": slots}
     equipment["layout_validation"] = _validate_and_infer_layout(slots)
     return equipment
+
+
+QUALITY_NAMES = {0: "poor", 1: "common", 2: "uncommon", 3: "rare", 4: "epic", 5: "legendary", 6: "artifact", 7: "heirloom"}
 
 
 def _parse_rel_payload(rel_payload: str) -> dict[str, object]:

@@ -46,6 +46,7 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
         equipment.append({
             "slot": (slot.get("layout_inference") or {}).get("inferred_slot_name") or slot.get("slot_name") or slot.get("slot_key"),
             "item_id": item_id,
+            "quality": ref.get("quality_name"),
             "name": names.get(item_id, ""),
             "transmog": transmog.get(item_id, ""),
             "enchant": (client.get("enchant") or {}).get("text"),
@@ -98,7 +99,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "|---|---|---|---|",
     ]
     for e in report["equipment"]:
-        item = f"{e['name'] or '?'} ({e['item_id']})"
+        item = f"{e['name'] or '?'} ({e['item_id']}, {e.get('quality') or 'quality unknown'})"
         if e.get("transmog"):
             item += f", transmog: {e['transmog']}"
         lines.append(f"| {e['slot']} | {item} | {e['enchant'] or ''} | {'; '.join(e['gems'])} |")
