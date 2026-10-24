@@ -10,12 +10,21 @@ Implementation rules for Copilot live in .github/copilot-instructions.md.
 - Local GitHub Copilot in VS Code: implementation and test runs.
 - GitHub's cloud coding agent is not used.
 
+## Autonomy (user directive, 2026-10-24)
+- The reviewer drives the project. Do not ask approval for each step.
+  Make file edits, write and run code and tests, and make local commits
+  when they serve the goal.
+- The user only copies and pastes and skims quickly. Keep replies short.
+- When a user decision is needed, put it at the very end under a label
+  "Decision needed:", at most 400 characters.
+- Still requires explicit user approval: git push, any GitHub change,
+  and any live network request to a data source (Warmane, EvoWoW,
+  Cavernoftime). Read-only access to local files is allowed.
+
 ## Approval boundaries
-- No code edits, staging, commits, pushes, or GitHub changes without
-  explicit user approval.
-- No network requests to data sources unless explicitly approved for a
-  bounded investigation. Live investigation is paused by default.
-- Commits and pushes are separate approvals.
+- Pushes, GitHub changes, and live requests to data sources need
+  explicit user approval (see Autonomy above).
+- Live investigation is paused by default.
 
 ## Review method
 - Use local read-only tools on the project folder; do not ask for uploads.

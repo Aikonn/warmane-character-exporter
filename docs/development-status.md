@@ -239,3 +239,16 @@ See [data-sources.md § 13a. Equipped-item code inventory — Aikka / Onyxia](./
 - **No further live requests are currently approved.**
 - Parser refinements must await explicit scope approval in next session.
 - Reviewer workflow and handoff rules: see reviewer-instructions.md.
+
+## Session handoff note (2026-10-24, end of session)
+- **Done this session (read-only, reviewer side):** source-terms review. EvoWoW robots.txt (user screenshot) does not disallow item/spell/enchantment pages; no terms page found. Cavernoftime: no robots.txt, footer "All rights reserved", Integrate page covers tooltip embedding only. Both sites reject non-browser clients (403 / IP block). Automated access and reuse terms NOT established for either site. AoWoW (Sarjuuk/aowow) is a self-hosted PHP/MySQL tool, no licence stated, "not for commercial use"; not worth installing.
+- **Decision:** do not build around live definition sites. Next source candidate: offline DBC reading from the local 3.3.5a client at `E:\Games\World of Warcraft 3.3.5a\` (passed as CLI argument only, never committed).
+- **Copilot reported (NOT yet reviewed by reviewer):** new files mpq_reader.py, dbc_parser.py, dbc_diagnostic.py, tests/test_mpq_dbc.py; 14 new tests, 120 total pass (Copilot-reported). It also ran `pip install -e .` in the .venv (environment change).
+- **Review items for next session (check the actual files, do not assume):**
+  1. Header layout: Copilot's reader/tests describe a 22-byte header with 16-bit table offsets and counts. Real MPQ v1 headers use 32-bit hash/block table offsets and sizes, so the reader may fail on the real client. Verify against the MPQ format.
+  2. Synthetic test archives are built with the project's own encrypt/decrypt helpers, so tests may not prove compatibility with real archives. Real-client run is the true check.
+  3. Confirm no debug_mpq.py left behind, no real client data in the repo, no network use, and that existing files were not modified.
+  4. Confirm priority order and compression handling (zlib/bzip2, unsupported flags raise clear errors).
+- **Then (needs user approval):** user runs dbc_diagnostic once against the client Data folder; check enchant 3820, spell 14769 and glyph 55679 against manually verified text.
+- **Pending doc-only edit (not yet approved or done):** add the terms-review and AoWoW findings plus the DBC plan to data-sources.md.
+- **Approval boundary unchanged:** no live requests to data sites; no commits or pushes without separate approval.
