@@ -182,6 +182,8 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
                 "gems_filled": filled,
                 "sockets_empty": max(len(acore.sockets) - filled, 0),
                 "scaling_stats": acore.scaling,
+                "armor": acore.armor,
+                "socket_bonus": defs.enchant_text(acore.socket_bonus_enchant_id) if acore.socket_bonus_enchant_id else None,
             }
             effects = _item_effects(defs, acore, slot.get("slot_key"), warnings)
             if effects:
@@ -208,6 +210,9 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
             info = defs.gem_info(code) if hasattr(defs, "gem_info") else None
             if info:
                 gem.update(info)
+            requirements = defs.gem_requirements(code) if hasattr(defs, "gem_requirements") else None
+            if requirements:
+                gem["requirements"] = requirements
             gems.append(gem)
             if text is None:
                 warnings.append(f"{slot.get('slot_key')}: gem code {code} text unresolved (no text source has it)")

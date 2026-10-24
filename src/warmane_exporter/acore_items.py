@@ -166,6 +166,7 @@ class AcoreItem:
     socket_bonus_enchant_id: int      # SpellItemEnchantment id, 0 = none
     gem_properties_id: int
     scaling: bool                     # heirloom-style scaling stats: stat values are not fixed
+    armor: int = 0
     spells: tuple[tuple[int, int], ...] = ()   # (spell id, trigger) pairs; trigger 0 use, 1 equip, 2 chance on hit
 
     @property
@@ -197,6 +198,7 @@ class AcoreItems:
             row["entry"], row["name"], row["class"], row["subclass"], row["Quality"], row["InventoryType"],
             row["ItemLevel"], row["RequiredLevel"], stats, sockets, row["socketBonus"], row["GemProperties"],
             bool(row["ScalingStatDistribution"]),
+            row["armor"],
             self._spells(row),
         )
 

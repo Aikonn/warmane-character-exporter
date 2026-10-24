@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .client_definitions import (
-    ENCHANT_FIELDS, ENCHANT_NAME, GEMPROP_FIELDS, GLYPH_FIELDS, TALENT_COLUMN, TALENT_FIELDS, TALENT_RANK_COUNT,
+    ENCHANT_CONDITION, ENCHANT_FIELDS, ENCHANT_NAME, GEMPROP_FIELDS, GLYPH_FIELDS, TALENT_COLUMN, TALENT_FIELDS, TALENT_RANK_COUNT,
     TALENT_RANK_FIRST, TALENT_ROW, TALENT_TAB, ClientDefinitions,
 )
 
@@ -40,6 +40,14 @@ def export_definitions(defs: ClientDefinitions, extra_spell_ids: Iterable[int] =
         row = gem_table.row(position)
         if row[1]:
             gem_properties.setdefault(str(row[1]), [row[0], row[4]])
+
+    enchant_conditions: dict[str, list[list[int]]] = {}
+    for position in range(len(enchant_table)):
+        row = enchant_table.row(position)
+        if row[ENCHANT_CONDITION]:
+            found = defs.gem_requirements(row[0])
+            if found:
+                enchant_conditions[str(row[0])] = found
 
     talent_table = defs._table("Talent.dbc", TALENT_FIELDS)
     talents: list[dict[str, Any]] = []
@@ -78,9 +86,10 @@ def export_definitions(defs: ClientDefinitions, extra_spell_ids: Iterable[int] =
     return {
         "schema": SCHEMA,
         "exported_at": time.time(),
-        "client_tables": {"enchants": len(enchants), "gem_properties": len(gem_properties), "talents": len(talents), "glyphs": len(glyphs), "spells": len(spells)},
+        "client_tables": {"enchants": len(enchants), "gem_properties": len(gem_properties), "enchant_conditions": len(enchant_conditions), "talents": len(talents), "glyphs": len(glyphs), "spells": len(spells)},
         "enchants": enchants,
         "gem_properties": gem_properties,
+        "enchant_conditions": enchant_conditions,
         "talents": talents,
         "glyphs": glyphs,
         "spells": spells,

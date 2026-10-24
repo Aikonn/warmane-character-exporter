@@ -64,13 +64,14 @@ class HtmlTests(unittest.TestCase):
             "identity": {"name": "A<b>", "realm": "Onyxia", "level": 80, "race": "Blood Elf", "class": "Priest", "faction": "Horde",
                          "guild": None, "achievement_points": 10},
             "snapshot_time": 1792846391, "active_specialization": "unknown (not exposed by Warmane)",
+            "bonus_totals": {"Stamina": 5, "Spell Power": 30},
             "equipment": [
                 {"slot": "Head", "item_id": 1, "name": "Hood", "quality": "epic", "item_level": 264, "stats": [["stamina", 5]],
                  "enchant": "+30 Spell Power", "gems": ["+10 All Stats"], "sockets_empty": 1, "transmog": "", "inventory_type": "head",
-                 "sockets": ["meta", "blue"], "gem_lines": ["+10 All Stats (epic blue)", "<no gem>"], "buckle": False, "effects": []},
+                 "sockets": ["meta", "blue"], "gem_lines": ["+10 All Stats (epic blue)", "<no gem>"], "buckle": False, "effects": [], "socket_bonus_info": {"text": "+9 Stamina", "active": False}},
                 {"slot": "Waist", "item_id": 3, "name": "Belt", "quality": "epic", "item_level": 245, "stats": [], "enchant": None,
                  "gems": [], "inventory_type": "waist", "sockets": ["yellow"], "gem_lines": ["+12 Spell Power (epic yellow)", "+12 Spell Power (epic red)"],
-                 "buckle": True, "effects": [{"trigger": "Equip", "spell": 9, "text": "Your spell casts have a chance to grant 304 mana per 5 sec for 15 sec."}]},
+                 "buckle": True, "gem_states": [], "effects": [{"trigger": "Equip", "spell": 9, "text": "Your spell casts have a chance to grant 304 mana per 5 sec for 15 sec."}]},
                 {"slot": "Shirt", "item_id": 2, "name": "Shirt", "quality": "common", "item_level": 1, "stats": [], "gems": []}],
             "specializations": [{"label": "Discipline", "split": [57, 14, 0], "glyphs": [], "talent_detail": [
                 {"tree": "Discipline", "points": 57, "talents": [{"name": "Penance", "spent": 1, "max": 1, "description": "Heals"}]}]}],
@@ -93,13 +94,13 @@ class HtmlTests(unittest.TestCase):
         self.assertEqual([r["name"] for r in pve["currencies"]], ["Emblems of Frost acquired"])
         self.assertEqual(len(pve["achievement_groups"]), 1)
         html = render_html(pve)
-        for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "&lt;no gem&gt;", "+12 Spell Power (epic yellow)", "Eternal Belt Buckle", "Equip: Your spell casts have a chance to grant 304 mana per 5 sec for 15 sec.", "Special effects", "GearScore", "Penance", "Do the thing",
+        for needle in ("<!doctype html>", "A&lt;b&gt;", "Ulduar &lt;10&gt;", "&lt;no gem&gt;", "+12 Spell Power (epic yellow)", "Eternal Belt Buckle", "Equip: Your spell casts have a chance to grant 304 mana per 5 sec for 15 sec.", "Base stats and special effects", "Socket bonus (inactive): +9 Stamina", "Total base stat bonuses", "<td>Spell Power</td><td>+30</td>", "https://wotlk.cavernoftime.com/item=1", "GearScore", "Penance", "Do the thing",
                        "Sindragosa", "heroic", "Warning: some armory kill counts", "Argent Crusade", "Wind Rider", "2026-"):
             self.assertIn(needle, html)
         self.assertNotIn("Ulduar <10>", html)  # raw armory text is never injected
         self.assertNotIn("<h1>A<b>", html)
         self.assertNotIn("<script", html)
-        self.assertNotIn("http", html)
+        self.assertEqual(html.count("http"), 3)   # only the item links; no scripts, styles or images are loaded from the web
 
     def test_minimal_report_does_not_crash(self):
         html = render_html(build_pve_report({"identity": {"name": "X", "realm": "Icecrown"}, "missing_sections": ["statistics"]}))

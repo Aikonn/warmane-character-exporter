@@ -41,6 +41,8 @@ TALENT_ROW = 2
 TALENT_COLUMN = 3
 TALENT_RANK_FIRST = 4   # RankID[9] occupies fields 4..12
 TALENT_RANK_COUNT = 9
+ENCHANT_CONDITION = 34      # SpellItemEnchantment.dbc: id of the SpellItemEnchantmentCondition row (meta gem requirements)
+CONDITION_FIELDS = 31      # SpellItemEnchantmentCondition.dbc: ID + 5 x (colour, operand, comparator, compare colour, value, logic)
 GEMPROP_FIELDS = 5        # GemProperties.dbc: ID, EnchantID, MaxcountInv, MaxcountItem, Type (colour bit mask)
 GLYPH_FIELDS = 4         # GlyphProperties.dbc: ID, SpellID, GlyphSlotFlags, SpellIconID (UNVERIFIED)
 ITEM_FIELDS = 8
@@ -94,6 +96,14 @@ class ItemInfo:
         return INVENTORY_TYPES.get(self.inventory_type, f"unknown({self.inventory_type})")
 
 
+def condition_rows(row) -> list[list[int]] | None:
+    """Rows of one SpellItemEnchantmentCondition record (columns: colour[5], operand[5], comparator[5], compare colour[5], value[5])."""
+    if row is None:
+        return None
+    found = [[row[1 + i], row[11 + i], row[16 + i], row[21 + i]] for i in range(5) if row[1 + i]]
+    return found or None
+
+
 class ClientDefinitions:
     """Lazy per-table loader. Raises DbcError if a table has an unexpected layout."""
 
@@ -133,6 +143,14 @@ class ClientDefinitions:
                 if row[1]:
                     self._gem_by_enchant.setdefault(row[1], (row[0], row[4]))
         return self._gem_by_enchant.get(enchant_id)
+
+    def gem_requirements(self, enchant_id: int) -> list[list[int]] | None:
+        """Meta gem requirements as [colour, comparator, compare colour, value] rows, None when the effect has none."""
+        table = self._table("SpellItemEnchantment.dbc", ENCHANT_FIELDS)
+        row = table.find(enchant_id)
+        if row is None or not row[ENCHANT_CONDITION]:
+            return None
+        return condition_rows(self._table("SpellItemEnchantmentCondition.dbc", CONDITION_FIELDS).find(row[ENCHANT_CONDITION]))
 
     def spell(self, spell_id: int) -> SpellInfo | None:
         table = self._table("Spell.dbc", SPELL_FIELDS)

@@ -188,6 +188,14 @@ def _e(value: Any) -> str:
     return escape("" if value is None else str(value))
 
 
+class Html(str):
+    """Markup that is already escaped (item links)."""
+
+
+def _cell(value: Any) -> str:
+    return str(value) if isinstance(value, Html) else _e(value)
+
+
 def _table(headers: list[str], rows: list[list[Any]], numeric_from: int | None = None) -> str:
     head = "".join(f"<th>{_e(h)}</th>" for h in headers)
     body = []
@@ -195,7 +203,7 @@ def _table(headers: list[str], rows: list[list[Any]], numeric_from: int | None =
         cells = []
         for i, cell in enumerate(row):
             cls = ' class="n"' if numeric_from is not None and i >= numeric_from else ""
-            text = "<br>".join(_e(c) for c in cell) if isinstance(cell, (list, tuple)) else _e(cell)
+            text = "<br>".join(_cell(c) for c in cell) if isinstance(cell, (list, tuple)) else _cell(cell)
             cells.append(f"<td{cls}>{text}</td>")
         body.append("<tr>" + "".join(cells) + "</tr>")
     return f"<table><tr>{head}</tr>{''.join(body)}</table>"
@@ -205,12 +213,31 @@ def _count_text(value: int | None) -> str:
     return "-" if not value else str(value)
 
 
+ITEM_URL = "https://wotlk.cavernoftime.com/item={}"
+
+
+def _bonus_text(value: int) -> str:
+    return f"+{value}"
+
+
 def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
     rows = []
     for e in report.get("equipment", []):
-        stats = ", ".join(f"+{v} {n}" for n, v in (e.get("stats") or []))
+        lines = []
+        if e.get("armor"):
+            lines.append(f"+{e['armor']} armor")
+        lines.extend(f"+{v} {n}" for n, v in (e.get("stats") or []))
         if e.get("scaling_stats"):
-            stats = (stats + " " if stats else "") + "(scaling item: stat values depend on character level)"
+            lines.append("(scaling item: stat values depend on character level)")
+        info = e.get("socket_bonus_info")
+        if info:
+            state = {True: "active", False: "inactive"}.get(info["active"], "unknown")
+            lines.append(f"Socket bonus ({state}): {info['text']}")
+        lines.extend(f"{x['trigger']}: {x['text']}" for x in e.get("effects") or [])
+        # base stats stay on one line, everything after them starts on a new line
+        stat_count = len(lines) - len(e.get("effects") or []) - (1 if info else 0)
+        if stat_count > 1:
+            lines[:stat_count] = [", ".join(lines[:stat_count])]
         if e.get("gem_lines") is not None and (e.get("gem_lines") or e.get("sockets") is not None):
             gems = list(e["gem_lines"])
         else:
@@ -218,13 +245,22 @@ def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
         enchant = [e["enchant"]] if e.get("enchant") else []
         if e.get("buckle"):
             enchant.append(BELT_BUCKLE)
-        item = f"{e.get('name') or '?'} ({e.get('item_id')})"
+        label = f"{e.get('name') or '?'} ({e.get('item_id')})"
+        if e.get("item_id"):
+            label = Html(f'<a href="{_e(ITEM_URL.format(e["item_id"]))}">{_e(e.get("name") or "?")}</a> ({e["item_id"]})')
         if e.get("transmog"):
-            item += f", transmog: {e['transmog']}"
+            label = Html(str(label) + _e(f", transmog: {e['transmog']}")) if isinstance(label, Html) else label + f", transmog: {e['transmog']}"
         item_score_value = score["per_item"].get(e.get("slot"))
-        rows.append([e.get("slot"), item, e.get("quality") or "?", e.get("item_level") if e.get("item_level") is not None else "?",
-                     item_score_value if item_score_value is not None else "", stats,
-                     [f"{x['trigger']}: {x['text']}" for x in e.get("effects") or []], enchant, gems])
+        rows.append([e.get("slot"), label, e.get("quality") or "?", e.get("item_level") if e.get("item_level") is not None else "?",
+                     item_score_value if item_score_value is not None else "", lines, enchant, gems])
+    totals = report.get("bonus_totals") or {}
+    totals_html = ""
+    if totals:
+        totals_html = ("<h3>Total base stat bonuses from gear, gems and enchants</h3>"
+                       + _table(["Stat", "Bonus"], [[n, _bonus_text(v)] for n, v in totals.items()])
+                       + '<p class="muted">Sum of item base stats, armor, enchants, gems, active socket bonuses and active meta gems. '
+                         "Special effects (procs, use effects, percent bonuses, weapon enchants such as Mongoose) are not counted; "
+                         "stat values of scaling items are not counted.</p>")
     note = ""
     if score["gearscore"] is not None:
         extra = f" Adjustments applied: {', '.join(score['adjustments'])}." if score["adjustments"] else ""
@@ -239,7 +275,7 @@ def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
         note = (f'<p class="muted">Average item level and GearScore not calculated: item level data is missing for '
                 f'{score["unknown_items"]} item(s). Run the AzerothCore fetch and rebuild the snapshot.</p>')
     return ("<h2 id=\"gear\">Equipment</h2>"
-            + _table(["Slot", "Item", "Quality", "Item level", "GearScore", "Base stats", "Special effects", "Enchant", "Gems"], rows) + note)
+            + _table(["Slot", "Item", "Quality", "Item level", "GearScore", "Base stats and special effects", "Enchant", "Gems"], rows) + note + totals_html)
 
 
 def _spec_section(report: dict[str, Any]) -> str:
