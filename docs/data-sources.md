@@ -534,3 +534,17 @@ https://wotlk.cavernoftime.com/item=51178&power=true&gems=3879      [PASS]
 - [ ] Access terms and relevant licenses have been checked.
 - [ ] Remaining gaps and proposed scope changes are listed for review.
 - [ ] No full exporter, optimization engine, AI runtime dependency, or bypass mechanism was added prematurely.
+
+
+## Offline client DBC data (verified 2026-10-24)
+
+Status: verified against the local 3.3.5a (build 12340) client by the user running dbc_diagnostic.
+
+- Source: DBC tables inside the client MPQ archives (patch archives override base ones). No network access, no third-party site.
+- Verified field indexes (uint32 fields, key in field 0; strings are offsets into the table string block):
+  - SpellItemEnchantment.dbc (38 fields): name enUS = field 14. Enchant 3820 = "+30 Spell Power and 20 Critical strike rating." (matches manual evidence).
+  - Spell.dbc (234 fields): name enUS = 136, rank enUS = 153, description enUS = 170. Spell 14769 = "Improved Power Word: Shield", Rank 3. Spell 55679 = "Glyph of Flash Heal".
+  - Item.dbc (8 fields): class = 1, subclass = 2, inventory type = 6. Item 51178 = armor, cloth, inventory type 1 (head).
+- Not available offline: item names, and the item-to-gem-property mapping (3.3.5a keeps these in the item cache, not in DBC files). Gem item definitions still need another source or manual evidence.
+- Earlier live-site findings: EvoWoW robots.txt does not disallow item/spell/enchantment pages but no terms were found; Cavernoftime has no robots.txt and states "All rights reserved". Both reject non-browser clients. Automated live access is not established as permitted.
+- Client path comes from warmane-character-exporter.config (not committed) or --data-dir.
