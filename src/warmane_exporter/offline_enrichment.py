@@ -10,6 +10,7 @@ import copy
 from typing import Any
 
 from .client_definitions import ClientDefinitions
+from .summary_parser import STANDARD_WOTLK_LAYOUT
 
 
 def _as_int(value: Any) -> int | None:
@@ -151,6 +152,37 @@ SLOT_INVENTORY_TYPES = {
 }
 
 
+def _verify_layout_by_item_types(equipment: dict[str, Any], defs: ClientDefinitions) -> None:
+    """Name the slots when the page has no empty slot to anchor the layout (every slot is filled).
+
+    The 8/8/3 paperdoll order is standard; it is accepted only if the page has exactly that many slots
+    and the inventory type of every item fits the slot it would occupy (Head item in slot 1, and so on).
+    """
+    validation = equipment.get("layout_validation") or {}
+    slots = equipment.get("slots") or []
+    if validation.get("status") != "unverified" or validation.get("anchors_checked") \
+            or validation.get("observed_counts") != validation.get("expected_counts"):
+        return
+    names: list[tuple[dict[str, Any], str]] = []
+    for slot in slots:
+        group = (slot.get("evidence") or {}).get("group")
+        index = (slot.get("evidence") or {}).get("index_in_group")
+        reference = slot.get("item_reference")
+        if group not in STANDARD_WOTLK_LAYOUT or not index or not reference:
+            return
+        name = STANDARD_WOTLK_LAYOUT[group][index - 1]
+        item_id = _as_int((reference.get("namespaces") or {}).get("item") or reference.get("href_item_id"))
+        info = defs.item(item_id) if item_id is not None else None
+        if info is None or info.inventory_type not in SLOT_INVENTORY_TYPES[name]:
+            return
+        names.append((slot, name))
+    for slot, name in names:
+        slot["layout_inference"] = {"inferred_slot_name": name, "basis": "standard_wotlk_paperdoll_order",
+                                    "status": "item_types_consistent"}
+    validation["status"] = "item_types_consistent"
+    validation["issues"] = None
+
+
 def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> dict[str, Any]:
     """Return a deep copy of a summary parse result with "client" data on equipped items.
 
@@ -159,6 +191,7 @@ def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> di
     """
     enriched = copy.deepcopy(result)
     warnings: list[str] = []
+    _verify_layout_by_item_types(enriched.get("equipment", {}), defs)
     for slot in enriched.get("equipment", {}).get("slots", []):
         reference = slot.get("item_reference")
         if not reference:

@@ -158,7 +158,13 @@ $wait.Add_FormClosing({
         if ($answer -eq "Yes") { $script:cancelled = $true; try { $script:process.Kill() } catch { } } else { $e.Cancel = $true }
     }
 })
+Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hWnd);'
 $wait.Show()
+# come to the front once (not permanently on top): the topmost flag is set and cleared again right away
+$wait.TopMost = $true
+$wait.TopMost = $false
+$wait.Activate()
+[void][Win32.Native]::SetForegroundWindow($wait.Handle)
 $env:WARMANE_PROGRESS = "1"
 $clock = [System.Diagnostics.Stopwatch]::StartNew()
 
