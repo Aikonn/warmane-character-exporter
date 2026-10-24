@@ -30,6 +30,11 @@ OVERVIEW_CATEGORY = 14807     # Dungeons & Raids: entered / completed counters
 DEATHS_CATEGORY = 125         # Deaths > Dungeons: "Deaths in <raid>"
 ACHIEVEMENT_PARENT = 168      # Dungeons & Raids
 
+ACHIEVEMENT_ORDER = (
+    "Dungeons & Raids", "Classic", "The Burning Crusade", "Lich King Dungeon", "Lich King Heroic",
+    "Lich King 10-Player Raid", "Lich King 25-Player Raid", "Secrets of Ulduar 10", "Secrets of Ulduar 25",
+    "Call of the Crusade 10", "Call of the Crusade 25", "Fall of the Lich King 10", "Fall of the Lich King 25",
+)
 BOSS_INSTANCE = {"Malygos": "The Eye of Eternity"}
 # Instance names differ between normal and heroic rows (Warmane wording). Key = lower case without "the ".
 KEY_FIX = {"ahn'kahet: the old kingdom": "ahn'kahet", "cot: stratholme": "caverns of time: stratholme",
@@ -86,6 +91,7 @@ def parse_progress_row(name: str) -> dict[str, Any] | None:
 def build_progression(statistics: list[dict[str, Any]]) -> dict[str, Any]:
     by_id = {c["category_id"]: c for c in statistics}
     groups = []
+    all_instances: dict[str, dict[str, Any]] = {}   # an instance spread over several categories (Vault of Archavon) is merged
     for category_id, heading in PROGRESS_CATEGORIES:
         category = by_id.get(category_id)
         if category is None:
@@ -98,7 +104,10 @@ def build_progression(statistics: list[dict[str, Any]]) -> dict[str, Any]:
             if parsed is None or count is None:
                 other.append({"name": row["name"], "value": row["value"]})
                 continue
-            inst = instances.setdefault(parsed["key"], {"name": parsed["instance"], "bosses": OrderedDict(), "modes": set()})
+            inst = all_instances.get(parsed["key"])
+            if inst is None:
+                inst = all_instances[parsed["key"]] = {"name": parsed["instance"], "bosses": OrderedDict(), "modes": set()}
+                instances[parsed["key"]] = inst
             mode = (parsed["size"], parsed["heroic"])
             inst["modes"].add(mode)
             inst["bosses"].setdefault(parsed["boss"], {})[mode] = count
@@ -130,7 +139,8 @@ def build_pve_report(report: dict[str, Any]) -> dict[str, Any]:
             category_names.setdefault(cid, entry["category"])
             grouped.setdefault(cid, []).append(entry)
     ach_groups = []
-    for cid, name in category_names.items():
+    order = {n: i for i, n in enumerate(ACHIEVEMENT_ORDER)}
+    for cid, name in sorted(category_names.items(), key=lambda kv: order.get(kv[1], len(order))):
         entries = grouped[cid]
         ach_groups.append({
             "category_id": cid, "name": name,
@@ -212,7 +222,9 @@ def _spec_section(report: dict[str, Any]) -> str:
         for tree in spec.get("talent_detail", []):
             if not tree["talents"]:
                 continue
-            rows = [[t["name"] or "?", f"{t['spent']}/{t['max']}", t["description"] or ""] for t in tree["talents"]]
+            rows = [[t["name"] or "?", f"{t['spent']}/{t['max']}",
+                      (t["description"] or "") + (" [placeholder not resolved]" if "$" in (t["description"] or "") else "")]
+                     for t in tree["talents"]]
             out.append(f"<details><summary>{_e(tree['tree'])}: {_e(tree['points'])} points</summary>"
                        + _table(["Talent", "Rank", "Effect at current rank"], rows) + "</details>")
         glyphs = [[g.get("category"), g.get("name"), g.get("effect") or ""] for g in spec.get("glyphs", [])]
@@ -230,7 +242,9 @@ def _progress_section(progress: dict[str, Any]) -> str:
     out = ["<h2 id=\"progress\">Dungeon and raid progression</h2>",
            '<p class="note">Source: armory statistics. These are lifetime kill counters for this character, not current lockouts. '
            "A dash means the armory shows no entry (never killed or not tracked). "
-           "Boss kill counts include every difficulty shown in the column header.</p>"]
+           "Counters are shown exactly as the armory reports them. Some bosses show the same number in several difficulty columns "
+           "(for example 13 in all four modes); the armory does not always separate difficulties cleanly, so read those columns with care. "
+           "Instances that are spread over several statistic categories (Vault of Archavon) are merged into one table.</p>"]
     # at-a-glance table
     glance = []
     for group in progress["groups"]:

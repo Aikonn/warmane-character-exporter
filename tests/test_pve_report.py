@@ -10,11 +10,12 @@ def _stats():
             ("Sindragosa kills (Icecrown 10 player)", "1"), ("Sindragosa kills (Heroic Icecrown 10 player)", "- -"),
             ("Sindragosa kills (Icecrown 25 player)", "2"), ("Sindragosa kills (Heroic Icecrown 25 player)", "- -"),
             ("Victories over the Lich King (Icecrown 25 player)", "1"),
-            ("Falric kills (Halls of Reflection)", "1"), ("Falric kills (Heroic Halls of Reflection)", "3"),
+            ("Toravon the Ice Watcher kills (Wintergrasp 10 player)", "- -"), ("Falric kills (Halls of Reflection)", "1"), ("Falric kills (Heroic Halls of Reflection)", "3"),
             ("Weird row without context", "5"), ("Broken kills (Icecrown 10 player)", "n/a"))},
         {"category_id": 14823, "category": "Wrath", "parent": 14807, "rows": rows(
             ("Keristrasza kills (The Nexus)", "14"), ("Keristrasza kills (Heroic Nexus)", "7"),
             ("Malygos kills (10 player)", "14"), ("Sartharion kills (Chamber of the Aspects 25 player)", "12"),
+            ("Archavon the Stone Watcher kills (Wintergrasp 10 player)", "4"),
             ("Mal'Ganis defeated (Caverns of Time: Stratholme)", "9"), ("Mal'Ganis defeated (Heroic CoT: Stratholme)", "- -"))},
         {"category_id": 15021, "category": "Call", "parent": 14807, "rows": rows(
             ("Lord Jaraxxus kills (Trial of the Crusader 10 player)", "14"),
@@ -44,6 +45,9 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(wrath["The Nexus"]["bosses"]["Keristrasza"], {(None, False): 14, (None, True): 7})
         self.assertEqual(len(wrath["Caverns of Time: Stratholme"]["modes"]), 2)
         self.assertIn("Obsidian Sanctum (Chamber of the Aspects)", wrath)
+        voa = wrath["Vault of Archavon (Wintergrasp)"]
+        self.assertEqual(set(voa["bosses"]), {"Archavon the Stone Watcher", "Toravon the Ice Watcher"})
+        self.assertNotIn("Vault of Archavon (Wintergrasp)", {i["name"] for i in groups["Fall of the Lich King"]["instances"]})
         icc = groups["Fall of the Lich King"]
         self.assertEqual([r["name"] for r in icc["other"]], ["Weird row without context", "Broken kills (Icecrown 10 player)"])
         icc_inst = {i["name"]: i for i in icc["instances"]}["Icecrown"]
