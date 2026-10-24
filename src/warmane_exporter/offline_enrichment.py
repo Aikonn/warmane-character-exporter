@@ -87,3 +87,71 @@ def enrich_talents_result(result: dict[str, Any], defs: ClientDefinitions) -> di
             _enrich_glyph(glyph, defs, warnings)
     enriched["client_warnings"] = warnings
     return enriched
+
+
+# Inventory types that may legitimately appear in each paperdoll slot (3.3.5a).
+SLOT_INVENTORY_TYPES = {
+    "Head": {1}, "Neck": {2}, "Shoulder": {3}, "Back": {16}, "Chest": {5, 20},
+    "Shirt": {4}, "Tabard": {19}, "Wrist": {9}, "Hands": {10}, "Waist": {6},
+    "Legs": {7}, "Feet": {8}, "Finger 1": {11}, "Finger 2": {11},
+    "Trinket 1": {12}, "Trinket 2": {12},
+    "Main Hand": {13, 17, 21}, "Off Hand": {13, 14, 22, 23},
+    "Ranged": {15, 25, 26, 28},
+}
+
+
+def enrich_summary_result(result: dict[str, Any], defs: ClientDefinitions) -> dict[str, Any]:
+    """Return a deep copy of a summary parse result with "client" data on equipped items.
+
+    Enchant and gem codes are SpellItemEnchantment IDs (verified); gem code 0 means an
+    empty socket. Item names are not available offline.
+    """
+    enriched = copy.deepcopy(result)
+    warnings: list[str] = []
+    for slot in enriched.get("equipment", {}).get("slots", []):
+        reference = slot.get("item_reference")
+        if not reference:
+            continue
+        ns = reference.get("namespaces", {})
+        client: dict[str, Any] = {}
+        slot["client"] = client
+        item_id = _as_int(ns.get("item") or reference.get("href_item_id"))
+        info = defs.item(item_id) if item_id is not None else None
+        if info is None:
+            warnings.append(f"{slot.get('slot_key')}: item {item_id} not in client Item.dbc")
+        else:
+            client["item"] = {
+                "item_id": info.item_id,
+                "class": info.item_class,
+                "subclass": info.item_subclass,
+                "inventory_type": info.inventory_type_name,
+            }
+            inferred = (slot.get("layout_inference") or {}).get("inferred_slot_name")
+            allowed = SLOT_INVENTORY_TYPES.get(inferred or "")
+            if allowed is not None:
+                client["slot_check"] = "ok" if info.inventory_type in allowed else "mismatch"
+                if client["slot_check"] == "mismatch":
+                    warnings.append(
+                        f"{slot.get('slot_key')}: item {item_id} is {info.inventory_type_name}, "
+                        f"inferred slot is {inferred}"
+                    )
+        ench = _as_int(ns.get("ench"))
+        if ench:
+            text = defs.enchant_text(ench)
+            client["enchant"] = {"id": ench, "text": text}
+            if text is None:
+                warnings.append(f"{slot.get('slot_key')}: enchant {ench} not in client data")
+        gems = []
+        for position in ns.get("gem_positions", []):
+            code = _as_int(position.get("raw_value"))
+            if not code:
+                gems.append({"position": position.get("position"), "id": code or 0, "empty": True})
+                continue
+            text = defs.enchant_text(code)
+            gems.append({"position": position.get("position"), "id": code, "text": text})
+            if text is None:
+                warnings.append(f"{slot.get('slot_key')}: gem code {code} not in client data")
+        if gems:
+            client["gems"] = gems
+    enriched["client_warnings"] = warnings
+    return enriched

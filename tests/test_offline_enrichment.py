@@ -67,3 +67,43 @@ class EnrichmentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SummaryEnrichmentTests(unittest.TestCase):
+    def test_equipment(self) -> None:
+        from warmane_exporter.offline_enrichment import enrich_summary_result
+
+        strings = b"\x00+30 Spell Power\x00+10 All Stats\x00"
+        ench = build_dbc([_row(38, {0: 3820, 14: 1}), _row(38, {0: 3879, 14: 17})], strings)
+        item = build_dbc([_row(8, {0: 51178, 1: 4, 2: 1, 6: 1}), _row(8, {0: 777, 1: 4, 2: 1, 6: 7})])
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        (Path(tmp.name) / "patch-3.MPQ").write_bytes(build_mpq({
+            "DBFilesClient\\SpellItemEnchantment.dbc": ench,
+            "DBFilesClient\\Item.dbc": item,
+        }))
+        client = ClientData(tmp.name)
+        self.addCleanup(client.close)
+        defs = ClientDefinitions(client)
+
+        def slot(key, item_id, inferred, ench_id, gems):
+            return {"slot_key": key, "layout_inference": {"inferred_slot_name": inferred},
+                    "item_reference": {"href_item_id": str(item_id), "namespaces": {
+                        "item": str(item_id), "ench": ench_id, "gems": gems,
+                        "gem_positions": [{"position": i + 1, "raw_value": g}
+                                          for i, g in enumerate((gems or "").split(":")) if gems]}}}
+
+        result = {"equipment": {"slots": [
+            slot("left_1", 51178, "Head", "3820", "3879:0"),
+            slot("left_2", 777, "Neck", None, None),
+            {"slot_key": "left_3", "is_empty": True},
+        ]}}
+        out = enrich_summary_result(result, defs)
+        s0, s1, s2 = out["equipment"]["slots"]
+        self.assertEqual(s0["client"]["slot_check"], "ok")
+        self.assertEqual(s0["client"]["enchant"]["text"], "+30 Spell Power")
+        self.assertEqual(s0["client"]["gems"][0]["text"], "+10 All Stats")
+        self.assertTrue(s0["client"]["gems"][1]["empty"])
+        self.assertEqual(s1["client"]["slot_check"], "mismatch")
+        self.assertNotIn("client", s2)
+        self.assertEqual(len(out["client_warnings"]), 1)
