@@ -184,6 +184,7 @@ if (-not $Output) {
     $dialog.Title = "Where to save the report"
     $dialog.Filter = "HTML report (*.html)|*.html"
     $dialog.DefaultExt = "html"
+    $dialog.AutoUpgradeEnabled = $false   # classic dialog: the modern one restores a remembered window size per program and could open collapsed
     $dialog.FileName = ("{0}-{1}-pve.html" -f $charName.ToLower(), $charRealm.ToLower())
     $startDir = Get-DownloadsFolder
     $dialog.InitialDirectory = $startDir
