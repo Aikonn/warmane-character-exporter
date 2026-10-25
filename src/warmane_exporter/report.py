@@ -85,6 +85,9 @@ def build_report(snapshot: dict[str, Any]) -> dict[str, Any]:
         equipment.append({
             "slot": slot_name,
             "inventory_type": (client.get("item") or {}).get("inventory_type"),
+            "item_class": (client.get("item") or {}).get("class"),
+            "item_subclass": (client.get("item") or {}).get("subclass"),
+            "enchant_id": (client.get("enchant") or {}).get("id"),
             "gem_details": gem_details,
             "set": client.get("set"),
             "armor": (client.get("acore") or {}).get("armor"),
