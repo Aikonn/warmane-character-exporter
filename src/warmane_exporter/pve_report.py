@@ -178,7 +178,7 @@ def build_pve_report(report: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------- HTML
 
 CSS = """
-.issue{color:#b00020;font-weight:bold} .warn{color:#b26a00;font-weight:bold}
+.finding{color:#b00020}
 body{font-family:Segoe UI,Arial,sans-serif;max-width:1100px;margin:1.5em auto;padding:0 1em;color:#111;line-height:1.4}
 h1{border-bottom:2px solid #444;padding-bottom:.2em} h2{margin-top:1.8em;border-bottom:1px solid #999}
 table{border-collapse:collapse;margin:.6em 0;font-size:.92em} th,td{border:1px solid #bbb;padding:.25em .6em;text-align:left;vertical-align:top}
@@ -274,9 +274,8 @@ def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
             label = Html(f'<a href="{_e(ITEM_URL.format(e["item_id"]))}">{_e(e.get("name") or "?")}</a> ({e["item_id"]})')
         if e.get("transmog"):
             label = Html(str(label) + _e(f", transmog: {e['transmog']}")) if isinstance(label, Html) else label + f", transmog: {e['transmog']}"
-        item_score_value = score["per_item"].get(e.get("slot"))
         rows.append([e.get("slot"), label, e.get("quality") or "?", e.get("item_level") if e.get("item_level") is not None else "?",
-                     item_score_value if item_score_value is not None else "", lines, enchant, gems])
+                     lines, enchant, gems])
     totals = report.get("bonus_totals") or {}
     totals_html = ""
     if totals:
@@ -299,7 +298,7 @@ def _gear_section(report: dict[str, Any], score: dict[str, Any]) -> str:
         note = (f'<p class="muted">Average item level and GearScore not calculated: item level data is missing for '
                 f'{score["unknown_items"]} item(s). Run the AzerothCore fetch and rebuild the snapshot.</p>')
     return ("<h2 id=\"gear\">Equipment</h2>"
-            + _table(["Slot", "Item", "Quality", "Item level", "GearScore", "Base stats and special effects", "Enchant", "Gems"], rows) + _set_html(report) + note + totals_html)
+            + _table(["Slot", "Item", "Quality", "Item level", "Base stats and special effects", "Enchant", "Gems"], rows) + _set_html(report) + note + totals_html)
 
 
 def _spec_section(report: dict[str, Any]) -> str:
@@ -447,9 +446,9 @@ def _checks_section(checks: dict[str, Any]) -> str:
              f"<p><b>{len(issues)} issue(s), {len(warnings)} warning(s).</b> Issues are almost certainly wrong; warnings may be intentional.</p>"]
     if not issues and not warnings:
         parts.append("<p>No problems found by these checks (enchants, gems, meta gem, belt buckle, glyphs, talent points, armor type).</p>")
-    for title, css, rows in (("Issues", "issue", issues), ("Warnings", "warn", warnings)):
+    for title, rows in (("Issues", issues), ("Warnings", warnings)):
         if rows:
-            parts.append(f"<h3>{title}</h3><ul>" + "".join(f'<li><span class="{css}">{_e(r["area"])}</span>: {_e(r["text"])}</li>' for r in rows) + "</ul>")
+            parts.append(f"<h3>{title}</h3><ul>" + "".join(f'<li class="finding">{_e(r["area"])}: {_e(r["text"])}</li>' for r in rows) + "</ul>")
     return "".join(parts)
 
 
