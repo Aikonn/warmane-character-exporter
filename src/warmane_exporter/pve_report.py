@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from .gearscore import character_score
+from .checks import run_checks
 from .snapshot import character_page_url
 from .report import BELT_BUCKLE
 from .identity import SUPPORTED_REALMS
@@ -170,12 +171,14 @@ def build_pve_report(report: dict[str, Any]) -> dict[str, Any]:
         "achievement_groups": ach_groups,
         "gearscore": score,
         "currencies": currencies,
+        "checks": run_checks(report),
     }
 
 
 # ---------------------------------------------------------------------------- HTML
 
 CSS = """
+.issue{color:#b00020;font-weight:bold} .warn{color:#b26a00;font-weight:bold}
 body{font-family:Segoe UI,Arial,sans-serif;max-width:1100px;margin:1.5em auto;padding:0 1em;color:#111;line-height:1.4}
 h1{border-bottom:2px solid #444;padding-bottom:.2em} h2{margin-top:1.8em;border-bottom:1px solid #999}
 table{border-collapse:collapse;margin:.6em 0;font-size:.92em} th,td{border:1px solid #bbb;padding:.25em .6em;text-align:left;vertical-align:top}
@@ -438,6 +441,18 @@ def _other_section(pve: dict[str, Any]) -> str:
     return "".join(out)
 
 
+def _checks_section(checks: dict[str, Any]) -> str:
+    issues, warnings = checks["issues"], checks["warnings"]
+    parts = ['<h2 id="checks">Raid readiness</h2>',
+             f"<p><b>{len(issues)} issue(s), {len(warnings)} warning(s).</b> Issues are almost certainly wrong; warnings may be intentional.</p>"]
+    if not issues and not warnings:
+        parts.append("<p>No problems found by these checks (enchants, gems, meta gem, belt buckle, glyphs, talent points, armor type).</p>")
+    for title, css, rows in (("Issues", "issue", issues), ("Warnings", "warn", warnings)):
+        if rows:
+            parts.append(f"<h3>{title}</h3><ul>" + "".join(f'<li><span class="{css}">{_e(r["area"])}</span>: {_e(r["text"])}</li>' for r in rows) + "</ul>")
+    return "".join(parts)
+
+
 def _armory_link(ident: dict[str, Any]) -> str:
     try:
         url = character_page_url(str(ident.get("name") or ""), str(ident.get("realm") or ""), "summary")
@@ -453,7 +468,7 @@ def render_html(pve: dict[str, Any]) -> str:
     when = datetime.fromtimestamp(taken, timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if isinstance(taken, (int, float)) else "unknown"
     title = f"{ident.get('name')} - {ident.get('realm')} - PvE report"
     toc = "".join(f'<li><a href="#{a}">{_e(t)}</a></li>' for a, t in (
-        ("gear", "Equipment"), ("specs", "Talents and glyphs"), ("progress", "WotLK raid progression: boss kills"),
+        ("checks", "Raid readiness"), ("gear", "Equipment"), ("specs", "Talents and glyphs"), ("progress", "WotLK raid progression: boss kills"),
         ("other", "Other dungeon and raid statistics"), ("achievements", "WotLK raid achievements"),
         ("currency", "Badges and emblems"), ("rep", "Reputation"), ("mounts", "Mounts")))
     missing = report.get("missing_sections") or []
@@ -467,6 +482,7 @@ def render_html(pve: dict[str, Any]) -> str:
         "intended for PvE discussion. Values the armory does not expose are marked unknown, never guessed "
         "(for example the active specialization).</p>",
         f"<ul>{toc}</ul>",
+        _checks_section(pve["checks"]),
         _gear_section(report, pve["gearscore"]),
         _spec_section(report),
         _progress_section(pve["progression"]),
