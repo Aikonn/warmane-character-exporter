@@ -19,6 +19,12 @@ param(
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
+# The window is hidden, so an unexpected error would end the script silently: always tell the user.
+trap {
+    try { [System.IO.File]::AppendAllText((Join-Path $PSScriptRoot ".warmane-cache\launcher-error.log"), ("[" + (Get-Date) + "] " + ($_ | Out-String) + "`r`n")) } catch { }
+    [void][System.Windows.Forms.MessageBox]::Show("Unexpected error: " + $_.Exception.Message + "`r`n(details in .warmane-cache\launcher-error.log)", "Warmane Character Exporter", "OK", "Error")
+    exit 1
+}
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $root = $PSScriptRoot
@@ -143,6 +149,8 @@ function Read-Link {
     $form.CancelButton = $cancel
     $form.Controls.AddRange(@($label, $box, $hint, $ok, $cancel))
     while ($true) {
+        $form.TopMost = $true      # appears in front once; the user can still put other windows over it
+        $form.Add_Shown({ $form.Activate(); $form.TopMost = $false })
         if ($form.ShowDialog() -ne "OK") { return $null }
         if ($box.Text -match $pattern) { return $box.Text.Trim() }
         Show-Message "That does not look like a Warmane armory character link." "Warmane Character Exporter" "Warning"
@@ -179,7 +187,18 @@ if (-not $Output) {
     $dialog.FileName = ("{0}-{1}-pve.html" -f $charName.ToLower(), $charRealm.ToLower())
     $startDir = Get-DownloadsFolder
     $dialog.InitialDirectory = $startDir
-    if ($dialog.ShowDialog() -ne "OK") { exit 0 }
+    # Owner window: makes sure the dialog appears in front even though this script runs hidden and may not own the foreground.
+    $owner = New-Object System.Windows.Forms.Form
+    $owner.TopMost = $true
+    $owner.ShowInTaskbar = $false
+    $owner.StartPosition = "CenterScreen"
+    $owner.Opacity = 0
+    $owner.Size = New-Object System.Drawing.Size(1, 1)
+    $owner.Show()
+    $owner.Activate()
+    $pick = $dialog.ShowDialog($owner)
+    $owner.Close()
+    if ($pick -ne "OK") { exit 0 }
     $Output = $dialog.FileName
 }
 
