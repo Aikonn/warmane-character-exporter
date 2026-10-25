@@ -461,3 +461,9 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 ## PvE-only fetch and 1 s spacing
 - run.py now fetches only what the PvE report reads: 13 of 52 achievement categories (168 and its children) and 9 of 33 statistic categories (14807, the six instance categories, 125, 130). About 28 live requests instead of about 90. `--full` (run.py and collect.py) fetches everything; cached categories are reused.
 - Default spacing between requests is now 1 s (owner decision, one character at a time); it was 3 s.
+
+## Raid readiness checks (tier 1)
+- `checks.py` adds a "Raid readiness" section to the PvE report with issues and warnings.
+- Issues: missing enchant (head, shoulder, back, chest, wrist, hands, legs, feet, weapons and shield; ranged for hunters; rings for Enchanters), empty gem socket, inactive meta gem, missing Eternal Belt Buckle, unspent talent points, empty major glyph slot (both specializations, same rules).
+- Warnings: armor type lower than the class's best, and a second specialization with zero talent points (dual specialization probably not purchased; it is then not checked).
+- Not checked by design: socket bonuses, minor glyphs, stat caps, best-in-slot, consumables.
