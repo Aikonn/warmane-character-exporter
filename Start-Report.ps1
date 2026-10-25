@@ -189,6 +189,7 @@ if (-not $Output) {
     $dialog.InitialDirectory = $startDir
     # Owner window: makes sure the dialog appears in front even though this script runs hidden and may not own the foreground.
     $owner = New-Object System.Windows.Forms.Form
+    $owner.FormBorderStyle = "None"      # no caption, so nothing visible is left of this helper window
     $owner.TopMost = $true
     $owner.ShowInTaskbar = $false
     $owner.StartPosition = "CenterScreen"
