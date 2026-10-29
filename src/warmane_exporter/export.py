@@ -124,6 +124,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("realm")
     parser.add_argument("--cache-dir", default=".warmane-cache")
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--quick", action="store_true",
+                        help="quick report: equipment, talents, glyphs, professions and raid readiness only (files get a -quick suffix)")
     args = parser.parse_args(argv)
 
     realm = SUPPORTED_REALMS[args.realm.strip().lower()]
@@ -138,12 +140,18 @@ def main(argv: list[str] | None = None) -> int:
         path = cache_dir / "discovery" / f"{stem}-{view}.html"
         return path.read_text(encoding="utf-8") if path.exists() else None
 
-    report = build_full_report(
-        _load(snapshot_path),
-        _load(_newest(cache_dir / "collections", f"{stem}-achievements-*.json")),
-        _load(_newest(cache_dir / "collections", f"{stem}-statistics-*.json")),
-        page("reputation"), page("mounts-and-companions"),
-    )
+    if args.quick:
+        report = build_report(_load(snapshot_path))
+        report["quick"] = True
+        report["missing_sections"] = []
+        stem = f"{stem}-quick"
+    else:
+        report = build_full_report(
+            _load(snapshot_path),
+            _load(_newest(cache_dir / "collections", f"{stem}-achievements-*.json")),
+            _load(_newest(cache_dir / "collections", f"{stem}-statistics-*.json")),
+            page("reputation"), page("mounts-and-companions"),
+        )
     out_dir = Path(args.output_dir) if args.output_dir else cache_dir / "exports"
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / f"{stem}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
