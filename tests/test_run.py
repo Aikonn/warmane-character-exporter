@@ -36,7 +36,7 @@ class RunTests(unittest.TestCase):
                 code = run.main(["https://armory.warmane.com/character/Aikka/Onyxia/summary", "--cache-dir", str(cache),
                                  "--html-output", str(target), "--offline"])
             self.assertEqual(code, 0)
-            runner.assert_called_once_with("Aikka", "Onyxia", str(cache), False, True, False)
+            runner.assert_called_once_with("Aikka", "Onyxia", str(cache), False, True, False, False)
             self.assertEqual(target.read_text(encoding="utf-8"), "<html>ok</html>")
 
     def test_bad_link_is_reported(self):

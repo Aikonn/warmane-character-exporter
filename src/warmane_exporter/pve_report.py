@@ -465,11 +465,13 @@ def render_html(pve: dict[str, Any]) -> str:
     ident = report["identity"]
     taken = report.get("snapshot_time")
     when = datetime.fromtimestamp(taken, timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if isinstance(taken, (int, float)) else "unknown"
-    title = f"{ident.get('name')} - {ident.get('realm')} - PvE report"
-    toc = "".join(f'<li><a href="#{a}">{_e(t)}</a></li>' for a, t in (
-        ("checks", "Raid readiness"), ("gear", "Equipment"), ("specs", "Talents and glyphs"), ("progress", "WotLK raid progression: boss kills"),
-        ("other", "Other dungeon and raid statistics"), ("achievements", "WotLK raid achievements"),
-        ("currency", "Badges and emblems"), ("rep", "Reputation"), ("mounts", "Mounts")))
+    quick = bool(report.get("quick"))
+    title = f"{ident.get('name')} - {ident.get('realm')} - {'Quick PvE report' if quick else 'PvE report'}"
+    toc_items = [("checks", "Raid readiness"), ("gear", "Equipment"), ("specs", "Talents and glyphs")]
+    if not quick:
+        toc_items += [("progress", "WotLK raid progression: boss kills"), ("other", "Other dungeon and raid statistics"),
+                      ("achievements", "WotLK raid achievements"), ("currency", "Badges and emblems"), ("rep", "Reputation"), ("mounts", "Mounts")]
+    toc = "".join(f'<li><a href="#{a}">{_e(t)}</a></li>' for a, t in toc_items)
     missing = report.get("missing_sections") or []
     parts = [
         f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{_e(title)}</title><style>{CSS}</style></head><body>",
@@ -484,11 +486,12 @@ def render_html(pve: dict[str, Any]) -> str:
         _checks_section(pve["checks"]),
         _gear_section(report, pve["gearscore"]),
         _spec_section(report),
-        _progress_section(pve["progression"]),
-        _other_content_section(pve["progression"]),
-        _achievement_section(pve["achievement_groups"]),
-        _other_section(pve),
     ]
+    if quick:
+        parts.append('<p class="muted">Quick report: raid progression, achievements, reputation and mounts were not collected.</p>')
+    else:
+        parts += [_progress_section(pve["progression"]), _other_content_section(pve["progression"]),
+                  _achievement_section(pve["achievement_groups"]), _other_section(pve)]
     if missing:
         parts.append(f"<h2>Missing sections</h2><p>{_e(', '.join(missing))}</p>")
     parts.append("</body></html>\n")

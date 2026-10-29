@@ -467,3 +467,6 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 - Issues: missing enchant (head, shoulder, back, chest, wrist, hands, legs, feet, weapons and shield; ranged for hunters; rings for Enchanters), empty gem socket, inactive meta gem, missing Eternal Belt Buckle, unspent talent points, empty major glyph slot (both specializations, same rules).
 - Warnings: armor type lower than the class's best, and a second specialization with zero talent points (dual specialization probably not purchased; it is then not checked).
 - Not checked by design: socket bonuses, minor glyphs, stat caps, best-in-slot, consumables.
+
+## Quick report
+- `run --quick` (launcher: radio button in the first dialog, last choice remembered in `.warmane-cache/launcher-mode.txt`) fetches only the 3 snapshot requests and builds `<name>-<realm>-quick-pve.html`: raid readiness, equipment, talents, glyphs and professions. Statistics, achievements, reputation and mounts are neither fetched nor shown, even if cached from an earlier full run.

@@ -5,7 +5,8 @@ Double-click Start-Report.cmd. It asks for an armory link, asks where to save th
 runs the exporter, then opens the report in the default browser.
 
 For testing or scripting the prompts can be skipped:
-  .\Start-Report.ps1 -Link https://armory.warmane.com/character/Aikka/Onyxia/summary -Output C:\temp\report.html [-Offline] [-NoOpen]
+  .\Start-Report.ps1 -Link https://armory.warmane.com/character/Aikka/Onyxia/summary -Output C:\temp\report.html [-Quick] [-Offline] [-NoOpen]
+-Quick makes the quick report (gear, talents, glyphs, professions, raid readiness; 3 requests); the default is the full PvE report.
 -Offline makes no requests and rebuilds from data already collected.
 #>
 param(
@@ -13,6 +14,8 @@ param(
     [string]$Output,
     [switch]$Offline,
     [switch]$NoOpen,
+    [switch]$Quick,
+    [switch]$Full,
     [switch]$InstallPython
 )
 
@@ -32,6 +35,7 @@ Set-Location $root
 $cache = Join-Path $root ".warmane-cache"
 New-Item -ItemType Directory -Force -Path $cache, (Join-Path $root ".tools\tmp") | Out-Null
 $logOut = Join-Path $cache "launcher.log"
+$modeFile = Join-Path $cache "launcher-mode.txt"
 $logErr = Join-Path $cache "launcher-error.log"
 $pattern = 'armory\.warmane\.com/character/([^/\s?#"''<>]+)/([^/\s?#"''<>]+)'
 
@@ -121,7 +125,7 @@ function Read-Link {
     $form.FormBorderStyle = "FixedDialog"
     $form.MaximizeBox = $false
     $form.MinimizeBox = $false
-    $form.ClientSize = New-Object System.Drawing.Size(520, 130)
+    $form.ClientSize = New-Object System.Drawing.Size(520, 215)
     $label = New-Object System.Windows.Forms.Label
     $label.Text = "Paste the armory link of the character (Onyxia or Icecrown):"
     $label.Location = New-Object System.Drawing.Point(12, 12)
@@ -135,24 +139,38 @@ function Read-Link {
     $hint.ForeColor = [System.Drawing.Color]::Gray
     $hint.Location = New-Object System.Drawing.Point(12, 68)
     $hint.AutoSize = $true
+    $quickButton = New-Object System.Windows.Forms.RadioButton
+    $quickButton.Text = "Quick report: gear, talents, glyphs, professions and raid readiness (fast, 3 requests)"
+    $quickButton.Location = New-Object System.Drawing.Point(12, 98)
+    $quickButton.Size = New-Object System.Drawing.Size(496, 22)
+    $fullButton = New-Object System.Windows.Forms.RadioButton
+    $fullButton.Text = "Full PvE report: adds raid progression, achievements, reputation and mounts (slower)"
+    $fullButton.Location = New-Object System.Drawing.Point(12, 124)
+    $fullButton.Size = New-Object System.Drawing.Size(496, 22)
+    if (Test-Path $modeFile) { $lastMode = (Get-Content $modeFile -Raw).Trim() } else { $lastMode = "full" }
+    if ($Quick -or ($lastMode -eq "quick" -and -not $Full)) { $quickButton.Checked = $true } else { $fullButton.Checked = $true }
     $ok = New-Object System.Windows.Forms.Button
     $ok.Text = "Create report"
     $ok.Size = New-Object System.Drawing.Size(110, 28)
-    $ok.Location = New-Object System.Drawing.Point(288, 92)
+    $ok.Location = New-Object System.Drawing.Point(288, 170)
     $ok.DialogResult = "OK"
     $cancel = New-Object System.Windows.Forms.Button
     $cancel.Text = "Cancel"
     $cancel.Size = New-Object System.Drawing.Size(100, 28)
-    $cancel.Location = New-Object System.Drawing.Point(408, 92)
+    $cancel.Location = New-Object System.Drawing.Point(408, 170)
     $cancel.DialogResult = "Cancel"
     $form.AcceptButton = $ok
     $form.CancelButton = $cancel
-    $form.Controls.AddRange(@($label, $box, $hint, $ok, $cancel))
+    $form.Controls.AddRange(@($label, $box, $hint, $quickButton, $fullButton, $ok, $cancel))
     while ($true) {
         $form.TopMost = $true      # appears in front once; the user can still put other windows over it
         $form.Add_Shown({ $form.Activate(); $form.TopMost = $false })
         if ($form.ShowDialog() -ne "OK") { return $null }
-        if ($box.Text -match $pattern) { return $box.Text.Trim() }
+        if ($box.Text -match $pattern) {
+            $script:Quick = [bool]$quickButton.Checked
+            try { Set-Content -Path $modeFile -Value $(if ($script:Quick) { "quick" } else { "full" }) -Encoding ASCII } catch { }
+            return $box.Text.Trim()
+        }
         Show-Message "That does not look like a Warmane armory character link." "Warmane Character Exporter" "Warning"
     }
 }
@@ -185,7 +203,8 @@ if (-not $Output) {
     $dialog.Filter = "HTML report (*.html)|*.html"
     $dialog.DefaultExt = "html"
     $dialog.AutoUpgradeEnabled = $false   # classic dialog: the modern one restores a remembered window size per program and could open collapsed
-    $dialog.FileName = ("{0}-{1}-pve.html" -f $charName.ToLower(), $charRealm.ToLower())
+    $kind = if ($Quick) { "quick" } else { "pve" }
+    $dialog.FileName = ("{0}-{1}-{2}.html" -f $charName.ToLower(), $charRealm.ToLower(), $kind)
     $startDir = Get-DownloadsFolder
     $dialog.InitialDirectory = $startDir
     # Owner window: makes sure the dialog appears in front even though this script runs hidden and may not own the foreground.
@@ -210,6 +229,7 @@ $env:PYTHONPATH = Join-Path $root "src"
 $env:PYTHONIOENCODING = "utf-8"
 $arguments = '-m warmane_exporter.run "{0}" --html-output "{1}"' -f $Link, $Output
 if ($Offline) { $arguments += " --offline" }
+if ($Quick) { $arguments += " --quick" }
 
 $script:cancelled = $false
 $wait = New-Object System.Windows.Forms.Form
