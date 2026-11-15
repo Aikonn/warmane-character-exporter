@@ -5,7 +5,7 @@ Project: Warmane Character Exporter (repo Aikonn/warmane-character-exporter, loc
 ## Roles
 
 - Claude (claude.ai project "warmane-character-exporter") is the overseer: specification, architecture, review, docs. It may push docs, instruction files and code skeletons straight to main.
-- GitHub Copilot in VS Code implements larger code changes from bounded task notes; Claude reviews the diff. Code changes go through branch dev and a pull request; the user merges.
+- GitHub Copilot in VS Code implements code from Task entries in docs/COPILOT_NOTES.md (Claude writes skeletons and specs in docs/tasks/); Claude reviews the diff and runs the tests. Everyone works directly on main (owner decision 2026-11-15); branch dev is no longer used.
 - The point of the project is hands-on AI-assisted development; keep tasks small and reviewable.
 
 ## Conventions
@@ -28,6 +28,7 @@ Project: Warmane Character Exporter (repo Aikonn/warmane-character-exporter, loc
 
 ## Backlog (candidates, not approved)
 
+0. In progress: raid roster (docs/tasks/raid-roster.md, roster.py skeleton, stage 1 task in COPILOT_NOTES).
 1. End-game focus: ICC/RS summary at the top of the PvE report (bosses killed per mode, Light of Dawn / Bane of the Fallen King / The Twilight Destroyer style meta progress), ICC reputation (Ashen Verdict) and ICC-specific readiness hints.
 2. Client-independent enchant and gem texts beyond client-export.json (needs a source with clear terms).
 3. Direct URL command polish (warmane-export URL).

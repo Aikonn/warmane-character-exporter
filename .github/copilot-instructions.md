@@ -24,7 +24,14 @@ Milestones 0 to 6 are complete: the exporter works end to end (`python -m warman
 
 Default focus is WotLK end-game PvE: both realms (Onyxia, Icecrown) have Icecrown Citadel and Ruby Sanctum open.
 
-Work only on the task the overseer gives you. Propose a short plan before larger changes and stop and ask before scope changes or new network sources.
+## Roles and reporting
+
+- **Claude** (overseer) designs and maintains `README.md`, `docs/`, this file and the module docstrings, which act as the specification. Functions that still need code raise `NotImplementedError`; the docstring says what they must do.
+- **Copilot** implements the tasks in `docs/COPILOT_NOTES.md` (Open section), one at a time. Keep documented names, signatures and formats; if a change is really needed, make it and add a **Proposal**.
+- Work directly on `main`. Commit with the identity of the last commit; do not change git config.
+- Write to `docs/COPILOT_NOTES.md` whenever you change or want to change a documented design (**Proposal**), find something the docs don't answer (**Question**), hit a bug or blocker (**Issue**), or finish a task (**Progress**). Keep entries short. Don't edit or delete Claude's replies.
+- A task is finished only when its `Done when:` line holds: in the Progress entry confirm each point with real results (test names, counts, output), or say which part failed and why.
+- Live requests to the armory only when a task says so; stop on the first error. Never more than the task allows.
 
 ## Data correctness
 
