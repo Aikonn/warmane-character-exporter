@@ -1,6 +1,6 @@
 # Task: raid roster report
 
-Status: stage 1 (pure functions, not-found probe) done 2026-11-15; stage 2 (fetching, CLI) assigned; stage 3 (launcher) next. Owner decisions are marked (owner).
+Status: stage 1 (pure functions, not-found probe) done 2026-11-15; stage 2 (fetching, CLI) done; stage 3 (transport fix, progress, launcher) assigned. Owner decisions are marked (owner).
 
 ## Goal
 

@@ -25,7 +25,22 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-No open entries.
+### 2026-11-15 · Task · Raid roster, stage 3: transport fix, roster progress, launcher
+Module: transport.py, roster.py, progress.py, Start-Report.ps1
+
+Spec: `docs/tasks/raid-roster.md` (Launcher). No live requests needed; the owner tests on the PC.
+
+1. `classify_response`: restore the earlier order (403 + block marker = blocked before the rate checks). On a 2xx status, treat only a Cloudflare error page as blocked: "error code: 1010" present and the body short (under 2 KB) or without the armory page markup; never on "access denied" alone. Tests: 200 armory-like page containing "Access Denied" in text stays success; 200 short "error code: 1010" body is blocked; existing tests keep passing.
+2. Roster progress: one overall percent across all characters (each character = 4 units: 3 snapshot + export), and `progress.note("Character N of M: Name")` before each character. `run_character` must not reset the overall percent when called from the roster (for example a parameter that skips `progress.start`). Test with WARMANE_PROGRESS set: percent never goes down over a 2-character mocked run.
+3. Launcher (`Start-Report.ps1`):
+   - First dialog: third radio "Raid roster: quick report for a list of characters". Remember the mode as today ("roster"). When chosen, the armory link box is not required.
+   - Roster dialog: multi-line text box (one name per line, paste-friendly, scroll bars), realm drop-down Onyxia / Icecrown (last used, `.warmane-cache/launcher-realm.txt`), "Refresh all" checkbox (unchecked), output folder field with Browse (FolderBrowserDialog; last used in `.warmane-cache/launcher-roster-folder.txt`, default Downloads), buttons Create reports / Cancel.
+   - Before starting Python: write the names to a UTF-8 temp file in `.tools\tmp`; run `-m warmane_exporter.roster --realm R --names-file F --output-dir D` (+ `--refresh`). Quote paths (spaces, accented letters).
+   - Progress window as today; title "Creating raid roster reports (N characters, Realm)".
+   - Exit 0 or 1: open the path from the last "summary: " line in the browser; on 1 also show a short message that the run stopped early and why (last stderr line). Exit 2: show the input errors (stderr) and reopen the roster dialog with the text kept.
+   - Single-character modes unchanged.
+
+Done when: points 1-3 hold; `python -m unittest discover -s tests` passes (report counts); on the PC a launcher run with 3 names (Aikka, Bezduse, Qzxqzxqzxqzx) on Onyxia opens a summary with 2 OK rows and 1 not found, and a second run within 2 hours shows "from cache: 2" in the header (paste both header lines in Progress).
 
 ## Resolved
 
@@ -64,6 +79,10 @@ summary: <Downloads>\raid-2026-11-15-2159.html
 ```
 
 The assistant made no live requests. Launcher integration remains stage 3.
+
+**Claude:** Accepted (2026-11-15) with two follow-ups in stage 3. Reviewed the diff; 259 tests OK in the cloud clone; the PC run meets Done when. Proposal on `run_character` returning the exit code: accepted. Note for next time: leave your Progress entry and my Task in **Open**; I move them to Resolved after review.
+- Regression risk in `transport.classify_response`: the block markers now match on any status, and "access denied" is plain text that can appear on a normal 200 page (guild name, item or achievement text). That would stop every command with exit 4. Fix in stage 3, point 1.
+- `run_roster` does not emit "Character N of M: Name", and each `run_character` restarts the percent at 0. Stage 3, point 2.
 
 ### 2026-11-15 · Task · Raid roster, stage 2: fetching, CLI, status in summary
 Module: src/warmane_exporter/roster.py, snapshot.py, fetch.py, run.py
