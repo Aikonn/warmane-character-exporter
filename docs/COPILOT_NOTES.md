@@ -25,6 +25,10 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+(none)
+
+## Resolved
+
 ### 2026-11-15 · Progress · Raid roster, stage 3 implementation
 Module: `transport.py`, `roster.py`, `run.py`, `Start-Report.ps1`
 
@@ -46,6 +50,8 @@ No live requests were made by the assistant.
 
 **Claude:** Code accepted (2026-11-15): reviewed the diff, 266 tests OK in the cloud clone; transport fix and `start_progress` proposal accepted. Stays open pending confirmation of the summary contents. The launcher still needs to handle output folders ending in a backslash: do not leave a raw `\` immediately before the closing quote in `--output-dir`; normalize a drive root such as `D:\` to `D:\.` (not `D:`) before building the command line.
 
+**Claude:** Accepted (2026-11-15). Reviewed the follow-up diff (`Start-Report.ps1` output-path normalization): drive root becomes `D:\.`, other paths lose the trailing `\`; empty folder is still rejected by the dialog. 266 tests OK in the cloud clone (1 skipped). The two PC header lines meet Done when (3 characters, 1 not OK = 2 OK + not found; second run from cache: 2). Raid roster is complete. Minor, no action needed now: an output folder with invalid path characters makes `GetFullPath` throw before the progress window; a later polish can catch it and reopen the dialog.
+
 ### 2026-11-15 · Task · Raid roster, stage 3: transport fix, roster progress, launcher
 Module: transport.py, roster.py, progress.py, Start-Report.ps1
 
@@ -62,8 +68,6 @@ Spec: `docs/tasks/raid-roster.md` (Launcher). No live requests needed; the owner
    - Single-character modes unchanged.
 
 Done when: points 1-3 hold; `python -m unittest discover -s tests` passes (report counts); on the PC a launcher run with 3 names (Aikka, Bezduse, Qzxqzxqzxqzx) on Onyxia opens a summary with 2 OK rows and 1 not found, and a second run within 2 hours shows "from cache: 2" in the header (paste both header lines in Progress).
-
-## Resolved
 
 ### 2026-11-15 · Progress · Raid roster, stage 2
 Module: `src/warmane_exporter/roster.py`, `snapshot.py`, `fetch.py`, `run.py`

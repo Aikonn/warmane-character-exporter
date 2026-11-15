@@ -24,11 +24,11 @@ Project: Warmane Character Exporter (repo Aikonn/warmane-character-exporter, loc
 - End to end for any character: quick report (3 requests: raid readiness, gear, talents, glyphs, professions) and PvE report (about 28 requests: plus WotLK raid boss kills, raid achievements, emblems, reputation, mounts). Launcher Start-Report.cmd bootstraps a portable Python.
 - Definitions without the game client: client-export.json (texts) and AzerothCore items.db (item facts, sockets, set ids). GearScore, socket/meta/set bonus activation, stat totals, raid readiness checks are in.
 - Icecrown Citadel and Ruby Sanctum (Halion 10/25 normal/heroic) appear in the boss-kill tables and in the Fall of the Lich King / Lich King raid achievements. The armory tracks only Halion for Ruby Sanctum, not the mini-bosses.
+- Raid roster (done 2026-11-15): launcher option and `python -m warmane_exporter.roster` create quick reports for up to 40 names plus a timestamped HTML summary; cache reused for 120 minutes, "Refresh all" ignores it; not-found rows continue, access block / rate limit stops the run. Spec: docs/tasks/raid-roster.md.
 - Known gaps: active spec, conditional spell text, armory heroic kill counts sometimes copy normal counts (marked with *).
 
 ## Backlog (candidates, not approved)
 
-0. In progress: raid roster (docs/tasks/raid-roster.md, roster.py skeleton, stage 1 task in COPILOT_NOTES).
 1. End-game focus: ICC/RS summary at the top of the PvE report (bosses killed per mode, Light of Dawn / Bane of the Fallen King / The Twilight Destroyer style meta progress), ICC reputation (Ashen Verdict) and ICC-specific readiness hints.
 2. Client-independent enchant and gem texts beyond client-export.json (needs a source with clear terms).
 3. Direct URL command polish (warmane-export URL).
