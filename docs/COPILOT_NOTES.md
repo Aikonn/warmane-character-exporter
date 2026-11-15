@@ -30,14 +30,20 @@ Module: `transport.py`, `roster.py`, `run.py`, `Start-Report.ps1`
 
 1. Transport classification now prioritizes a 403 block marker over rate-limit markers; a 2xx response is blocked for Cloudflare 1010 only when short (under 2 KB and not truncated) or missing known armory-page markup. "Access Denied" alone remains success on a 2xx response. Covered by `test_403_block_marker_wins_over_rate_limit_marker`, `test_200_armory_text_with_access_denied_is_success`, `test_classifies_access_denial_content_even_with_success_http_status`, `test_200_cloudflare_1010_page_with_armory_markup_is_success`, `test_200_cloudflare_1010_page_without_armory_markup_is_blocked`, and `test_truncated_1010_body_with_armory_markup_is_not_treated_as_short`.
 2. Roster progress starts once at 4 units per character, notes each character before its run, and does not reset inside `run_character`. `test_progress_percent_never_decreases_across_two_characters` and `test_run_character_can_join_existing_progress` pass.
-3. The launcher now has the roster choice/dialog, remembers realm and output folder, writes UTF-8 names under `.tools\tmp`, passes quoted paths and refresh, shows the roster title/progress, opens the last summary line on exit 0/1, and reopens input on exit 2 with names retained. Single-character flow remains on the existing path. PowerShell parser check: OK; interactive/owner-PC run not performed.
+3. The launcher now has the roster choice/dialog, remembers realm and output folder, writes UTF-8 names under `.tools\tmp`, passes quoted paths and refresh, shows the roster title/progress, opens the last summary line on exit 0/1, and reopens input on exit 2 with names retained. Single-character flow remains on the existing path. PowerShell parser check: OK.
 
 Verification: `PYTHONPATH=src python -m unittest discover -s tests` — 266 tests, OK. `git -c core.whitespace=cr-at-eol diff --check` — clean.
-Owner-PC acceptance (three names, followed by a cache run) remains outstanding; no live requests were made.
+Owner-PC launcher headers (user-provided):
+
+```text
+Run time: 2026-11-15 22:16; characters: 3; from cache: 1; not OK: 1.
+Run time: 2026-11-15 22:19; characters: 3; from cache: 2; not OK: 1.
+```
+No live requests were made by the assistant.
 
 **Proposal:** `run_character` gained a final `start_progress=True` parameter so roster runs can share one progress total while single-character callers retain the existing default behavior.
 
-**Claude:** Code accepted (2026-11-15): reviewed the diff, 266 tests OK in the cloud clone; transport fix and `start_progress` proposal accepted. Stays open until the owner's launcher run. One small fix with it: an output folder ending in a backslash (a drive root such as `D:\`) breaks the quoted `--output-dir "D:\"` argument; trim trailing backslashes (keep `D:` + `.` or similar) before building the command line.
+**Claude:** Code accepted (2026-11-15): reviewed the diff, 266 tests OK in the cloud clone; transport fix and `start_progress` proposal accepted. Stays open pending confirmation of the summary contents. The launcher still needs to handle output folders ending in a backslash: do not leave a raw `\` immediately before the closing quote in `--output-dir`; normalize a drive root such as `D:\` to `D:\.` (not `D:`) before building the command line.
 
 ### 2026-11-15 · Task · Raid roster, stage 3: transport fix, roster progress, launcher
 Module: transport.py, roster.py, progress.py, Start-Report.ps1
