@@ -233,13 +233,26 @@ def classify_response(response: HttpResponse) -> str:
     body_lower = response.body_text.lower()
     has_client_signature_block_marker = any(marker in body_lower for marker in CLIENT_SIGNATURE_BLOCK_MARKERS)
     has_rate_marker = any(marker in body_lower for marker in RATE_LIMIT_MARKERS)
+    if status == 403 and has_client_signature_block_marker:
+        return "client_signature_blocked"
     if status == 429:
         return "rate_limited"
     if status == 403 and has_rate_marker:
         return "rate_limited"
     if status == 200 and has_rate_marker:
         return "rate_limited"
-    if has_client_signature_block_marker:
+    has_cloudflare_1010 = "error code: 1010" in body_lower
+    has_armory_markup = any(
+        marker in body_lower
+        for marker in ('id="character-sheet"', 'id="character-profile"', 'id="inpage-navigation"')
+    )
+    body_bytes = response.body_bytes_captured or len(response.body_text.encode("utf-8"))
+    body_is_short = not response.body_truncated and body_bytes < 2 * 1024
+    if (
+        200 <= status < 300
+        and has_cloudflare_1010
+        and (body_is_short or not has_armory_markup)
+    ):
         return "client_signature_blocked"
 
     if 300 <= status < 400:

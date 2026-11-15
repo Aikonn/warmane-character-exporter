@@ -278,7 +278,7 @@ def run_roster(names: list[str], realm: str, output_dir: Path, cache_dir: str,
       atomically (temp name, then rename). Returns the rows and the summary path.
     """
     from . import run
-    from .progress import note
+    from .progress import note, start
 
     cache_path = Path(cache_dir)
     exports_dir = cache_path / "exports"
@@ -287,6 +287,7 @@ def run_roster(names: list[str], realm: str, output_dir: Path, cache_dir: str,
     rows: list[RosterRow] = []
     stopped = False
 
+    start(4 * len(names), "Starting raid roster")
     for index, name in enumerate(names, start=1):
         if stopped:
             rows.append(placeholder_row(name, realm, NOT_RUN, "An earlier character stopped the roster."))
@@ -295,7 +296,7 @@ def run_roster(names: list[str], realm: str, output_dir: Path, cache_dir: str,
         note(f"Character {index} of {len(names)}: {name}")
         code = run.run_character(
             name, realm, str(cache_path), refresh, False, quick=True,
-            max_age_minutes=max_age_minutes,
+            max_age_minutes=max_age_minutes, start_progress=False,
         )
         if code == 3:
             rows.append(placeholder_row(name, realm, NOT_FOUND, "Character does not exist."))

@@ -8,6 +8,7 @@ from contextlib import redirect_stdout
 import io
 
 from warmane_exporter.pve_report import build_pve_report
+from warmane_exporter import progress
 from warmane_exporter.roster import (
     FAILED,
     NOT_FOUND,
@@ -182,8 +183,10 @@ class RosterRunTests(unittest.TestCase):
         self.seed_success("Alice")
         self.seed_success("Bob")
 
-        def fake_run(name, realm, cache_dir, refresh, offline, full=False, quick=False, max_age_minutes=15):
+        def fake_run(name, realm, cache_dir, refresh, offline, full=False, quick=False,
+                     max_age_minutes=15, start_progress=True):
             self.assertEqual(max_age_minutes, 120)
+            self.assertFalse(start_progress)
             return {"Alice": 0, "Missing": 3, "Broken": 1, "Bob": 0}[name]
 
         with mock.patch("warmane_exporter.run.run_character", side_effect=fake_run) as runner:
@@ -200,6 +203,42 @@ class RosterRunTests(unittest.TestCase):
         self.assertIn("not found: Character does not exist.", summary_text)
         self.assertIn("failed: Character run failed (exit code 1).", summary_text)
         self.assertEqual(list(self.output.glob(".*.tmp")), [])
+
+    def test_progress_percent_never_decreases_across_two_characters(self):
+        self.seed_success("Alice")
+        self.seed_success("Bob")
+
+        def fake_run(name, realm, cache_dir, refresh, offline, full=False, quick=False,
+                     max_age_minutes=15, start_progress=True):
+            self.assertFalse(start_progress)
+            progress.advance(f"{name} snapshot", 3)
+            progress.advance(f"{name} export")
+            return 0
+
+        with (
+            mock.patch.dict("os.environ", {"WARMANE_PROGRESS": "1"}),
+            mock.patch("warmane_exporter.run.run_character", side_effect=fake_run) as runner,
+            redirect_stdout(io.StringIO()) as output,
+        ):
+            rows, summary = run_roster(
+                ["Alice", "Bob"], "Onyxia", self.output, str(self.cache), False, 120,
+            )
+
+        percentages = [
+            int(line.split("|", 2)[1])
+            for line in output.getvalue().splitlines()
+            if line.startswith("PROGRESS|")
+        ]
+        progress_lines = output.getvalue().splitlines()
+        self.assertEqual(percentages, sorted(percentages))
+        self.assertEqual(percentages[-1], 100)
+        first_note = "PROGRESS|0|Character 1 of 2: Alice"
+        first_snapshot = "PROGRESS|37|Alice snapshot"
+        self.assertLess(progress_lines.index(first_note), progress_lines.index(first_snapshot))
+        self.assertIn("PROGRESS|50|Character 2 of 2: Bob", output.getvalue())
+        self.assertEqual([row.status for row in rows], [OK, OK])
+        self.assertTrue(summary.exists())
+        self.assertEqual(runner.call_count, 2)
 
     def test_stops_after_exit_four_and_writes_remaining_not_run_rows(self):
         self.seed_success("Alice")

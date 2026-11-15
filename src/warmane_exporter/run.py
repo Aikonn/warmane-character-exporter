@@ -63,10 +63,12 @@ def step_units(label: str, full: bool = False) -> int:
 
 def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool, full: bool = False,
                   quick: bool = False,
-                  max_age_minutes: int = CHARACTER_MAX_AGE_SECONDS // 60) -> int:
+                  max_age_minutes: int = CHARACTER_MAX_AGE_SECONDS // 60,
+                  start_progress: bool = True) -> int:
     print(f"== {name}@{realm}")
     plan = steps(name, realm, cache_dir, refresh, offline, full, quick, max_age_minutes)
-    progress.start(sum(step_units(label, full) for label, _, _ in plan), f"Starting {name} ({realm})")
+    if start_progress:
+        progress.start(sum(step_units(label, full) for label, _, _ in plan), f"Starting {name} ({realm})")
     for label, entry, argv in plan:
         print(f"-- {label}")
         progress.note(STEP_TEXT.get(label, label))

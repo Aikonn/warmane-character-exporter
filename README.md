@@ -6,7 +6,7 @@ A local Python tool that exports a Warmane character (Onyxia, Icecrown) into a s
 
 1. On the [repository page](https://github.com/Aikonn/warmane-character-exporter) choose Code, then Download ZIP, and extract it anywhere (for example the Desktop).
 2. Double-click `Start-Report.cmd`. On the first run, if Python 3.12 or newer is missing, the launcher offers to download a portable copy (about 11 MB, from python.org) into the same folder. Nothing is installed on the system, and no game client or configuration is needed.
-3. Paste an armory link (for example `https://armory.warmane.com/character/Aikka/Onyxia/summary`), pick Quick report (gear, talents, glyphs, professions and raid readiness; only 3 requests) or Full PvE report, choose where to save, and the report opens in the browser.
+3. Paste an armory link (for example `https://armory.warmane.com/character/Aikka/Onyxia/summary`), pick Quick report (gear, talents, glyphs, professions and raid readiness; only 3 requests) or Full PvE report, choose where to save, and the report opens in the browser. Or choose Raid roster to paste one character name per line and create quick reports plus a summary for Onyxia or Icecrown.
 
 If Windows SmartScreen warns about the script, choose More info, then Run anyway. A run takes a few minutes and uses about 28 requests of the daily budget.
 
@@ -84,7 +84,7 @@ Out of scope: hosted service, DPS prediction, automated upgrade advice, private 
 
 ## Quick start (Windows)
 
-Double-click `Start-Report.cmd`. It asks for an armory link, asks where to save the HTML report, runs the export and opens the report in the default browser. Command line equivalent: `python -m warmane_exporter.run https://armory.warmane.com/character/Aikka/Onyxia/summary --html-output report.html`.
+Double-click `Start-Report.cmd`. It offers single-character reports and a raid-roster option, runs the export and opens the HTML report or roster summary in the default browser. Command line equivalent for one character: `python -m warmane_exporter.run https://armory.warmane.com/character/Aikka/Onyxia/summary --html-output report.html`.
 
 ## License
 

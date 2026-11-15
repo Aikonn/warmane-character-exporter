@@ -125,7 +125,7 @@ function Read-Link {
     $form.FormBorderStyle = "FixedDialog"
     $form.MaximizeBox = $false
     $form.MinimizeBox = $false
-    $form.ClientSize = New-Object System.Drawing.Size(520, 215)
+    $form.ClientSize = New-Object System.Drawing.Size(520, 240)
     $label = New-Object System.Windows.Forms.Label
     $label.Text = "Paste the armory link of the character (Onyxia or Icecrown):"
     $label.Location = New-Object System.Drawing.Point(12, 12)
@@ -147,32 +147,236 @@ function Read-Link {
     $fullButton.Text = "Full PvE report: adds raid progression, achievements, reputation and mounts (slower)"
     $fullButton.Location = New-Object System.Drawing.Point(12, 124)
     $fullButton.Size = New-Object System.Drawing.Size(496, 22)
+    $rosterButton = New-Object System.Windows.Forms.RadioButton
+    $rosterButton.Text = "Raid roster: quick report for a list of characters"
+    $rosterButton.Location = New-Object System.Drawing.Point(12, 150)
+    $rosterButton.Size = New-Object System.Drawing.Size(496, 22)
     if (Test-Path $modeFile) { $lastMode = (Get-Content $modeFile -Raw).Trim() } else { $lastMode = "full" }
-    if ($Quick -or ($lastMode -eq "quick" -and -not $Full)) { $quickButton.Checked = $true } else { $fullButton.Checked = $true }
+    if ($Quick -or ($lastMode -eq "quick" -and -not $Full)) {
+        $quickButton.Checked = $true
+    } elseif ($lastMode -eq "roster" -and -not $Quick -and -not $Full) {
+        $rosterButton.Checked = $true
+    } else {
+        $fullButton.Checked = $true
+    }
+    $box.Enabled = -not $rosterButton.Checked
+    $rosterButton.Add_CheckedChanged({ $box.Enabled = -not $rosterButton.Checked }.GetNewClosure())
     $ok = New-Object System.Windows.Forms.Button
     $ok.Text = "Create report"
     $ok.Size = New-Object System.Drawing.Size(110, 28)
-    $ok.Location = New-Object System.Drawing.Point(288, 170)
+    $ok.Location = New-Object System.Drawing.Point(288, 190)
     $ok.DialogResult = "OK"
     $cancel = New-Object System.Windows.Forms.Button
     $cancel.Text = "Cancel"
     $cancel.Size = New-Object System.Drawing.Size(100, 28)
-    $cancel.Location = New-Object System.Drawing.Point(408, 170)
+    $cancel.Location = New-Object System.Drawing.Point(408, 190)
     $cancel.DialogResult = "Cancel"
     $form.AcceptButton = $ok
     $form.CancelButton = $cancel
-    $form.Controls.AddRange(@($label, $box, $hint, $quickButton, $fullButton, $ok, $cancel))
+    $form.Controls.AddRange(@($label, $box, $hint, $quickButton, $fullButton, $rosterButton, $ok, $cancel))
     while ($true) {
         $form.TopMost = $true      # appears in front once; the user can still put other windows over it
         $form.Add_Shown({ $form.Activate(); $form.TopMost = $false })
         if ($form.ShowDialog() -ne "OK") { return $null }
+        if ($rosterButton.Checked) {
+            $script:RosterMode = $true
+            try { Set-Content -Path $modeFile -Value "roster" -Encoding ASCII } catch { }
+            return ""
+        }
         if ($box.Text -match $pattern) {
+            $script:RosterMode = $false
             $script:Quick = [bool]$quickButton.Checked
             try { Set-Content -Path $modeFile -Value $(if ($script:Quick) { "quick" } else { "full" }) -Encoding ASCII } catch { }
             return $box.Text.Trim()
         }
         Show-Message "That does not look like a Warmane armory character link." "Warmane Character Exporter" "Warning"
     }
+}
+
+function Read-Roster([string]$initialNames) {
+    $realmFile = Join-Path $cache "launcher-realm.txt"
+    $folderFile = Join-Path $cache "launcher-roster-folder.txt"
+    $lastRealm = if (Test-Path $realmFile) { (Get-Content $realmFile -Raw).Trim() } else { "Onyxia" }
+    if ($lastRealm -notin @("Onyxia", "Icecrown")) { $lastRealm = "Onyxia" }
+    $lastFolder = if (Test-Path $folderFile) { (Get-Content $folderFile -Raw).Trim() } else { Get-DownloadsFolder }
+    if (-not $lastFolder) { $lastFolder = Get-DownloadsFolder }
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "Raid roster reports"
+    $form.StartPosition = "CenterScreen"
+    $form.FormBorderStyle = "FixedDialog"
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.ClientSize = New-Object System.Drawing.Size(620, 430)
+
+    $namesLabel = New-Object System.Windows.Forms.Label
+    $namesLabel.Text = "Character names (one per line):"
+    $namesLabel.Location = New-Object System.Drawing.Point(12, 12)
+    $namesLabel.AutoSize = $true
+    $names = New-Object System.Windows.Forms.TextBox
+    $names.Location = New-Object System.Drawing.Point(12, 36)
+    $names.Size = New-Object System.Drawing.Size(596, 200)
+    $names.Multiline = $true
+    $names.AcceptsReturn = $true
+    $names.ScrollBars = "Vertical"
+    $names.WordWrap = $false
+    $names.Text = $initialNames
+
+    $realmLabel = New-Object System.Windows.Forms.Label
+    $realmLabel.Text = "Realm:"
+    $realmLabel.Location = New-Object System.Drawing.Point(12, 248)
+    $realmLabel.AutoSize = $true
+    $realm = New-Object System.Windows.Forms.ComboBox
+    $realm.Location = New-Object System.Drawing.Point(74, 244)
+    $realm.Size = New-Object System.Drawing.Size(150, 24)
+    $realm.DropDownStyle = "DropDownList"
+    [void]$realm.Items.AddRange([object[]]@("Onyxia", "Icecrown"))
+    $realm.SelectedItem = $lastRealm
+
+    $refresh = New-Object System.Windows.Forms.CheckBox
+    $refresh.Text = "Refresh all"
+    $refresh.Location = New-Object System.Drawing.Point(250, 246)
+    $refresh.AutoSize = $true
+
+    $folderLabel = New-Object System.Windows.Forms.Label
+    $folderLabel.Text = "Output folder:"
+    $folderLabel.Location = New-Object System.Drawing.Point(12, 286)
+    $folderLabel.AutoSize = $true
+    $folder = New-Object System.Windows.Forms.TextBox
+    $folder.Location = New-Object System.Drawing.Point(12, 310)
+    $folder.Size = New-Object System.Drawing.Size(500, 24)
+    $folder.Text = $lastFolder
+    $browse = New-Object System.Windows.Forms.Button
+    $browse.Text = "Browse..."
+    $browse.Location = New-Object System.Drawing.Point(518, 308)
+    $browse.Size = New-Object System.Drawing.Size(90, 28)
+    $browse.Add_Click({
+        $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dialog.Description = "Choose where to save the roster reports"
+        $dialog.ShowNewFolderButton = $true
+        $dialog.SelectedPath = $folder.Text
+        if ($dialog.ShowDialog($form) -eq "OK") { $folder.Text = $dialog.SelectedPath }
+    }.GetNewClosure())
+
+    $create = New-Object System.Windows.Forms.Button
+    $create.Text = "Create reports"
+    $create.Size = New-Object System.Drawing.Size(110, 28)
+    $create.Location = New-Object System.Drawing.Point(378, 378)
+    $create.DialogResult = "OK"
+    $cancel = New-Object System.Windows.Forms.Button
+    $cancel.Text = "Cancel"
+    $cancel.Size = New-Object System.Drawing.Size(100, 28)
+    $cancel.Location = New-Object System.Drawing.Point(498, 378)
+    $cancel.DialogResult = "Cancel"
+    $form.AcceptButton = $create
+    $form.CancelButton = $cancel
+    $form.Controls.AddRange(@(
+        $namesLabel, $names, $realmLabel, $realm, $refresh, $folderLabel,
+        $folder, $browse, $create, $cancel
+    ))
+
+    while ($true) {
+        $form.TopMost = $true
+        $form.Add_Shown({ $form.Activate(); $form.TopMost = $false })
+        if ($form.ShowDialog() -ne "OK") { return $null }
+        if ($realm.SelectedItem -and $folder.Text.Trim()) {
+            try {
+                [System.IO.File]::WriteAllText($realmFile, [string]$realm.SelectedItem, [System.Text.Encoding]::UTF8)
+                [System.IO.File]::WriteAllText($folderFile, $folder.Text.Trim(), [System.Text.Encoding]::UTF8)
+            } catch {
+                Show-Message ("Could not remember roster settings: " + $_.Exception.Message) "Raid roster reports" "Warning"
+            }
+            return [pscustomobject]@{
+                Names = $names.Text
+                Realm = [string]$realm.SelectedItem
+                Refresh = [bool]$refresh.Checked
+                OutputFolder = $folder.Text.Trim()
+            }
+        }
+        Show-Message "Choose a realm and output folder." "Raid roster reports" "Warning"
+    }
+}
+
+if (-not ("Win32.Native" -as [type])) {
+    Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hWnd);'
+}
+
+function Invoke-ProgressProcess([string]$arguments, [string]$windowTitle) {
+    [System.IO.File]::WriteAllText($logOut, "")
+    [System.IO.File]::WriteAllText($logErr, "")
+    $script:cancelled = $false
+    $wait = New-Object System.Windows.Forms.Form
+    $wait.Text = "Warmane Character Exporter"
+    $wait.StartPosition = "CenterScreen"
+    $wait.FormBorderStyle = "FixedDialog"
+    $wait.MaximizeBox = $false
+    $wait.ClientSize = New-Object System.Drawing.Size(520, 175)
+    $title = New-Object System.Windows.Forms.Label
+    $title.Text = $windowTitle
+    $title.Location = New-Object System.Drawing.Point(12, 12)
+    $title.AutoSize = $true
+    $percentLabel = New-Object System.Windows.Forms.Label
+    $percentLabel.Text = "0%"
+    $percentLabel.Font = New-Object System.Drawing.Font("Segoe UI", 22)
+    $percentLabel.Location = New-Object System.Drawing.Point(12, 36)
+    $percentLabel.Size = New-Object System.Drawing.Size(120, 44)
+    $status = New-Object System.Windows.Forms.Label
+    $status.Text = "Starting"
+    $status.Location = New-Object System.Drawing.Point(140, 46)
+    $status.Size = New-Object System.Drawing.Size(368, 40)
+    $elapsedLabel = New-Object System.Windows.Forms.Label
+    $elapsedLabel.Text = "Elapsed 0:00"
+    $elapsedLabel.ForeColor = [System.Drawing.Color]::Gray
+    $elapsedLabel.Location = New-Object System.Drawing.Point(12, 100)
+    $elapsedLabel.Size = New-Object System.Drawing.Size(496, 65)
+    $wait.Controls.AddRange(@($title, $percentLabel, $status, $elapsedLabel))
+    $wait.Add_FormClosing({
+        param($sender, $e)
+        if ($script:process -and -not $script:process.HasExited) {
+            $answer = [System.Windows.Forms.MessageBox]::Show("Stop the export? Data already fetched is kept, so a new run continues where this one stopped.", "Warmane Character Exporter", "YesNo", "Question")
+            if ($answer -eq "Yes") { $script:cancelled = $true; try { $script:process.Kill() } catch { } } else { $e.Cancel = $true }
+        }
+    })
+    $wait.Show()
+    $wait.TopMost = $true
+    $wait.TopMost = $false
+    $wait.Activate()
+    [void][Win32.Native]::SetForegroundWindow($wait.Handle)
+    $env:WARMANE_PROGRESS = "1"
+    $clock = [System.Diagnostics.Stopwatch]::StartNew()
+
+    $script:process = Start-Process -FilePath $python -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden `
+        -RedirectStandardOutput $logOut -RedirectStandardError $logErr -PassThru
+    $process = $script:process
+    $null = $process.Handle
+    $tick = 0
+    $lastText = "Starting"
+    while (-not $process.HasExited) {
+        [System.Windows.Forms.Application]::DoEvents()
+        if ($script:cancelled) { break }
+        Start-Sleep -Milliseconds 100
+        $tick++
+        if ($tick % 3 -eq 0 -and (Test-Path $logOut)) {
+            try {
+                $lines = @(Get-Content $logOut -Tail 40 -Encoding UTF8 -ErrorAction Stop | Where-Object { $_ -like "PROGRESS|*" })
+                if ($lines.Count -gt 0) {
+                    $parts = $lines[-1].Split("|", 3)
+                    $percentLabel.Text = $parts[1] + "%"
+                    $lastText = $parts[2]
+                }
+            } catch { }
+        }
+        $seconds = [int]$clock.Elapsed.TotalSeconds
+        $pos = [math]::Abs(([int][math]::Floor($tick / 3) % 10) - 5)
+        $track = (0..5 | ForEach-Object { if ($_ -eq $pos) { "o" } else { "." } }) -join " "
+        $status.Text = $lastText
+        $elapsedLabel.Text = ("Working  {0}`r`nElapsed {1}:{2:00}. Requests to Warmane are spaced 1 second apart, so this takes a while. The window can be minimized or placed behind other windows." -f $track, [math]::Floor($seconds / 60), ($seconds % 60))
+    }
+    $process.WaitForExit()
+    $code = $process.ExitCode
+    $script:process = $null
+    $wait.Close()
+    return [int]$code
 }
 
 $python = Find-Python
@@ -186,125 +390,103 @@ if (-not $python) {
     if (-not $python) { Show-Message "Python is still not available after the download." "Warmane Character Exporter" "Error"; exit 1 }
 }
 
+$script:RosterMode = $false
 if (-not $Link) {
     $Link = Read-Link
-    if (-not $Link) { exit 0 }
+    if (-not $script:RosterMode -and -not $Link) { exit 0 }
 }
-if ($Link -notmatch $pattern) {
-    Show-Message "Not an armory character link: $Link" "Warmane Character Exporter" "Error"
-    exit 2
-}
-$charName = $Matches[1]
-$charRealm = $Matches[2]
+if (-not $script:RosterMode) {
+    if ($Link -notmatch $pattern) {
+        Show-Message "Not an armory character link: $Link" "Warmane Character Exporter" "Error"
+        exit 2
+    }
+    $charName = $Matches[1]
+    $charRealm = $Matches[2]
 
-if (-not $Output) {
-    $dialog = New-Object System.Windows.Forms.SaveFileDialog
-    $dialog.Title = "Where to save the report"
-    $dialog.Filter = "HTML report (*.html)|*.html"
-    $dialog.DefaultExt = "html"
-    $dialog.AutoUpgradeEnabled = $false   # classic dialog: the modern one restores a remembered window size per program and could open collapsed
-    $kind = if ($Quick) { "quick" } else { "pve" }
-    $dialog.FileName = ("{0}-{1}-{2}.html" -f $charName.ToLower(), $charRealm.ToLower(), $kind)
-    $startDir = Get-DownloadsFolder
-    $dialog.InitialDirectory = $startDir
-    # Owner window: makes sure the dialog appears in front even though this script runs hidden and may not own the foreground.
-    $owner = New-Object System.Windows.Forms.Form
-    $owner.FormBorderStyle = "None"      # no caption, so nothing visible is left of this helper window
-    $owner.TopMost = $true
-    $owner.ShowInTaskbar = $false
-    $owner.StartPosition = "CenterScreen"
-    $owner.Opacity = 0
-    $owner.Size = New-Object System.Drawing.Size(1, 1)
-    $owner.Show()
-    $owner.Activate()
-    $pick = $dialog.ShowDialog($owner)
-    $owner.Close()
-    if ($pick -ne "OK") { exit 0 }
-    $Output = $dialog.FileName
+    if (-not $Output) {
+        $dialog = New-Object System.Windows.Forms.SaveFileDialog
+        $dialog.Title = "Where to save the report"
+        $dialog.Filter = "HTML report (*.html)|*.html"
+        $dialog.DefaultExt = "html"
+        $dialog.AutoUpgradeEnabled = $false   # classic dialog: the modern one restores a remembered window size per program and could open collapsed
+        $kind = if ($Quick) { "quick" } else { "pve" }
+        $dialog.FileName = ("{0}-{1}-{2}.html" -f $charName.ToLower(), $charRealm.ToLower(), $kind)
+        $startDir = Get-DownloadsFolder
+        $dialog.InitialDirectory = $startDir
+        $owner = New-Object System.Windows.Forms.Form
+        $owner.FormBorderStyle = "None"
+        $owner.TopMost = $true
+        $owner.ShowInTaskbar = $false
+        $owner.StartPosition = "CenterScreen"
+        $owner.Opacity = 0
+        $owner.Size = New-Object System.Drawing.Size(1, 1)
+        $owner.Show()
+        $owner.Activate()
+        $pick = $dialog.ShowDialog($owner)
+        $owner.Close()
+        if ($pick -ne "OK") { exit 0 }
+        $Output = $dialog.FileName
+    }
 }
 
 $env:TEMP = Join-Path $root ".tools\tmp"
 $env:TMP = $env:TEMP
 $env:PYTHONPATH = Join-Path $root "src"
 $env:PYTHONIOENCODING = "utf-8"
+$code = 0
+if ($script:RosterMode) {
+    $namesText = ""
+    while ($true) {
+        $selection = Read-Roster $namesText
+        if ($null -eq $selection) { exit 0 }
+        $namesText = $selection.Names
+        $namesPath = Join-Path $root (".tools\tmp\roster-names-{0}.txt" -f [guid]::NewGuid().ToString("N"))
+        $utf8 = New-Object System.Text.UTF8Encoding -ArgumentList $false
+        [System.IO.File]::WriteAllText($namesPath, $namesText, $utf8)
+        $arguments = '-m warmane_exporter.roster --realm "{0}" --names-file "{1}" --output-dir "{2}"' -f `
+            $selection.Realm, $namesPath, $selection.OutputFolder
+        if ($selection.Refresh) { $arguments += " --refresh" }
+        $nameCount = @($namesText -split '\r?\n' | Where-Object { $_.Trim() }).Count
+        $windowTitle = "Creating raid roster reports ($nameCount characters, $($selection.Realm))"
+        try {
+            $code = Invoke-ProgressProcess $arguments $windowTitle
+        } finally {
+            if (Test-Path $namesPath) { Remove-Item -LiteralPath $namesPath -Force }
+        }
+        if ($script:cancelled) { exit 0 }
+
+        $errorLines = @()
+        if (Test-Path $logErr) { $errorLines = @(Get-Content $logErr -Encoding UTF8 | Where-Object { $_.Trim() }) }
+        if ($code -eq 2) {
+            $details = if ($errorLines.Count -gt 0) { $errorLines -join "`n" } else { "The roster input was not accepted." }
+            Show-Message $details "Raid roster input errors" "Warning"
+            continue
+        }
+        if ($code -eq 0 -or $code -eq 1) {
+            $summaryLines = @(Get-Content $logOut -Encoding UTF8 | Where-Object { $_ -like "summary: *" })
+            if ($summaryLines.Count -gt 0) {
+                $summaryPath = $summaryLines[-1].Substring(9).Trim()
+                if ($code -eq 1) {
+                    $lastError = if ($errorLines.Count -gt 0) { $errorLines[-1] } else { "The run stopped early." }
+                    Show-Message ("The roster run stopped early. {0}" -f $lastError) "Raid roster reports" "Warning"
+                }
+                if (-not $NoOpen) { Start-Process -FilePath $summaryPath }
+                exit $code
+            }
+        }
+        $tail = @()
+        foreach ($file in $logOut, $logErr) {
+            if (Test-Path $file) { $tail += Get-Content $file -Tail 12 -Encoding UTF8 }
+        }
+        Show-Message ("The roster reports could not be created (exit code {0}).`n`n{1}`n`nFull log: {2}" -f $code, ($tail -join "`n"), $logOut) "Raid roster reports" "Error"
+        exit 1
+    }
+}
+
 $arguments = '-m warmane_exporter.run "{0}" --html-output "{1}"' -f $Link, $Output
 if ($Offline) { $arguments += " --offline" }
 if ($Quick) { $arguments += " --quick" }
-
-$script:cancelled = $false
-$wait = New-Object System.Windows.Forms.Form
-$wait.Text = "Warmane Character Exporter"
-$wait.StartPosition = "CenterScreen"
-$wait.FormBorderStyle = "FixedDialog"
-$wait.MaximizeBox = $false
-$wait.ClientSize = New-Object System.Drawing.Size(520, 175)
-$title = New-Object System.Windows.Forms.Label
-$title.Text = "Creating the report for $charName ($charRealm)"
-$title.Location = New-Object System.Drawing.Point(12, 12)
-$title.AutoSize = $true
-$percentLabel = New-Object System.Windows.Forms.Label
-$percentLabel.Text = "0%"
-$percentLabel.Font = New-Object System.Drawing.Font("Segoe UI", 22)
-$percentLabel.Location = New-Object System.Drawing.Point(12, 36)
-$percentLabel.Size = New-Object System.Drawing.Size(120, 44)
-$status = New-Object System.Windows.Forms.Label
-$status.Text = "Starting"
-$status.Location = New-Object System.Drawing.Point(140, 46)
-$status.Size = New-Object System.Drawing.Size(368, 40)
-$elapsedLabel = New-Object System.Windows.Forms.Label
-$elapsedLabel.Text = "Elapsed 0:00"
-$elapsedLabel.ForeColor = [System.Drawing.Color]::Gray
-$elapsedLabel.Location = New-Object System.Drawing.Point(12, 100)
-$elapsedLabel.Size = New-Object System.Drawing.Size(496, 65)
-$wait.Controls.AddRange(@($title, $percentLabel, $status, $elapsedLabel))
-$wait.Add_FormClosing({
-    param($sender, $e)
-    if ($script:process -and -not $script:process.HasExited) {
-        $answer = [System.Windows.Forms.MessageBox]::Show("Stop the export? Data already fetched is kept, so a new run continues where this one stopped.", "Warmane Character Exporter", "YesNo", "Question")
-        if ($answer -eq "Yes") { $script:cancelled = $true; try { $script:process.Kill() } catch { } } else { $e.Cancel = $true }
-    }
-})
-Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hWnd);'
-$wait.Show()
-# come to the front once (not permanently on top): the topmost flag is set and cleared again right away
-$wait.TopMost = $true
-$wait.TopMost = $false
-$wait.Activate()
-[void][Win32.Native]::SetForegroundWindow($wait.Handle)
-$env:WARMANE_PROGRESS = "1"
-$clock = [System.Diagnostics.Stopwatch]::StartNew()
-
-$script:process = Start-Process -FilePath $python -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden `
-    -RedirectStandardOutput $logOut -RedirectStandardError $logErr -PassThru
-$process = $script:process
-$null = $process.Handle   # keeps the exit code readable after the process ends
-$tick = 0
-$lastText = "Starting"
-while (-not $process.HasExited) {
-    [System.Windows.Forms.Application]::DoEvents()
-    if ($script:cancelled) { break }
-    Start-Sleep -Milliseconds 100
-    $tick++
-    if ($tick % 3 -eq 0 -and (Test-Path $logOut)) {
-        try {
-            $lines = @(Get-Content $logOut -Tail 40 -Encoding UTF8 -ErrorAction Stop | Where-Object { $_ -like "PROGRESS|*" })
-            if ($lines.Count -gt 0) {
-                $parts = $lines[-1].Split("|", 3)
-                $percentLabel.Text = $parts[1] + "%"
-                $lastText = $parts[2]
-            }
-        } catch { }
-    }
-    $seconds = [int]$clock.Elapsed.TotalSeconds
-    $pos = [math]::Abs(([int][math]::Floor($tick / 3) % 10) - 5)   # 0..5..1, moves left and right
-    $track = (0..5 | ForEach-Object { if ($_ -eq $pos) { "o" } else { "." } }) -join " "
-    $status.Text = $lastText
-    $elapsedLabel.Text = ("Working  {0}`r`nElapsed {1}:{2:00}. Requests to Warmane are spaced 1 second apart, so this takes a while. The window can be minimized or placed behind other windows." -f $track, [math]::Floor($seconds / 60), ($seconds % 60))
-}
-$process.WaitForExit()
-$code = $process.ExitCode
-$script:process = $null
-$wait.Close()
+$code = Invoke-ProgressProcess $arguments "Creating the report for $charName ($charRealm)"
 if ($script:cancelled) { exit 0 }
 
 if ($code -eq 0 -and (Test-Path $Output)) {

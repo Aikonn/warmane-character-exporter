@@ -39,6 +39,21 @@ class ProgressTests(unittest.TestCase):
         self.assertTrue(progress_lines[-1].startswith("PROGRESS|"))
         self.assertIn("Reading character summary and talents", progress_lines[1])
 
+    def test_run_character_can_join_existing_progress(self):
+        plan = [("snapshot", lambda a: 0, []), ("export", lambda a: 0, [])]
+        with (
+            mock.patch.dict(os.environ, {"WARMANE_PROGRESS": "1"}),
+            mock.patch.object(run, "steps", return_value=plan),
+        ):
+            def work():
+                progress.start(8, "Roster")
+                run.run_character("A", "Onyxia", "c", False, False, quick=True, start_progress=False)
+            lines = capture(work)
+        progress_lines = [line for line in lines if line.startswith("PROGRESS|")]
+        self.assertEqual(progress_lines[0], "PROGRESS|0|Roster")
+        self.assertTrue(all(int(line.split("|", 2)[1]) <= 50 for line in progress_lines))
+        self.assertNotIn("PROGRESS|0|Starting A (Onyxia)", progress_lines)
+
 
 if __name__ == "__main__":
     unittest.main()

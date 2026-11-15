@@ -55,6 +55,47 @@ class TransportTests(unittest.TestCase):
         response = HttpResponse(status_code=200, headers={}, body_text="Error code: 1010")
         self.assertEqual(classify_response(response), "client_signature_blocked")
 
+    def test_403_block_marker_wins_over_rate_limit_marker(self) -> None:
+        response = HttpResponse(
+            status_code=403,
+            headers={},
+            body_text="error code: 1010; too many requests",
+        )
+        self.assertEqual(classify_response(response), "client_signature_blocked")
+
+    def test_200_armory_text_with_access_denied_is_success(self) -> None:
+        body = (
+            '<html><body><div id="character-sheet">'
+            "Guild name: Access Denied"
+            "</div></body></html>"
+        )
+        response = HttpResponse(status_code=200, headers={}, body_text=body)
+        self.assertEqual(classify_response(response), "success")
+
+    def test_200_cloudflare_1010_page_with_armory_markup_is_success(self) -> None:
+        body = (
+            '<html><body><div id="character-sheet">'
+            "error code: 1010 " + ("x" * 2048) + "</div></body></html>"
+        )
+        response = HttpResponse(status_code=200, headers={}, body_text=body)
+        self.assertEqual(classify_response(response), "success")
+
+    def test_truncated_1010_body_with_armory_markup_is_not_treated_as_short(self) -> None:
+        body = '<html><body><div id="character-sheet">error code: 1010</div></body></html>'
+        response = HttpResponse(
+            status_code=200,
+            headers={},
+            body_text=body,
+            body_truncated=True,
+            body_bytes_captured=len(body.encode("utf-8")),
+        )
+        self.assertEqual(classify_response(response), "success")
+
+    def test_200_cloudflare_1010_page_without_armory_markup_is_blocked(self) -> None:
+        body = "<html><body>error code: 1010 " + ("x" * 2048) + "</body></html>"
+        response = HttpResponse(status_code=200, headers={}, body_text=body)
+        self.assertEqual(classify_response(response), "client_signature_blocked")
+
     def test_classifies_cloudflare_1015_html(self) -> None:
         fixture = Path("tests/fixtures/synthetic/cloudflare-1015-synthetic.html").read_text(encoding="utf-8")
         response = HttpResponse(status_code=200, headers={}, body_text=fixture)
