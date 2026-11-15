@@ -33,6 +33,7 @@ Module: `transport.py`, `roster.py`, `run.py`, `Start-Report.ps1`
 3. The launcher now has the roster choice/dialog, remembers realm and output folder, writes UTF-8 names under `.tools\tmp`, passes quoted paths and refresh, shows the roster title/progress, opens the last summary line on exit 0/1, and reopens input on exit 2 with names retained. Single-character flow remains on the existing path. PowerShell parser check: OK.
 
 Verification: `PYTHONPATH=src python -m unittest discover -s tests` — 266 tests, OK. `git -c core.whitespace=cr-at-eol diff --check` — clean.
+Follow-up: `Start-Report.ps1` now removes trailing separators from non-root output paths and represents filesystem roots with a `.` component (for example, `D:\.`) before quoting the CLI argument. PowerShell parser and output-path checks passed, including a path with spaces and an accented character. Owner-PC acceptance remains open because the final summary contents were not provided; no live requests were made.
 Owner-PC launcher headers (user-provided):
 
 ```text

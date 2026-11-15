@@ -443,8 +443,15 @@ if ($script:RosterMode) {
         $namesPath = Join-Path $root (".tools\tmp\roster-names-{0}.txt" -f [guid]::NewGuid().ToString("N"))
         $utf8 = New-Object System.Text.UTF8Encoding -ArgumentList $false
         [System.IO.File]::WriteAllText($namesPath, $namesText, $utf8)
+        $outputFolder = [System.IO.Path]::GetFullPath($selection.OutputFolder.Trim())
+        $pathRoot = [System.IO.Path]::GetPathRoot($outputFolder)
+        if ($outputFolder.Equals($pathRoot, [StringComparison]::OrdinalIgnoreCase)) {
+            $outputFolder += "."
+        } else {
+            $outputFolder = $outputFolder.TrimEnd([char[]]@('\'))
+        }
         $arguments = '-m warmane_exporter.roster --realm "{0}" --names-file "{1}" --output-dir "{2}"' -f `
-            $selection.Realm, $namesPath, $selection.OutputFolder
+            $selection.Realm, $namesPath, $outputFolder
         if ($selection.Refresh) { $arguments += " --refresh" }
         $nameCount = @($namesText -split '\r?\n' | Where-Object { $_.Trim() }).Count
         $windowTitle = "Creating raid roster reports ($nameCount characters, $($selection.Realm))"
