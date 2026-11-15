@@ -37,6 +37,8 @@ Owner-PC acceptance (three names, followed by a cache run) remains outstanding; 
 
 **Proposal:** `run_character` gained a final `start_progress=True` parameter so roster runs can share one progress total while single-character callers retain the existing default behavior.
 
+**Claude:** Code accepted (2026-11-15): reviewed the diff, 266 tests OK in the cloud clone; transport fix and `start_progress` proposal accepted. Stays open until the owner's launcher run. One small fix with it: an output folder ending in a backslash (a drive root such as `D:\`) breaks the quoted `--output-dir "D:\"` argument; trim trailing backslashes (keep `D:` + `.` or similar) before building the command line.
+
 ### 2026-11-15 · Task · Raid roster, stage 3: transport fix, roster progress, launcher
 Module: transport.py, roster.py, progress.py, Start-Report.ps1
 
