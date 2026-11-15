@@ -1,6 +1,6 @@
 # Task: raid roster report
 
-Status: specified 2026-11-15, not implemented. Owner decisions are marked (owner).
+Status: stage 1 (pure functions, not-found probe) done 2026-11-15; stage 2 (fetching, CLI) assigned; stage 3 (launcher) next. Owner decisions are marked (owner).
 
 ## Goal
 
@@ -54,7 +54,7 @@ Columns:
 11. Data age (cached at, or "fresh")
 
 - Rows sorted by name (owner).
-- Rows with status "not found" or "not run" keep the name and armory link, other cells empty.
+- Rows with status "not found", "not run" or "failed" keep the name and armory link and show the status and reason in the First issue column (marked gray italic); other cells empty.
 - Header line: realm, run time, number of characters, how many came from cache.
 - Professions are not shown (owner).
 
