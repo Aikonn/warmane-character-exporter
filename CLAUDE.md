@@ -7,3 +7,4 @@
 - Every Task/Design note for Copilot has a `Done when:` line. Larger specs live in `docs/tasks/`.
 - The owner's clone is on his Windows PC; changes pushed here need a `git pull` there. Don't edit code while Copilot has unsynced changes.
 - Current state, access rules and backlog: `docs/handoff.md`; dated history: `docs/development-status.md`.
+- Commit under the session's default git identity (`Claude <noreply@anthropic.com>`). Don't set `user.name`/`user.email` or `--author` to Aikonn: the session signing key only verifies for the Claude identity, so Aikonn-authored commits show as Unverified on GitHub.
