@@ -597,6 +597,15 @@ Status: verified by 4 live GET requests (user-approved, one per character, 15 s 
 - Request cost: 1 request per character for JSON basics; HTML summary and talents pages are still needed for enchants, gems, talents and glyphs.
 - Not yet probed live: achievements, statistics, HTML pages from a plain HTTP client (earlier scripted request got Cloudflare 1010).
 
+### Finding: warmane-api-not-found-onyxia-2026-11-15
+
+Status: verified by one user-approved, budgeted GET request using the fetch transport and its fixed headers; automatic retries were disabled for this probe.
+
+- Request: `/api/character/Qzxqzxqzxqzx/Onyxia/summary`.
+- Response: HTTP 200, `application/json`, 37 bytes, JSON object with the single key `error` and value `"Character does not exist."`. A sanitized copy is `tests/fixtures/real/api-summary-not-found-onyxia.json`.
+- This exact response distinguishes the observed non-existent-character case. Do not treat other JSON errors as not-found. Access blocks and rate limits must still be detected from their transport status and response content (including Error 1010 / access denied and Error 1015 / rate-limit markers); Error 1015 is not assumed to be the HTTP status.
+- Policy check for this probe: the current [Warmane terms page](https://www.warmane.com/policies/terms) does not address automated access; `https://armory.warmane.com/robots.txt` and `https://www.warmane.com/robots.txt` redirected to not-found pages rather than publishing directives. This is not evidence that general automated access is permitted. The single probe was made under the explicit owner approval in the roster task.
+
 ### Finding: achievements-statistics-structure-2026-10-24
 
 Status: verified by 3 further live requests (user-approved; achievements page GET, one category POST, statistics page GET; 12 s apart; user's Chrome; no blocks). Total live requests this session: 7. Raw captures in git-ignored local-captures/.

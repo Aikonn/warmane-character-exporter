@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "name": "Mélora",
+    "realm": "Onyxia",
+    "level": 80,
+    "class": "Priest"
+  },
+  "snapshot_time": 1794762000,
+  "equipment": [
+    {
+      "slot": "Head",
+      "quality": "epic",
+      "item_level": 264,
+      "inventory_type": "head"
+    }
+  ],
+  "specializations": [
+    {
+      "label": "Discipline",
+      "split": [57, 14, 0],
+      "glyphs": [
+        {"category": "major"},
+        {"category": "major"},
+        {"category": "major"}
+      ]
+    },
+    {
+      "label": "Holy",
+      "split": [0, 0, 0],
+      "glyphs": []
+    }
+  ]
+}

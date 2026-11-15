@@ -25,6 +25,13 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-15 · Progress · Raid roster, stage 1
+Module: `src/warmane_exporter/roster.py`
+
+Verified the one-request not-found probe: HTTP 200, `application/json`, 37 bytes, `{"error":"Character does not exist."}`; added its sanitized fixture and documented how it differs from access/rate-limit responses. Implemented the six pure roster functions. `run_roster` and `main` remain unimplemented for stage 2.
+Tests: `test_trims_blank_lines_and_deduplicates_case_insensitively`, `test_accepts_matching_realm_suffix_and_rejects_other_realm`, `test_rejects_nonletter_names_but_accepts_accented_letters`, `test_rejects_more_than_40_distinct_names`, `test_uses_pve_report_gearscore_checks_and_specialization_labels`, `test_placeholder_rows_keep_identity_and_armory_link_only`, `test_sort_rows_case_insensitively`, `test_summary_file_name_uses_local_timestamp`, `test_render_summary_escapes_name_and_issue_text`.
+Done when: one-request response and fixture recorded; all 246 tests pass with the nine roster tests in `python -m unittest discover -s tests`.
+
 ### 2026-11-15 · Task · Raid roster, stage 1: not-found check and pure functions
 Module: src/warmane_exporter/roster.py
 
