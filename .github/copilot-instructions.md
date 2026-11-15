@@ -18,29 +18,13 @@ Inspect the repository before assuming files, commands, dependencies, or functio
 
 If documents conflict, identify the conflict and ask for a decision rather than silently choosing a new requirement. Do not rewrite the specification or materially expand scope without approval.
 
-## Current scope: Milestone 0 only
+## Current scope
 
-Until the user explicitly approves a later milestone, work only on source feasibility investigation.
+Milestones 0 to 6 are complete: the exporter works end to end (`python -m warmane_exporter.run`, launcher `Start-Report.cmd`) and writes JSON, Markdown and a self-contained PvE HTML report. Current status and backlog: `docs/development-status.md` (latest Update sections) and `docs/handoff.md`.
 
-Before editing files, installing dependencies, or making network requests:
+Default focus is WotLK end-game PvE: both realms (Onyxia, Icecrown) have Icecrown Citadel and Ruby Sanctum open.
 
-- Inspect the existing repository.
-- Propose a short plan listing files, minimal Python setup, dependencies, retrieval safeguards, intended requests, and tests.
-- Identify unresolved choices and wait for the user to approve the plan.
-
-After approval, stay within the approved plan. Stop and ask before material scope changes or broadening network collection.
-
-Milestone 0 deliverables:
-
-- A minimal runnable retrieval probe with documented setup and commands.
-- A field-availability matrix covering both realms and the four supplied debug characters.
-- Verified findings about equipment, item, gem, enchantment, talent, glyph, and progression sources.
-- Ruleset compatibility findings and explicit identifier mappings.
-- Request counts and cache opportunities.
-- Small sanitized fixtures and fixture-based tests.
-- Updated findings, limitations, and open questions in `docs/data-sources.md`.
-
-Do not implement the full exporter, a GUI, a hosted service, gear scoring, combat simulation, or upgrade recommendations during this milestone. Do not mark the milestone complete merely because the probe runs.
+Work only on the task the overseer gives you. Propose a short plan before larger changes and stop and ask before scope changes or new network sources.
 
 ## Data correctness
 

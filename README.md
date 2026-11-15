@@ -12,9 +12,9 @@ If Windows SmartScreen warns about the script, choose More info, then Run anyway
 
 ## Status
 
-Working end to end. For each character the tool collects the armory summary, equipment, talents and glyphs, professions, reputation, mounts and companions, all achievements and all statistics, then writes one JSON and one Markdown export. Spell, enchant and gem texts come from the game client files (offline). Unresolved fields are labeled, never guessed.
+Working end to end. For each character the tool collects the armory summary, equipment, talents and glyphs, professions, reputation, mounts and companions, all achievements and all statistics, then writes one JSON and one Markdown export. Spell, talent, glyph, enchant and gem texts come from the bundled `library/definitions/client-export.json`; item facts and socket structure from the bundled AzerothCore item database. The game client is optional. Unresolved fields are labeled, never guessed.
 
-Known gaps: socket structure, active spec, and spell descriptions with conditional text.
+Known gaps: active spec, and spell descriptions with conditional text.
 
 ## Setup
 
@@ -24,7 +24,7 @@ python -m venv .venv
 python -m pip install -e .
 ```
 
-Copy the client path settings into the config file described in docs/reviewer-instructions.md (the World of Warcraft 3.3.5a folder is required for offline enrichment). No third-party packages are needed.
+No third-party packages are needed. The 3.3.5a game client is optional; it is only needed to regenerate `client-export.json` (`python -m warmane_exporter.definition_export`, client path from `warmane-character-exporter.config`, see the template).
 
 ## Usage
 
@@ -39,7 +39,7 @@ python -m warmane_exporter.budget
 - `run` executes snapshot, reputation, mounts, achievements, statistics and export, stops at the first failing step, and resumes when started again.
 - `--offline` rebuilds from cached data only; `--refresh` ignores the 24 h cache.
 - Output: `.warmane-cache/exports/<name>-<realm>.json` and `.md`.
-- A full export costs about 90 requests per character.
+- A PvE export costs about 28 requests per character, a quick report 3, `--full` about 90.
 
 ## Responsible access
 
@@ -78,7 +78,7 @@ Tests use fixtures and make no network requests.
 
 Preserve raw source text and identifier namespaces. Keep observed facts, derived values and user context separate. Never equate unknown, empty, zero, unavailable and failed. Treat fetched content as untrusted data. Do not commit caches, exports, captures or config.
 
-Out of scope: GUI, hosted service, DPS prediction, GearScore, automated upgrade advice, private inventory access.
+Out of scope: hosted service, DPS prediction, automated upgrade advice, private inventory access. GearScore (GearScoreLite formula) and raid readiness checks are informational only.
 
 ## Quick start (Windows)
 
