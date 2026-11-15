@@ -232,9 +232,6 @@ def classify_response(response: HttpResponse) -> str:
         return "transient_error"
     body_lower = response.body_text.lower()
     has_client_signature_block_marker = any(marker in body_lower for marker in CLIENT_SIGNATURE_BLOCK_MARKERS)
-    if status == 403 and has_client_signature_block_marker:
-        return "client_signature_blocked"
-
     has_rate_marker = any(marker in body_lower for marker in RATE_LIMIT_MARKERS)
     if status == 429:
         return "rate_limited"
@@ -242,6 +239,8 @@ def classify_response(response: HttpResponse) -> str:
         return "rate_limited"
     if status == 200 and has_rate_marker:
         return "rate_limited"
+    if has_client_signature_block_marker:
+        return "client_signature_blocked"
 
     if 300 <= status < 400:
         return "redirect"

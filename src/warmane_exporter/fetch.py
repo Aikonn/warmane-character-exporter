@@ -32,6 +32,7 @@ class FetchResult:
     origin: str  # network | cache | stale-cache | none
     observed_at: float | None
     detail: str
+    stop_reason: str | None = None
 
 
 def fetch_character_summary(

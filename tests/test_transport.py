@@ -51,6 +51,10 @@ class TransportTests(unittest.TestCase):
         )
         self.assertEqual(classify_response(response), "client_signature_blocked")
 
+    def test_classifies_access_denial_content_even_with_success_http_status(self) -> None:
+        response = HttpResponse(status_code=200, headers={}, body_text="Error code: 1010")
+        self.assertEqual(classify_response(response), "client_signature_blocked")
+
     def test_classifies_cloudflare_1015_html(self) -> None:
         fixture = Path("tests/fixtures/synthetic/cloudflare-1015-synthetic.html").read_text(encoding="utf-8")
         response = HttpResponse(status_code=200, headers={}, body_text=fixture)

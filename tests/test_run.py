@@ -21,8 +21,13 @@ class RunTests(unittest.TestCase):
 
         plan = [("one", fake("one", 0), []), ("two", fake("two", 3), []), ("three", fake("three", 0), [])]
         with mock.patch.object(run, "steps", return_value=plan):
-            self.assertFalse(run.run_character("A", "Onyxia", "c", False, False))
+            self.assertEqual(run.run_character("A", "Onyxia", "c", False, False), 3)
         self.assertEqual(calls, ["one", "two"])
+
+    def test_snapshot_step_receives_configured_max_age(self):
+        snapshot_step = run.steps("A", "Onyxia", "cache", False, False, quick=True, max_age_minutes=120)[0]
+        self.assertEqual(snapshot_step[0], "snapshot")
+        self.assertEqual(snapshot_step[2][-2:], ["--max-age-minutes", "120"])
 
     def test_link_runs_one_character_and_copies_html(self):
         import tempfile
@@ -32,7 +37,7 @@ class RunTests(unittest.TestCase):
             (cache / "exports").mkdir(parents=True)
             (cache / "exports" / "aikka-onyxia-pve.html").write_text("<html>ok</html>", encoding="utf-8")
             target = Path(tmp) / "out" / "report.html"
-            with mock.patch.object(run, "run_character", return_value=True) as runner:
+            with mock.patch.object(run, "run_character", return_value=0) as runner:
                 code = run.main(["https://armory.warmane.com/character/Aikka/Onyxia/summary", "--cache-dir", str(cache),
                                  "--html-output", str(target), "--offline"])
             self.assertEqual(code, 0)

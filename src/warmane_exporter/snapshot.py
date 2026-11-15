@@ -1,10 +1,12 @@
 """Build a character snapshot from the JSON summary, HTML summary and talents pages.
 
-python -m warmane_exporter.snapshot NAME REALM [--refresh] [--offline] [--allow-stale] [--no-client]
+python -m warmane_exporter.snapshot NAME REALM [--refresh] [--offline] [--allow-stale] [--no-client] [--max-age-minutes N]
 
 Live requests: at most 3 (one per source), spaced by the transport interval (10 s here),
 none when the cache is fresh or --offline. Each section succeeds or fails on its own and
-carries its origin (network, cache, stale-cache) and observation time.
+carries its origin (network, cache, stale-cache) and observation time. Exit codes: 0 complete,
+1 incomplete for other failures, 2 invalid input, 3 the verified character-not-found response,
+4 a host-wide stop (access block, rate limit, or exhausted request budget).
 """
 
 from __future__ import annotations
@@ -67,8 +69,8 @@ def fetch_validated(
     entry = cache.get(key)
     now = now_fn()
 
-    def from_entry(origin: str, detail: str) -> FetchResult:
-        return FetchResult("ok", validate(entry.body), origin, entry.fetched_at, detail)
+    def from_entry(origin: str, detail: str, stop_reason: str | None = None) -> FetchResult:
+        return FetchResult("ok", validate(entry.body), origin, entry.fetched_at, detail, stop_reason)
 
     if entry is not None and not refresh and entry.age_seconds(now) <= max_age_seconds:
         return from_entry("cache", "Fresh cache entry used.")
@@ -78,6 +80,13 @@ def fetch_validated(
         return FetchResult("offline_miss", None, "none", None, "Offline mode and nothing cached.")
 
     result = orchestrator.execute_single_request(url=url, client=client, form=form, referer=referer)
+    if source == "warmane-json-summary" and result.status == "success":
+        try:
+            response_data = json.loads(result.body_text)
+        except json.JSONDecodeError:
+            response_data = None
+        if response_data == {"error": "Character does not exist."}:
+            return FetchResult("not_found", None, "none", None, "Character does not exist.")
     if result.status == "success":
         try:
             parsed = validate(result.body_text)
@@ -91,6 +100,20 @@ def fetch_validated(
             return FetchResult("ok", parsed, "network", now_fn(), "Fetched live.")
     else:
         detail = f"Request failed: {result.status} ({result.detail})"
+        if result.classification == "rate_limited":
+            stop_reason = "failed_rate_limited"
+        elif result.classification == "client_signature_blocked" or result.response_status == 403:
+            stop_reason = "failed_access_blocked"
+        else:
+            stop_reason = None
+        if stop_reason is not None:
+            if entry is not None and allow_stale:
+                return from_entry(
+                    "stale-cache",
+                    f"{detail} Using stale cache ({int(entry.age_seconds(now))} s old).",
+                    stop_reason,
+                )
+            return FetchResult(stop_reason, None, "none", None, detail)
     if entry is not None and allow_stale:
         return from_entry("stale-cache", f"{detail} Using stale cache ({int(entry.age_seconds(now))} s old).")
     return FetchResult("failed", None, "none", None, detail)
@@ -109,6 +132,7 @@ def _section(result: FetchResult) -> dict[str, Any]:
         "origin": result.origin,
         "observed_at": result.observed_at,
         "detail": result.detail,
+        "stop_reason": result.stop_reason,
         "data": result.data,
     }
 
@@ -127,10 +151,20 @@ def build_snapshot(
     common = dict(cache=cache, orchestrator=orchestrator, client=client, now_fn=now_fn,
                   reject_dir=reject_dir, **options)
     json_res = fetch_validated(api_summary_url(name, realm), "warmane-json-summary", parse_api_summary, **common)
-    html_res = fetch_validated(character_page_url(name, realm, "summary"), "warmane-html-summary",
-                               _validate_summary_html, **common)
-    talents_res = fetch_validated(character_page_url(name, realm, "talents"), "warmane-html-talents",
-                                  _validate_talents_html, **common)
+    if json_res.status == "not_found":
+        html_res = FetchResult("not_run", None, "none", None, "Not run: character does not exist.")
+        talents_res = FetchResult("not_run", None, "none", None, "Not run: character does not exist.")
+    elif json_res.status in ("failed_rate_limited", "failed_access_blocked") or json_res.stop_reason:
+        html_res = FetchResult("not_run", None, "none", None, "Not run: host access was blocked.")
+        talents_res = FetchResult("not_run", None, "none", None, "Not run: host access was blocked.")
+    else:
+        html_res = fetch_validated(character_page_url(name, realm, "summary"), "warmane-html-summary",
+                                   _validate_summary_html, **common)
+        if html_res.status in ("failed_rate_limited", "failed_access_blocked") or html_res.stop_reason:
+            talents_res = FetchResult("not_run", None, "none", None, "Not run: host access was blocked.")
+        else:
+            talents_res = fetch_validated(character_page_url(name, realm, "talents"), "warmane-html-talents",
+                                          _validate_talents_html, **common)
 
     notes: list[str] = []
     if defs is not None:
@@ -165,7 +199,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--allow-stale", action="store_true")
     parser.add_argument("--no-client", action="store_true", help="skip offline client enrichment")
+    parser.add_argument("--max-age-minutes", type=int, default=CHARACTER_MAX_AGE_SECONDS // 60,
+                        help="reuse character data no older than this many minutes (default: 15)")
     args = parser.parse_args(argv)
+    if args.max_age_minutes < 0:
+        parser.error("--max-age-minutes must be zero or greater.")
 
     cache_dir = Path(args.cache_dir)
     cache = ResponseCache(cache_dir / "responses.sqlite")
@@ -202,7 +240,11 @@ def main(argv: list[str] | None = None) -> int:
             args.name, args.realm, cache, orchestrator, budgeted_client(cache_dir), defs=defs,
             reject_dir=cache_dir / "rejected",
             refresh=args.refresh, offline=args.offline, allow_stale=args.allow_stale,
+            max_age_seconds=args.max_age_minutes * 60,
         )
+    except BudgetExhausted as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 4
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -210,6 +252,11 @@ def main(argv: list[str] | None = None) -> int:
         cache.close()
         if defs_ctx is not None:
             defs_ctx.__exit__(None, None, None)
+
+    if snapshot["sections"]["json_summary"]["status"] == "not_found":
+        print("json_summary: not_found (network) Character does not exist.")
+        print("complete: False")
+        return 3
 
     out_dir = cache_dir / "snapshots"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -220,6 +267,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{key}: {section['status']} ({section['origin']}) {section['detail']}")
     print(f"complete: {snapshot['complete']}")
     print(f"saved: {out_path}")
+    if any(section["status"] in ("failed_rate_limited", "failed_access_blocked") or section.get("stop_reason")
+           for section in snapshot["sections"].values()):
+        return 4
     return 0 if snapshot["complete"] else 1
 
 

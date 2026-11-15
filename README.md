@@ -34,10 +34,12 @@ python -m warmane_exporter.run Aikka Onyxia
 python -m warmane_exporter.run --all
 python -m warmane_exporter.run Aikka Onyxia --offline
 python -m warmane_exporter.budget
+python -m warmane_exporter.roster --realm Onyxia --names Aikka,Bezduse --output-dir "$HOME\Downloads"
 ```
 
 - `run` executes snapshot, reputation, mounts, achievements, statistics and export, stops at the first failing step, and resumes when started again.
 - `--offline` rebuilds from cached data only; `--refresh` ignores the 24 h cache.
+- `roster` creates one quick report per name and a timestamped HTML summary; cached character data is reused for up to 120 minutes by default.
 - Output: `.warmane-cache/exports/<name>-<realm>.json` and `.md`.
 - A PvE export costs about 28 requests per character, a quick report 3, `--full` about 90.
 

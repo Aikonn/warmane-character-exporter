@@ -1,7 +1,9 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest import mock
 
+from warmane_exporter.budget import BudgetExhausted
 from warmane_exporter.cache import ResponseCache
 from warmane_exporter.checkpoint import ProbeCheckpointStore
 from warmane_exporter.http_client import HttpResponse
@@ -12,6 +14,7 @@ FIX = Path("tests/fixtures")
 JSON_BODY = (FIX / "real/api-summary-aikka-onyxia.json").read_text(encoding="utf-8")
 SUMMARY = (FIX / "synthetic/layout-consistent-with-anchors.html").read_text(encoding="utf-8")
 TALENTS = (FIX / "synthetic/talents-page-dom-synthetic.html").read_text(encoding="utf-8")
+NOT_FOUND = (FIX / "real/api-summary-not-found-onyxia.json").read_text(encoding="utf-8")
 
 
 class RoutingClient:
@@ -74,6 +77,94 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(snap["sections"]["talents"]["status"], "ok")
         self.assertEqual(len(list(rejects.glob("*.txt"))), 1)
         self.assertIsNone(self.cache.get("warmane-html-summary|https://armory.warmane.com/character/Aikka/Onyxia/summary"))
+
+    def test_verified_not_found_stops_after_json_and_is_not_cached(self) -> None:
+        client = RoutingClient({"/api/character/Qzxqzxqzxqzx/Onyxia/summary": NOT_FOUND})
+        snap = build_snapshot("Qzxqzxqzxqzx", "Onyxia", self.cache, self.orch, client)
+        self.assertEqual(len(client.urls), 1)
+        self.assertEqual(snap["sections"]["json_summary"]["status"], "not_found")
+        self.assertEqual(snap["sections"]["html_summary"]["status"], "not_run")
+        self.assertEqual(snap["sections"]["talents"]["status"], "not_run")
+        self.assertIsNone(self.cache.get(
+            "warmane-json-summary|https://armory.warmane.com/api/character/Qzxqzxqzxqzx/Onyxia/summary"
+        ))
+
+    def test_access_block_stops_remaining_snapshot_requests(self):
+        class BlockedClient:
+            def __init__(self):
+                self.calls = 0
+
+            def get(self, url, connect_timeout, read_timeout):
+                self.calls += 1
+                return HttpResponse(status_code=200, headers={}, body_text="Error code: 1010")
+
+        client = BlockedClient()
+        snap = build_snapshot("Aikka", "Onyxia", self.cache, self.orch, client)
+        self.assertEqual(client.calls, 1)
+        self.assertEqual(snap["sections"]["json_summary"]["status"], "failed_access_blocked")
+        self.assertEqual(snap["sections"]["html_summary"]["status"], "not_run")
+        self.assertEqual(snap["sections"]["talents"]["status"], "not_run")
+
+    def test_snapshot_cli_passes_max_age_minutes_to_fetch_path(self):
+        complete = {
+            "generated_at": 100.0,
+            "character": {"realm": "Onyxia"},
+            "complete": True,
+            "sections": {
+                key: {"status": "ok", "origin": "cache", "detail": ""}
+                for key in ("json_summary", "html_summary", "talents")
+            },
+        }
+        with mock.patch("warmane_exporter.definitions.load_definitions", return_value=None), \
+             mock.patch("warmane_exporter.snapshot.budgeted_client"), \
+             mock.patch("warmane_exporter.snapshot.build_snapshot", return_value=complete) as build:
+            code = __import__("warmane_exporter.snapshot", fromlist=["main"]).main([
+                "Aikka", "Onyxia", "--cache-dir", str(self.root / "cli-cache"),
+                "--no-client", "--max-age-minutes", "120",
+            ])
+        self.assertEqual(code, 0)
+        self.assertEqual(build.call_args.kwargs["max_age_seconds"], 7200)
+
+    def test_snapshot_cli_returns_four_for_budget_exhaustion(self):
+        snapshot_module = __import__("warmane_exporter.snapshot", fromlist=["main"])
+        with mock.patch("warmane_exporter.definitions.load_definitions", return_value=None), \
+             mock.patch("warmane_exporter.snapshot.budgeted_client"), \
+             mock.patch("warmane_exporter.snapshot.build_snapshot", side_effect=BudgetExhausted("spent")):
+            code = snapshot_module.main([
+                "Aikka", "Onyxia", "--cache-dir", str(self.root / "budget-cache"), "--no-client",
+            ])
+        self.assertEqual(code, 4)
+
+    def test_snapshot_cli_maps_not_found_and_access_block_exit_codes(self):
+        snapshot_module = __import__("warmane_exporter.snapshot", fromlist=["main"])
+        common_patches = (
+            mock.patch("warmane_exporter.definitions.load_definitions", return_value=None),
+            mock.patch("warmane_exporter.snapshot.budgeted_client"),
+        )
+        not_found = {"sections": {"json_summary": {"status": "not_found"}}}
+        with common_patches[0], common_patches[1], \
+             mock.patch("warmane_exporter.snapshot.build_snapshot", return_value=not_found):
+            code = snapshot_module.main([
+                "Absent", "Onyxia", "--cache-dir", str(self.root / "not-found-cache"), "--no-client",
+            ])
+        self.assertEqual(code, 3)
+
+        blocked = {
+            "generated_at": 100.0,
+            "character": {"realm": "Onyxia"},
+            "complete": False,
+            "sections": {
+                "json_summary": {"status": "failed_access_blocked", "origin": "none", "detail": ""},
+                "html_summary": {"status": "not_run", "origin": "none", "detail": ""},
+                "talents": {"status": "not_run", "origin": "none", "detail": ""},
+            },
+        }
+        with common_patches[0], common_patches[1], \
+             mock.patch("warmane_exporter.snapshot.build_snapshot", return_value=blocked):
+            code = snapshot_module.main([
+                "Aikka", "Onyxia", "--cache-dir", str(self.root / "blocked-cache"), "--no-client",
+            ])
+        self.assertEqual(code, 4)
 
 
 if __name__ == "__main__":

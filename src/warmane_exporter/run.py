@@ -19,18 +19,23 @@ import sys
 from pathlib import Path
 
 from . import collect, discover, export, progress, snapshot
+from .fetch import CHARACTER_MAX_AGE_SECONDS
 from .identity import parse_character_link
 
 ALL_CHARACTERS = (("Aikka", "Onyxia"), ("Aikka", "Icecrown"), ("Bezduse", "Onyxia"), ("Bezduse", "Icecrown"))
 
 
-def steps(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool, full: bool = False, quick: bool = False) -> list[tuple[str, object, list[str]]]:
+def steps(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool, full: bool = False,
+          quick: bool = False,
+          max_age_minutes: int = CHARACTER_MAX_AGE_SECONDS // 60) -> list[tuple[str, object, list[str]]]:
     common = ["--cache-dir", cache_dir]
     flags = (["--refresh"] if refresh else []) + (["--offline"] if offline else [])
     coll_flags = flags + (["--full"] if full else [])
     plan: list[tuple[str, object, list[str]]] = []
     if not offline:
-        plan.append(("snapshot", snapshot.main, [name, realm, *common, *flags]))
+        plan.append(("snapshot", snapshot.main, [
+            name, realm, *common, *flags, "--max-age-minutes", str(max_age_minutes),
+        ]))
     if quick:
         plan.append(("export", export.main, [name, realm, *common, "--quick"]))
         return plan
@@ -56,20 +61,27 @@ def step_units(label: str, full: bool = False) -> int:
     return {"snapshot": 3, "achievements": len(collect.categories_for("achievements", full)), "statistics": len(collect.categories_for("statistics", full))}.get(label, 1)
 
 
-def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool, full: bool = False, quick: bool = False) -> bool:
+def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool, full: bool = False,
+                  quick: bool = False,
+                  max_age_minutes: int = CHARACTER_MAX_AGE_SECONDS // 60) -> int:
     print(f"== {name}@{realm}")
-    plan = steps(name, realm, cache_dir, refresh, offline, full, quick)
+    plan = steps(name, realm, cache_dir, refresh, offline, full, quick, max_age_minutes)
     progress.start(sum(step_units(label, full) for label, _, _ in plan), f"Starting {name} ({realm})")
     for label, entry, argv in plan:
         print(f"-- {label}")
         progress.note(STEP_TEXT.get(label, label))
         code = entry(argv)  # type: ignore[operator]
         if code != 0:
-            print(f"Stopped at step '{label}' (exit code {code}). Run the same command again to continue.")
-            return False
+            if code == 3:
+                print("Character not found: the armory returned its verified not-found response.")
+            elif code == 4:
+                print("Stopped: access block, rate limit, or request budget exhaustion; pause before retrying.")
+            else:
+                print(f"Stopped at step '{label}' (exit code {code}). Run the same command again to continue.")
+            return code
         if label not in ("achievements", "statistics"):
             progress.advance(f"{STEP_TEXT.get(label, label)}: done", step_units(label, full))
-    return True
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -101,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.html_output and len(targets) != 1:
         parser.error("--html-output works with one character")
     for name, realm in targets:
-        if not run_character(name, realm, args.cache_dir, args.refresh, args.offline, args.full, args.quick):
+        if run_character(name, realm, args.cache_dir, args.refresh, args.offline, args.full, args.quick) != 0:
             return 1
         if args.html_output:
             suffix = "-quick" if args.quick else ""
