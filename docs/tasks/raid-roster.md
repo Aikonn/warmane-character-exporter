@@ -53,7 +53,7 @@ Columns:
 10. Armory: link to https://armory.warmane.com/character/NAME/REALM/summary
 11. Data age (cached at, or "fresh")
 
-- Rows sorted by class, then GearScore descending.
+- Rows sorted by name (owner).
 - Rows with status "not found" or "not run" keep the name and armory link, other cells empty.
 - Header line: realm, run time, number of characters, how many came from cache.
 - Professions are not shown (owner).
