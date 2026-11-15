@@ -9,3 +9,4 @@
 - Current state, access rules and backlog: `docs/handoff.md`; dated history: `docs/development-status.md`.
 - Commit under the session's default git identity (`Claude <noreply@anthropic.com>`). Don't set `user.name`/`user.email` or `--author` to Aikonn: the session signing key only verifies for the Claude identity, so Aikonn-authored commits show as Unverified on GitHub.
 - When a commit records an owner decision or a goal update, add `Co-Authored-By: Aikonn <46801295+Aikonn@users.noreply.github.com>` to the message so GitHub shows "Aikonn and Claude" (still Verified, since Claude stays the committer). Other commits: Claude only.
+- Copilot commits and pushes finished tasks straight to `main` (`.github/copilot-instructions.md`, Roles section). If we ever move to feature branches or PRs, update that rule and the hygiene line there too.

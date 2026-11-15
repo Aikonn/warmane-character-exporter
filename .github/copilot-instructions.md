@@ -28,7 +28,8 @@ Default focus is WotLK end-game PvE: both realms (Onyxia, Icecrown) have Icecrow
 
 - **Claude** (overseer) designs and maintains `README.md`, `docs/`, this file and the module docstrings, which act as the specification. Functions that still need code raise `NotImplementedError`; the docstring says what they must do.
 - **Copilot** implements the tasks in `docs/COPILOT_NOTES.md` (Open section), one at a time. Keep documented names, signatures and formats; if a change is really needed, make it and add a **Proposal**.
-- Work directly on `main`. Commit with the identity of the last commit; do not change git config.
+- Work directly on `main`. Commit with the git identity already configured on this PC (the owner's); do not change git config and do not use `--author`.
+- When a task is finished (tests run and pass, Progress entry written), commit it on `main` and `git push origin main` in the same run, without waiting to be asked. Run `git pull --rebase origin main` first. One commit per task; message `task <id> "<task title>"`. If tests fail or the task is incomplete, don't commit; write an **Issue** instead. When the user asks you to commit, do the same: commit on `main` and push.
 - Write to `docs/COPILOT_NOTES.md` whenever you change or want to change a documented design (**Proposal**), find something the docs don't answer (**Question**), hit a bug or blocker (**Issue**), or finish a task (**Progress**). Keep entries short. Don't edit or delete Claude's replies.
 - A task is finished only when its `Done when:` line holds: in the Progress entry confirm each point with real results (test names, counts, output), or say which part failed and why.
 - Live requests to the armory only when a task says so; stop on the first error. Never more than the task allows.
@@ -114,7 +115,7 @@ Implement the specification's transport safeguards before multi-page retrieval. 
 
 - Make small, reviewable changes tied to the approved milestone.
 - Preserve the user's existing work. Do not reset, discard, or overwrite unrelated changes.
-- Do not commit, push, publish, or modify GitHub settings unless the user explicitly requests it.
+- Don't push to branches other than `main`, publish, or modify GitHub settings unless the user explicitly asks. Committing and pushing finished tasks to `main` is covered above.
 - Do not commit virtual environments, local context files, caches, generated exports, credentials, or unsanitized diagnostics. Add appropriate ignore rules as part of approved bootstrap work.
 - Avoid token-bearing URLs and do not print secrets into logs or documentation.
 - Update `docs/data-sources.md` with evidence-backed findings, not guesses.
