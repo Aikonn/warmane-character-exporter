@@ -25,7 +25,38 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-(none)
+Do the two tasks in order: C, then D. Commit and report each separately. D starts only after Claude has read the C measurements.
+
+### 2026-11-16 · Task · C: Roster run timing (measure only)
+Module: src/warmane_exporter/roster.py, run.py, snapshot.py, export.py
+
+Owner: roster runs are slow even when every character comes from the cache. Measure where the time goes before changing anything.
+
+1. Add timing that is off by default and on with `--timing` on `roster` (or env var `WARMANE_TIMING=1`). For each character log the duration of: definition loading (client data, client-export.json, items.db), cache lookup / network fetch, snapshot build and save, export (JSON, Markdown, PvE HTML), copy to the output folder. Also log total per character and total run, plus summary rendering. Write the lines to stderr and to `.warmane-cache/timing-<YYYYMMDD-HHMM>.log`. No behaviour change when timing is off.
+2. Owner runs on the PC, same names both times (about 10 characters on one realm):
+   - Run 1: launcher or CLI with "Refresh all" (`--refresh`).
+   - Run 2: a few minutes later, normal run (everything should come from the cache).
+3. In the Progress entry, paste a short table per run: average and max per step, total run time, and say which step dominates in run 2.
+
+Done when: points 1-3 hold; `python -m unittest discover -s tests` passes (report counts), with a test that timing off produces no timing output; both runs measured on the PC and the table is in the Progress entry. Do not optimise anything in this task.
+
+### 2026-11-16 · Task · D: Roster: skip unchanged reports with a fingerprint
+Module: src/warmane_exporter/roster.py, export.py, pve_report.py (fingerprint field only), tests
+
+Owner decision (2026-11-16): a report built from the same cached armory data by the same tool version must not be rebuilt.
+
+1. Tool version: a SHA-256 over the contents of `src/warmane_exporter/*.py`, `library/definitions/client-export.json`, `library/acore/items.db` and the config file if present (client path). Computed once per roster run. No git needed (testers update from a ZIP).
+2. Fingerprint per character: SHA-256 of the tool version plus the cached response bodies of the three snapshot sources (JSON summary, HTML summary, talents), in a fixed order. Read the bodies straight from the response cache; no network, no definition loading.
+3. The quick export writes the fingerprint into its JSON (`fingerprint` field) and into the PvE HTML head as `<meta name="warmane-fingerprint" content="...">`. Single-character reports get it too (harmless, no visible change).
+4. Roster per character, before `run_character`: if `--refresh` is off, all three cache entries are younger than max age, and the exports JSON exists with the same fingerprint:
+   - output folder already has `<stem>-pve.html` with the same fingerprint: do nothing, build the row from the exports JSON;
+   - otherwise copy the exports HTML (if its fingerprint matches) and build the row;
+   - any mismatch or missing file: normal path (`run_character`) as today.
+   Skipped rows still count as "from cache" and keep the original snapshot time in Data age.
+5. Progress line for skipped characters, for example "Character 3 of 10: Name (unchanged, skipped)". The overall percent still advances by the full 4 units.
+6. Update `docs/tasks/raid-roster.md` (Fetching, Output) and the `run_roster` docstring.
+
+Done when: points 1-6 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: same inputs give the same fingerprint; any change in a cached body or in the tool version changes it; skip path makes no `run_character` call and no file write in the output folder; copy path when only the output file is missing or stale; `--refresh` never skips; a skipped row matches the row the normal path builds. On the PC: repeat run 2 of task C with `--timing` and report the new total next to the old one.
 
 ## Resolved
 
