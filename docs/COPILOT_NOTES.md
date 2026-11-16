@@ -25,7 +25,17 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-(none)
+### 2026-11-16 · Task · Roster summary: all issues listed, colored counts
+Module: src/warmane_exporter/roster.py, tests/test_roster.py
+
+Owner wants to see how the summary looks with every issue listed, and counts that stand out.
+
+1. `RosterRow.first_issue` becomes `issue_texts: list[str]` (all issue texts in `run_checks` order). Update `build_row`, docstrings and tests.
+2. Column "First issue" becomes "Issues list": OK rows show the issues as a compact list (`<ul class="issues">`, font-size about .8em, small margins and padding, one issue per line); empty when none. Non-OK rows keep the gray italic status note in this column. All texts HTML-escaped as today.
+3. Issues count: non-zero in red; Warnings count: non-zero in orange; a count of 4 or more also bold. Zero stays plain. Use CSS classes (for example `count-issue`, `count-warn`, `count-high`), no inline styles.
+4. Update `docs/tasks/raid-roster.md` (Summary page columns) to match.
+
+Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: all issues listed in order; escaping inside the list; classes for 0, 1-3 and 4+ issues and warnings; non-OK row still shows the status note. No live requests: the owner judges the look on his next roster run.
 
 ## Resolved
 
