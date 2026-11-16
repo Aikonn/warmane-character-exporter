@@ -25,6 +25,11 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-16 · Issue · Owner-PC updater acceptance pending
+Module: src/warmane_exporter/updater.py, Start-Report.ps1
+
+Implementation, 12 focused updater tests, the 278-test offline suite, and the PowerShell parser check pass. The PC acceptance remains unverified: check the Git-clone status and disabled Update now in Settings, then check an older Download ZIP copy for the expected update file list; the owner tests Update now with his brother.
+
 ### 2026-11-16 · Task · Update from GitHub: updater module and Settings window
 Module: src/warmane_exporter/updater.py, Start-Report.ps1, README.md
 

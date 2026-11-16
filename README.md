@@ -43,6 +43,10 @@ python -m warmane_exporter.roster --realm Onyxia --names Aikka,Bezduse --output-
 - Output: `.warmane-cache/exports/<name>-<realm>.json` and `.md`.
 - A PvE export costs about 28 requests per character, a quick report 3, `--full` about 90.
 
+## Updating
+
+Open **Settings > Check for updates**, then choose **Update now** when an update is available. The updater is available in Download ZIP copies; it preserves reports, cache, settings and portable Python. To update manually, download the ZIP again and extract it over the existing folder. In a Git clone, use `git pull`.
+
 ## Responsible access
 
 - Plain HTTP with a fixed browser-like User-Agent; no rotation, no evasion.

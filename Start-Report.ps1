@@ -118,6 +118,185 @@ function Install-Python {
     }
 }
 
+function Invoke-Updater([string]$command) {
+    $stdoutPath = Join-Path $root (".tools\tmp\updater-{0}.out" -f [guid]::NewGuid().ToString("N"))
+    $stderrPath = Join-Path $root (".tools\tmp\updater-{0}.err" -f [guid]::NewGuid().ToString("N"))
+    $savedTemp = $env:TEMP
+    $savedTmp = $env:TMP
+    $savedPath = $env:PYTHONPATH
+    $savedEncoding = $env:PYTHONIOENCODING
+    try {
+        $env:TEMP = Join-Path $root ".tools\tmp"
+        $env:TMP = $env:TEMP
+        $env:PYTHONPATH = Join-Path $root "src"
+        $env:PYTHONIOENCODING = "utf-8"
+        $process = Start-Process -FilePath $python -ArgumentList "-m warmane_exporter.updater $command" `
+            -WorkingDirectory $root -WindowStyle Hidden -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath -PassThru
+        while (-not $process.HasExited) {
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds 100
+        }
+        $process.WaitForExit()
+        $stdout = if (Test-Path $stdoutPath) { [System.IO.File]::ReadAllText($stdoutPath, [System.Text.Encoding]::UTF8) } else { "" }
+        $stderr = if (Test-Path $stderrPath) { [System.IO.File]::ReadAllText($stderrPath, [System.Text.Encoding]::UTF8) } else { "" }
+        return [pscustomobject]@{ ExitCode = [int]$process.ExitCode; Stdout = $stdout.Trim(); Stderr = $stderr.Trim() }
+    } catch {
+        return [pscustomobject]@{ ExitCode = 1; Stdout = ""; Stderr = $_.Exception.Message }
+    } finally {
+        $env:TEMP = $savedTemp
+        $env:TMP = $savedTmp
+        $env:PYTHONPATH = $savedPath
+        $env:PYTHONIOENCODING = $savedEncoding
+        foreach ($path in $stdoutPath, $stderrPath) {
+            if (Test-Path $path) { Remove-Item -LiteralPath $path -Force }
+        }
+    }
+}
+
+function Show-Settings([System.Windows.Forms.IWin32Window]$owner) {
+    $settings = New-Object System.Windows.Forms.Form
+    $settings.Text = "Settings"
+    $settings.StartPosition = "CenterParent"
+    $settings.FormBorderStyle = "FixedDialog"
+    $settings.MaximizeBox = $false
+    $settings.MinimizeBox = $false
+    $settings.ClientSize = New-Object System.Drawing.Size(480, 230)
+    $settings.Font = $owner.Font
+
+    $updates = New-Object System.Windows.Forms.GroupBox
+    $updates.Text = "Updates"
+    $updates.Location = New-Object System.Drawing.Point(12, 10)
+    $updates.Size = New-Object System.Drawing.Size(456, 170)
+    $status = New-Object System.Windows.Forms.Label
+    $status.Text = "Not checked yet. Checking contacts github.com."
+    $status.Location = New-Object System.Drawing.Point(14, 26)
+    $status.Size = New-Object System.Drawing.Size(428, 34)
+    $latest = New-Object System.Windows.Forms.Label
+    $latest.Text = "Latest: -"
+    $latest.Location = New-Object System.Drawing.Point(14, 62)
+    $latest.Size = New-Object System.Drawing.Size(428, 34)
+    $tooltip = New-Object System.Windows.Forms.ToolTip
+    $checkButton = New-Object System.Windows.Forms.Button
+    $checkButton.Text = "Check for updates"
+    $checkButton.Location = New-Object System.Drawing.Point(14, 102)
+    $checkButton.Size = New-Object System.Drawing.Size(148, 28)
+    $updateButton = New-Object System.Windows.Forms.Button
+    $updateButton.Text = "Update now"
+    $updateButton.Location = New-Object System.Drawing.Point(174, 102)
+    $updateButton.Size = New-Object System.Drawing.Size(110, 28)
+    $updateButton.Enabled = $false
+    $manual = New-Object System.Windows.Forms.LinkLabel
+    $manual.Text = "Manual update: github.com/Aikonn/warmane-character-exporter"
+    $manual.Location = New-Object System.Drawing.Point(14, 140)
+    $manual.Size = New-Object System.Drawing.Size(428, 20)
+    $manual.Add_LinkClicked({
+        Start-Process -FilePath "https://github.com/Aikonn/warmane-character-exporter"
+    }.GetNewClosure())
+    $updates.Controls.AddRange(@($status, $latest, $checkButton, $updateButton, $manual))
+
+    $close = New-Object System.Windows.Forms.Button
+    $close.Text = "Close"
+    $close.Size = New-Object System.Drawing.Size(90, 28)
+    $close.Location = New-Object System.Drawing.Point(378, 190)
+    $close.DialogResult = "Cancel"
+    $settings.CancelButton = $close
+    $settings.Controls.AddRange(@($updates, $close))
+
+    $state = @{ Check = $null }
+    $checkButton.Add_Click({
+        $status.Text = "Checking..."
+        $status.ForeColor = [System.Drawing.SystemColors]::ControlText
+        $latest.Text = "Latest: -"
+        $tooltip.SetToolTip($status, "")
+        $checkButton.Enabled = $false
+        $updateButton.Enabled = $false
+        $run = Invoke-Updater "check"
+        $result = $null
+        try {
+            $result = ConvertFrom-Json -InputObject $run.Stdout -ErrorAction Stop
+        } catch {
+            $lastError = @($run.Stderr -split "`r?`n" | Where-Object { $_.Trim() })
+            $status.Text = "Check failed. " + $(if ($lastError.Count -gt 0) { $lastError[-1] } else { "The updater returned invalid JSON." })
+            $status.ForeColor = [System.Drawing.Color]::DarkRed
+            $state.Check = $null
+            $checkButton.Enabled = $true
+            return
+        }
+        $state.Check = $result
+        if ($result.latest) {
+            try {
+                $date = [DateTimeOffset]::Parse([string]$result.latest.date).ToLocalTime().ToString("yyyy-MM-dd HH:mm")
+                $latest.Text = 'Latest: {0} "{1}"' -f $date, $result.latest.message
+            } catch {
+                $latest.Text = 'Latest: "{0}"' -f $result.latest.message
+            }
+        }
+        switch ([string]$result.status) {
+            "up_to_date" { $status.Text = "Up to date." }
+            "update_available" {
+                $status.Text = "Update available: " + $result.message
+                $paths = @($result.changed) + @($result.missing) + @($result.stale)
+                $paths = @($paths | Where-Object { $_ })
+                $shown = @($paths | Select-Object -First 20)
+                $more = $paths.Count - $shown.Count
+                if ($more -gt 0) { $shown += "and $more more" }
+                if ($shown.Count -gt 0) { $tooltip.SetToolTip($status, ($shown -join "`r`n")) }
+                $updateButton.Enabled = $true
+            }
+            "git_clone" {
+                $status.Text = [string]$result.message
+                if ($result.behind) { $status.Text += " (behind GitHub)" }
+            }
+            "error" {
+                $status.Text = [string]$result.message
+                $status.ForeColor = [System.Drawing.Color]::DarkRed
+            }
+            default {
+                $status.Text = "Check failed. The updater returned an unexpected result."
+                $status.ForeColor = [System.Drawing.Color]::DarkRed
+                $state.Check = $null
+            }
+        }
+        $checkButton.Enabled = $true
+    }.GetNewClosure())
+    $updateButton.Add_Click({
+        if (-not $state.Check -or $state.Check.status -ne "update_available") { return }
+        $answer = [System.Windows.Forms.MessageBox]::Show(
+            "Download the latest version (about 4 MB) from GitHub and replace the program files? Reports, cache and Python stay.",
+            "Warmane Character Exporter", "YesNo", "Question"
+        )
+        if ($answer -ne "Yes") { return }
+        $status.Text = "Updating..."
+        $status.ForeColor = [System.Drawing.SystemColors]::ControlText
+        $checkButton.Enabled = $false
+        $updateButton.Enabled = $false
+        $run = Invoke-Updater "apply"
+        $result = $null
+        try {
+            $result = ConvertFrom-Json -InputObject $run.Stdout -ErrorAction Stop
+        } catch {
+            $lastError = @($run.Stderr -split "`r?`n" | Where-Object { $_.Trim() })
+            $status.Text = "Update failed. " + $(if ($lastError.Count -gt 0) { $lastError[-1] } else { "The updater returned invalid JSON." })
+            $status.ForeColor = [System.Drawing.Color]::DarkRed
+            $checkButton.Enabled = $true
+            $updateButton.Enabled = $true
+            return
+        }
+        if ($run.ExitCode -eq 0 -and $result.status -eq "updated") {
+            Show-Message "Updated. The launcher will now restart." "Warmane Character Exporter"
+            $launcher = Join-Path $root "Start-Report.vbs"
+            Start-Process -FilePath "wscript.exe" -ArgumentList ('//nologo "{0}"' -f $launcher)
+            exit 0
+        }
+        $status.Text = [string]$result.message
+        $status.ForeColor = if ($result.status -eq "error") { [System.Drawing.Color]::DarkRed } else { [System.Drawing.SystemColors]::ControlText }
+        $checkButton.Enabled = $true
+        $updateButton.Enabled = ($state.Check -and $state.Check.status -eq "update_available")
+    }.GetNewClosure())
+    [void]$settings.ShowDialog($owner)
+}
+
 function Read-Link {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "Warmane Character Exporter"
@@ -166,6 +345,16 @@ function Read-Link {
     $ok.Size = New-Object System.Drawing.Size(110, 28)
     $ok.Location = New-Object System.Drawing.Point(288, 190)
     $ok.DialogResult = "OK"
+    $settingsButton = New-Object System.Windows.Forms.Button
+    $settingsButton.Text = ([char]0x2699).ToString() + " Settings"
+    $settingsButton.FlatStyle = "Flat"
+    $settingsButton.FlatAppearance.BorderSize = 0
+    $settingsButton.ForeColor = [System.Drawing.SystemColors]::GrayText
+    $settingsButton.Size = New-Object System.Drawing.Size(100, 28)
+    $settingsButton.Location = New-Object System.Drawing.Point(12, 190)
+    $settingsButton.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $settingsButton.Font = $form.Font
+    $settingsButton.Add_Click({ Show-Settings $form }.GetNewClosure())
     $cancel = New-Object System.Windows.Forms.Button
     $cancel.Text = "Cancel"
     $cancel.Size = New-Object System.Drawing.Size(100, 28)
@@ -173,7 +362,7 @@ function Read-Link {
     $cancel.DialogResult = "Cancel"
     $form.AcceptButton = $ok
     $form.CancelButton = $cancel
-    $form.Controls.AddRange(@($label, $box, $hint, $quickButton, $fullButton, $rosterButton, $ok, $cancel))
+    $form.Controls.AddRange(@($label, $box, $hint, $quickButton, $fullButton, $rosterButton, $settingsButton, $ok, $cancel))
     while ($true) {
         $form.TopMost = $true      # appears in front once; the user can still put other windows over it
         $form.Add_Shown({ $form.Activate(); $form.TopMost = $false })
