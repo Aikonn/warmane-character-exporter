@@ -28,7 +28,7 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 ### 2026-11-16 · Issue · Owner-PC updater acceptance pending
 Module: src/warmane_exporter/updater.py, Start-Report.ps1
 
-Implementation, 12 focused updater tests, the 278-test offline suite, and the PowerShell parser check pass. Owner-PC checks confirm a Git clone shows the clone message with Update now disabled, and a fresh ZIP shows "Up to date" rather than "git_clone". Older ZIPs predate the updater and cannot check for updates. This notes-only commit should make the existing fresh ZIP report this notes file as changed; verify that result and test Update now with the brother.
+Implementation, 12 focused updater tests, the 278-test offline suite, and the PowerShell parser check pass. Owner-PC checks confirm a Git clone shows the clone message with Update now disabled, and a fresh ZIP shows "Up to date" rather than "git_clone". Older ZIPs predate the updater and cannot check for updates. A PC Update now run found one changed file, but the restart raised `ExitException`: `exit 0` ran inside a WinForms click callback. The callback now closes both dialogs and defers restart/exit to the top level. Re-test Update now; the owner tests with his brother.
 
 ### 2026-11-16 · Task · Update from GitHub: updater module and Settings window
 Module: src/warmane_exporter/updater.py, Start-Report.ps1, README.md

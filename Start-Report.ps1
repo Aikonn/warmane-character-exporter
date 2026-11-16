@@ -154,7 +154,7 @@ function Invoke-Updater([string]$command) {
     }
 }
 
-function Show-Settings([System.Windows.Forms.IWin32Window]$owner) {
+function Show-Settings([System.Windows.Forms.Form]$owner) {
     $settings = New-Object System.Windows.Forms.Form
     $settings.Text = "Settings"
     $settings.StartPosition = "CenterParent"
@@ -285,9 +285,10 @@ function Show-Settings([System.Windows.Forms.IWin32Window]$owner) {
         }
         if ($run.ExitCode -eq 0 -and $result.status -eq "updated") {
             Show-Message "Updated. The launcher will now restart." "Warmane Character Exporter"
-            $launcher = Join-Path $root "Start-Report.vbs"
-            Start-Process -FilePath "wscript.exe" -ArgumentList ('//nologo "{0}"' -f $launcher)
-            exit 0
+            $script:restartLauncher = $true
+            $settings.Close()
+            $owner.Close()
+            return
         }
         $status.Text = [string]$result.message
         $status.ForeColor = if ($result.status -eq "error") { [System.Drawing.Color]::DarkRed } else { [System.Drawing.SystemColors]::ControlText }
@@ -580,8 +581,15 @@ if (-not $python) {
 }
 
 $script:RosterMode = $false
+$script:restartLauncher = $false
 if (-not $Link) {
     $Link = Read-Link
+    # Exit outside the WinForms callback; exit from its event handler raises ExitException.
+    if ($script:restartLauncher) {
+        $launcher = Join-Path $root "Start-Report.vbs"
+        Start-Process -FilePath "wscript.exe" -ArgumentList ('//nologo "{0}"' -f $launcher)
+        exit 0
+    }
     if (-not $script:RosterMode -and -not $Link) { exit 0 }
 }
 if (-not $script:RosterMode) {
