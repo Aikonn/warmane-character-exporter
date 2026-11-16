@@ -1,14 +1,21 @@
+import io
 import json
 import tempfile
+import time
 import unittest
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
 from contextlib import redirect_stderr, redirect_stdout
-import io
 
 from warmane_exporter.pve_report import build_pve_report, render_html as render_pve_html
+from warmane_exporter.cache import ResponseCache
 from warmane_exporter import progress
+from warmane_exporter.fingerprint import (
+    fingerprint_for_bodies,
+    response_cache_keys,
+    tool_version_hash,
+)
 from warmane_exporter.roster import (
     FAILED,
     NOT_FOUND,
@@ -194,6 +201,15 @@ class SummaryRenderingTests(unittest.TestCase):
         self.assertIn(".status{color:#666;font-style:italic}", html)
         self.assertIn('<a href="https://armory.warmane.com/character/Absent/Onyxia/summary">Armory</a>', not_found_html)
 
+    def test_pve_report_exposes_fingerprint_in_html_head(self):
+        report = build_pve_report({"identity": {"name": "X", "realm": "Onyxia"}})
+        fingerprint = "a" * 64
+        report["report"]["fingerprint"] = fingerprint
+
+        html = render_pve_html(report)
+
+        self.assertIn(f'<meta name="warmane-fingerprint" content="{fingerprint}">', html)
+
     def test_data_age_format_is_zero_padded_for_cached_and_fresh_rows(self):
         rows = [
             RosterRow(name="Cached", realm="Onyxia", status=OK, data_time=1234567890, from_cache=True),
@@ -326,8 +342,13 @@ class RosterRunTests(unittest.TestCase):
         self.fixture = json.loads(
             (FIXTURES / "synthetic" / "roster-report-synthetic.json").read_text(encoding="utf-8")
         )
+        self.definition_loader_patch = mock.patch(
+            "warmane_exporter.snapshot.load_definition_sources", return_value=(None, None),
+        )
+        self.definition_loader = self.definition_loader_patch.start()
 
     def tearDown(self):
+        self.definition_loader_patch.stop()
         self.temp.cleanup()
 
     def seed_success(self, name):
@@ -351,12 +372,37 @@ class RosterRunTests(unittest.TestCase):
             json.dumps(snapshot), encoding="utf-8"
         )
 
+    def seed_fingerprinted_success(self, name):
+        version = tool_version_hash()
+        bodies = ("json body", "html body", "talents body")
+        fingerprint = fingerprint_for_bodies(version, *bodies)
+        cache = ResponseCache(self.cache / "responses.sqlite")
+        try:
+            now = time.time()
+            for key, body in zip(response_cache_keys(name, "Onyxia"), bodies, strict=True):
+                cache.put(key, key.split("|", 1)[0], body, now)
+        finally:
+            cache.close()
+
+        self.seed_success(name)
+        stem = f"{name.lower()}-onyxia-quick"
+        report_path = self.cache / "exports" / f"{stem}.json"
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        report["fingerprint"] = fingerprint
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        html_path = self.cache / "exports" / f"{stem}-pve.html"
+        html_path.write_text(
+            f'<html><head><meta name="warmane-fingerprint" content="{fingerprint}"></head>{name}</html>',
+            encoding="utf-8",
+        )
+        return fingerprint
+
     def test_continues_after_not_found_and_failed_character(self):
         self.seed_success("Alice")
         self.seed_success("Bob")
 
         def fake_run(name, realm, cache_dir, refresh, offline, full=False, quick=False,
-                     max_age_minutes=15, start_progress=True):
+                     max_age_minutes=15, start_progress=True, **kwargs):
             self.assertEqual(max_age_minutes, 120)
             self.assertFalse(start_progress)
             return {"Alice": 0, "Missing": 3, "Broken": 1, "Bob": 0}[name]
@@ -381,7 +427,7 @@ class RosterRunTests(unittest.TestCase):
         self.seed_success("Bob")
 
         def fake_run(name, realm, cache_dir, refresh, offline, full=False, quick=False,
-                     max_age_minutes=15, start_progress=True):
+                     max_age_minutes=15, start_progress=True, **kwargs):
             self.assertFalse(start_progress)
             progress.advance(f"{name} snapshot", 3)
             progress.advance(f"{name} export")
@@ -522,6 +568,95 @@ class RosterRunTests(unittest.TestCase):
         self.assertEqual(rows[0].status, OK)
         self.assertTrue((output / "alice-onyxia-quick-pve.html").exists())
         self.assertTrue(summary.exists())
+
+    def test_unchanged_output_skips_run_and_preserves_report_file(self):
+        fingerprint = self.seed_fingerprinted_success("Alice")
+        self.output.mkdir()
+        target = self.output / "alice-onyxia-quick-pve.html"
+        target.write_text(
+            f'<html><head><meta name="warmane-fingerprint" content="{fingerprint}"></head>keep</html>',
+            encoding="utf-8",
+        )
+        before = (target.read_bytes(), target.stat().st_mtime_ns)
+        report = json.loads((self.cache / "exports" / "alice-onyxia-quick.json").read_text(encoding="utf-8"))
+        expected_row = build_row(report, target.name, from_cache=True)
+
+        with (
+            mock.patch.dict("os.environ", {"WARMANE_PROGRESS": "1"}),
+            mock.patch("warmane_exporter.run.run_character") as runner,
+            redirect_stdout(io.StringIO()) as progress_output,
+        ):
+            rows, summary = run_roster(
+                ["Alice"], "Onyxia", self.output, str(self.cache), False, 120,
+            )
+
+        runner.assert_not_called()
+        self.definition_loader.assert_not_called()
+        self.assertEqual(rows, [expected_row])
+        self.assertTrue(rows[0].from_cache)
+        self.assertEqual((target.read_bytes(), target.stat().st_mtime_ns), before)
+        self.assertIn("Character 1 of 1: Alice (unchanged, skipped)", progress_output.getvalue())
+        self.assertIn("PROGRESS|100|Alice: unchanged, skipped", progress_output.getvalue())
+        self.assertTrue(summary.exists())
+
+    def test_missing_or_stale_output_is_copied_from_matching_export(self):
+        self.seed_fingerprinted_success("Alice")
+        self.output.mkdir()
+        target = self.output / "alice-onyxia-quick-pve.html"
+        source = self.cache / "exports" / target.name
+        source_text = source.read_text(encoding="utf-8")
+
+        for stale in (False, True):
+            with self.subTest(stale=stale):
+                if stale:
+                    target.write_text(
+                        '<meta name="warmane-fingerprint" content="' + "0" * 64 + '">',
+                        encoding="utf-8",
+                    )
+                elif target.exists():
+                    target.unlink()
+                with mock.patch("warmane_exporter.run.run_character") as runner:
+                    rows, _ = run_roster(
+                        ["Alice"], "Onyxia", self.output, str(self.cache), False, 120,
+                    )
+                runner.assert_not_called()
+                self.assertEqual(target.read_text(encoding="utf-8"), source_text)
+                self.assertEqual(rows[0].status, OK)
+
+    def test_refresh_never_skips_a_matching_fingerprint(self):
+        self.seed_fingerprinted_success("Alice")
+        with mock.patch("warmane_exporter.run.run_character", return_value=1) as runner:
+            rows, _ = run_roster(
+                ["Alice"], "Onyxia", self.output, str(self.cache), True, 120,
+            )
+        runner.assert_called_once()
+        self.assertTrue(runner.call_args.args[3])
+        self.assertEqual(rows[0].status, FAILED)
+
+    def test_roster_loads_shared_definitions_once_for_normal_runs(self):
+        self.seed_success("Alice")
+        self.seed_success("Bob")
+        definitions = object()
+        client_context = object()
+        self.definition_loader.return_value = (definitions, client_context)
+        with (
+            mock.patch("warmane_exporter.roster.tool_version_hash", return_value="tool-hash") as version_hash,
+            mock.patch("warmane_exporter.snapshot.close_definition_sources") as close,
+            mock.patch("warmane_exporter.run.run_character", return_value=1) as runner,
+        ):
+            run_roster(["Alice", "Bob"], "Onyxia", self.output, str(self.cache), False, 120)
+
+        version_hash.assert_called_once_with()
+        self.definition_loader.assert_called_once_with()
+        close.assert_called_once_with(definitions, client_context)
+        self.assertEqual(runner.call_count, 2)
+        self.assertTrue(all(call.kwargs["definitions_preloaded"] for call in runner.call_args_list))
+        self.assertTrue(all(call.kwargs["defs"] is definitions for call in runner.call_args_list))
+        self.assertEqual(
+            len({call.kwargs["tool_version"] for call in runner.call_args_list}),
+            1,
+        )
+        self.assertEqual(runner.call_args.kwargs["tool_version"], "tool-hash")
 
 
 if __name__ == "__main__":

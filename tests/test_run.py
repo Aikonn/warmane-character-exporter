@@ -29,6 +29,29 @@ class RunTests(unittest.TestCase):
         self.assertEqual(snapshot_step[0], "snapshot")
         self.assertEqual(snapshot_step[2][-2:], ["--max-age-minutes", "120"])
 
+    def test_preloaded_definitions_and_tool_version_reach_their_steps(self):
+        definitions = object()
+        calls = {}
+
+        def snapshot_step(argv, **kwargs):
+            calls["snapshot"] = kwargs
+            return 0
+
+        def export_step(argv, **kwargs):
+            calls["export"] = kwargs
+            return 0
+
+        plan = [("snapshot", snapshot_step, []), ("export", export_step, [])]
+        with mock.patch.object(run, "steps", return_value=plan):
+            code = run.run_character(
+                "A", "Onyxia", "cache", False, False, quick=True,
+                defs=definitions, definitions_preloaded=True, tool_version="tool-hash",
+            )
+
+        self.assertEqual(code, 0)
+        self.assertIs(calls["snapshot"]["preloaded_defs"], definitions)
+        self.assertEqual(calls["export"], {"tool_version": "tool-hash", "fingerprint": None})
+
     def test_link_runs_one_character_and_copies_html(self):
         import tempfile
         from pathlib import Path

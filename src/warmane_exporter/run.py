@@ -17,6 +17,7 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
+from typing import Any
 
 from . import collect, discover, export, progress, snapshot
 from .fetch import CHARACTER_MAX_AGE_SECONDS
@@ -64,7 +65,11 @@ def step_units(label: str, full: bool = False) -> int:
 def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline: bool, full: bool = False,
                   quick: bool = False,
                   max_age_minutes: int = CHARACTER_MAX_AGE_SECONDS // 60,
-                  start_progress: bool = True) -> int:
+                  start_progress: bool = True,
+                  defs: Any = None,
+                  definitions_preloaded: bool = False,
+                  tool_version: str | None = None,
+                  fingerprint: str | None = None) -> int:
     print(f"== {name}@{realm}")
     plan = steps(name, realm, cache_dir, refresh, offline, full, quick, max_age_minutes)
     if start_progress:
@@ -72,7 +77,12 @@ def run_character(name: str, realm: str, cache_dir: str, refresh: bool, offline:
     for label, entry, argv in plan:
         print(f"-- {label}")
         progress.note(STEP_TEXT.get(label, label))
-        code = entry(argv)  # type: ignore[operator]
+        if label == "snapshot" and definitions_preloaded:
+            code = entry(argv, preloaded_defs=defs)  # type: ignore[operator]
+        elif label == "export" and (tool_version is not None or fingerprint is not None):
+            code = entry(argv, tool_version=tool_version, fingerprint=fingerprint)  # type: ignore[operator]
+        else:
+            code = entry(argv)  # type: ignore[operator]
         if code != 0:
             if code == 3:
                 print("Character not found: the armory returned its verified not-found response.")

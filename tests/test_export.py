@@ -6,7 +6,9 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from test_report import SNAP
+from warmane_exporter.cache import ResponseCache
 from warmane_exporter.export import build_full_report, main, render_full_markdown
+from warmane_exporter.fingerprint import fingerprint_for_bodies, response_cache_keys
 from warmane_exporter.timing import TimingLog, activate
 
 FIX = Path(__file__).parent / "fixtures" / "real"
@@ -46,6 +48,39 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(code, 0)
         for label in ("export JSON", "export Markdown", "export PvE HTML"):
             self.assertIn(f"X@Onyxia | {label}", timing_log.totals)
+
+    def test_quick_export_stores_fingerprint_in_json_and_html(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_dir = Path(tmp) / "cache"
+            snapshots = cache_dir / "snapshots"
+            snapshots.mkdir(parents=True)
+            (snapshots / "x-onyxia-123.json").write_text(json.dumps(SNAP), encoding="utf-8")
+            bodies = ("json response", "summary response", "talents response")
+            response_cache = ResponseCache(cache_dir / "responses.sqlite")
+            try:
+                for key, body in zip(response_cache_keys("X", "Onyxia"), bodies, strict=True):
+                    response_cache.put(key, key.split("|", 1)[0], body, 1.0)
+            finally:
+                response_cache.close()
+
+            with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
+                code = main(
+                    ["X", "Onyxia", "--cache-dir", str(cache_dir), "--quick"],
+                    tool_version="tool-v1",
+                )
+
+            fingerprint = fingerprint_for_bodies("tool-v1", *bodies)
+            report_path = cache_dir / "exports" / "x-onyxia-quick.json"
+            html_path = cache_dir / "exports" / "x-onyxia-quick-pve.html"
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            html = html_path.read_text(encoding="utf-8")
+
+        self.assertEqual(code, 0)
+        self.assertEqual(report["fingerprint"], fingerprint)
+        self.assertIn(
+            f'<meta name="warmane-fingerprint" content="{fingerprint}">',
+            html,
+        )
 
 
 if __name__ == "__main__":

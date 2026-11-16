@@ -69,6 +69,37 @@ class SnapshotTests(unittest.TestCase):
         self.assertIn("Client definitions not applied (no client data).", snap["notes"])
         self.assertGreater(timing_log.totals["Aikka@Onyxia | cache lookup / network fetch"], 0)
 
+    def test_snapshot_output_is_identical_for_equivalent_per_run_and_shared_definitions(self):
+        class EmptyDefinitions:
+            acore = None
+
+            def __getattr__(self, _name):
+                return lambda *_args, **_kwargs: None
+
+        first_cache = ResponseCache(self.root / "per-run.sqlite")
+        second_cache = ResponseCache(self.root / "shared.sqlite")
+        first_client = RoutingClient({
+            "/api/character/Aikka/Onyxia/summary": JSON_BODY,
+            "/character/Aikka/Onyxia/summary": SUMMARY,
+            "/character/Aikka/Onyxia/talents": TALENTS,
+        })
+        second_client = RoutingClient(dict(first_client.bodies))
+        try:
+            per_run = build_snapshot(
+                "Aikka", "Onyxia", first_cache, self.orch, first_client,
+                defs=EmptyDefinitions(), now_fn=lambda: 5000.0,
+            )
+            shared = EmptyDefinitions()
+            roster = build_snapshot(
+                "Aikka", "Onyxia", second_cache, self.orch, second_client,
+                defs=shared, now_fn=lambda: 5000.0,
+            )
+        finally:
+            first_cache.close()
+            second_cache.close()
+
+        self.assertEqual(per_run, roster)
+
     def test_invalid_html_fails_only_that_section_and_is_saved_for_debugging(self) -> None:
         client = RoutingClient({})
         client.bodies = {"/api/character/Aikka/Onyxia/summary": JSON_BODY,

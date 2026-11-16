@@ -467,6 +467,11 @@ def render_html(pve: dict[str, Any]) -> str:
     when = datetime.fromtimestamp(taken, timezone.utc).strftime("%Y-%m-%d %H:%M UTC") if isinstance(taken, (int, float)) else "unknown"
     quick = bool(report.get("quick"))
     title = f"{ident.get('name')} - {ident.get('realm')} - {'Quick PvE report' if quick else 'PvE report'}"
+    fingerprint = report.get("fingerprint")
+    fingerprint_meta = (
+        f'<meta name="warmane-fingerprint" content="{escape(fingerprint, quote=True)}">'
+        if isinstance(fingerprint, str) else ""
+    )
     toc_items = [("checks", "Raid readiness"), ("gear", "Equipment"), ("specs", "Talents and glyphs")]
     if not quick:
         toc_items += [("progress", "WotLK raid progression: boss kills"), ("other", "Other dungeon and raid statistics"),
@@ -474,7 +479,7 @@ def render_html(pve: dict[str, Any]) -> str:
     toc = "".join(f'<li><a href="#{a}">{_e(t)}</a></li>' for a, t in toc_items)
     missing = report.get("missing_sections") or []
     parts = [
-        f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>{_e(title)}</title><style>{CSS}</style></head><body>",
+        f"<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">{fingerprint_meta}<title>{_e(title)}</title><style>{CSS}</style></head><body>",
         f"<h1>{_e(ident.get('name'))} - {_e(ident.get('realm'))}</h1>",
         _armory_link(ident),
         f"<p>Level {_e(ident.get('level'))} {_e(ident.get('race'))} {_e(ident.get('class'))} ({_e(ident.get('faction'))}), "

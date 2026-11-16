@@ -33,6 +33,7 @@ from .warmane_api import api_summary_url, parse_api_summary
 
 SNAPSHOT_SCHEMA = "character-snapshot/0"
 SNAPSHOT_INTERVAL_SECONDS = DEFAULT_INTERVAL_SECONDS
+_NOT_PRELOADED = object()
 
 
 def _validate_summary_html(text: str) -> dict[str, Any]:
@@ -204,7 +205,49 @@ def build_snapshot(
     return result
 
 
-def main(argv: list[str] | None = None) -> int:
+def load_definition_sources(use_client: bool = True) -> tuple[Any, Any]:
+    """Load optional client data and the local definitions, returning the client context for cleanup."""
+    defs_ctx = None
+    client_defs = None
+    if use_client:
+        client_context = None
+        try:
+            from .client_definitions import ClientDefinitions
+            from .config import find_config_path, load_config, resolve_wow_client_dir
+            from .mpq_reader import ClientData
+
+            data_dir = resolve_wow_client_dir(load_config(find_config_path(None))) / "Data"
+            client_context = ClientData(data_dir)
+            client_data = client_context.__enter__()
+            defs_ctx = client_context
+            client_defs = ClientDefinitions(client_data)
+        except Exception as exc:  # the client is optional; continue with other sources
+            if defs_ctx is not None:
+                defs_ctx.__exit__(None, None, None)
+                defs_ctx = None
+            print(f"Note: game client unavailable ({exc}).", file=sys.stderr)
+            client_defs = None
+    from .definitions import load_definitions
+
+    try:
+        return load_definitions(client_defs, Path("library")), defs_ctx
+    except Exception:
+        if defs_ctx is not None:
+            defs_ctx.__exit__(*sys.exc_info())
+        raise
+
+
+def close_definition_sources(defs: Any, defs_ctx: Any) -> None:
+    """Close the local database and optional client context after their final use."""
+    try:
+        if defs is not None:
+            defs.close()
+    finally:
+        if defs_ctx is not None:
+            defs_ctx.__exit__(None, None, None)
+
+
+def main(argv: list[str] | None = None, *, preloaded_defs: Any = _NOT_PRELOADED) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("name")
     parser.add_argument("realm")
@@ -228,23 +271,12 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     defs_ctx = None
-    client_defs = None
-    with timed(f"{args.name}@{args.realm} | definition loading"):
-        if not args.no_client:
-            try:
-                from .client_definitions import ClientDefinitions
-                from .config import find_config_path, load_config, resolve_wow_client_dir
-                from .mpq_reader import ClientData
-
-                data_dir = resolve_wow_client_dir(load_config(find_config_path(None))) / "Data"
-                defs_ctx = ClientData(data_dir)
-                client_defs = ClientDefinitions(defs_ctx.__enter__())
-            except Exception as exc:  # the client is optional; continue with other sources
-                print(f"Note: game client unavailable ({exc}).", file=sys.stderr)
-                client_defs = None
-        from .definitions import load_definitions
-
-        defs = load_definitions(client_defs, Path("library"))
+    definitions_preloaded = preloaded_defs is not _NOT_PRELOADED
+    if definitions_preloaded:
+        defs = preloaded_defs
+    else:
+        with timed(f"{args.name}@{args.realm} | definition loading"):
+            defs, defs_ctx = load_definition_sources(use_client=not args.no_client)
     if defs is None:
         print("Note: no definition source (no client, no library/acore/items.db; run acore_cli fetch).", file=sys.stderr)
     else:
@@ -268,8 +300,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     finally:
         cache.close()
-        if defs_ctx is not None:
-            defs_ctx.__exit__(None, None, None)
+        if not definitions_preloaded:
+            close_definition_sources(defs, defs_ctx)
 
     fetch_elapsed = timing_total(fetch_label) - fetch_before if build_started is not None else 0.0
     build_elapsed = (

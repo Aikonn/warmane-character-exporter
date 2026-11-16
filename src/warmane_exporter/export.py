@@ -19,6 +19,8 @@ from .mounts_parser import parse_mounts_page
 from .report import build_report, render_markdown
 from .reputation_parser import parse_reputation_page
 from .collect import summarize
+from .cache import ResponseCache
+from .fingerprint import cached_fingerprint, tool_version_hash
 from .timing import timed
 
 
@@ -119,7 +121,12 @@ def render_full_markdown(report: dict[str, Any]) -> str:
     return "\n".join(out) + "\n"
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+    *,
+    tool_version: str | None = None,
+    fingerprint: str | None = None,
+) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("name")
     parser.add_argument("realm")
@@ -153,6 +160,15 @@ def main(argv: list[str] | None = None) -> int:
             _load(_newest(cache_dir / "collections", f"{stem}-statistics-*.json")),
             page("reputation"), page("mounts-and-companions"),
         )
+    if tool_version is None:
+        tool_version = tool_version_hash()
+    if fingerprint is None:
+        response_cache = ResponseCache(cache_dir / "responses.sqlite")
+        try:
+            fingerprint = cached_fingerprint(response_cache, args.name, realm, tool_version)
+        finally:
+            response_cache.close()
+    report["fingerprint"] = fingerprint
     out_dir = Path(args.output_dir) if args.output_dir else cache_dir / "exports"
     out_dir.mkdir(parents=True, exist_ok=True)
     with timed(f"{args.name}@{args.realm} | export JSON"):

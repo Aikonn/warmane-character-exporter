@@ -25,7 +25,9 @@ from typing import Any
 from unicodedata import normalize
 from urllib.parse import quote
 
+from .cache import ResponseCache
 from .checks import run_checks
+from .fingerprint import cached_fingerprint, html_fingerprint, tool_version_hash
 from .gearscore import character_score
 from .timing import TimingLog, activate, timed, timing_requested
 
@@ -222,6 +224,41 @@ def sort_rows(rows: list[RosterRow]) -> list[RosterRow]:
     return sorted(rows, key=lambda row: row.name.casefold())
 
 
+def _preflight_character(
+    name: str,
+    realm: str,
+    response_cache: ResponseCache,
+    exports_dir: Path,
+    output_dir: Path,
+    tool_version: str,
+    max_age_seconds: int,
+) -> tuple[str, RosterRow | None]:
+    fingerprint = cached_fingerprint(
+        response_cache, name, realm, tool_version, max_age_seconds=max_age_seconds,
+    )
+    if fingerprint is None:
+        return "run", None
+
+    stem = f"{name.lower()}-{realm.lower()}-quick"
+    report_path = exports_dir / f"{stem}.json"
+    source_html = exports_dir / f"{stem}-pve.html"
+    target_html = output_dir / source_html.name
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        if not isinstance(report, dict):
+            return "run", None
+        if report.get("fingerprint") != fingerprint:
+            return "run", None
+        row = build_row(report, target_html.name, from_cache=True)
+        if html_fingerprint(target_html) == fingerprint:
+            return "skip", row
+        if html_fingerprint(source_html) == fingerprint:
+            return "copy", row
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError):
+        pass
+    return "run", None
+
+
 def summary_file_name(now: datetime) -> str:
     """raid-YYYY-MM-DD-HHMM.html for the local time ``now``."""
     return now.strftime("raid-%Y-%m-%d-%H%M.html")
@@ -411,6 +448,9 @@ def run_roster(names: list[str], realm: str, output_dir: Path, cache_dir: str,
       down to the snapshot step (snapshot gets a --max-age-minutes option; the single
       character default of 15 minutes stays unchanged).
     - Progress lines: "Character N of M: Name" via progress.note, plus the existing steps.
+    - Unchanged reports with fresh source cache entries are skipped; missing or stale output
+      HTML is copied from the export when its fingerprint still matches.
+    - Client data and definitions are loaded once only if a character needs a normal run.
     - Character does not exist: NOT_FOUND row, continue. Access block, rate limit or
       BudgetExhausted: stop; remaining names become NOT_RUN rows. Other failure: FAILED row,
       continue.
@@ -429,86 +469,132 @@ def run_roster(names: list[str], realm: str, output_dir: Path, cache_dir: str,
 def _run_roster(names: list[str], realm: str, output_dir: Path, cache_path: Path,
                 refresh: bool, max_age_minutes: int) -> tuple[list[RosterRow], Path]:
     from . import run
-    from .progress import note, start
+    from . import snapshot
+    from .progress import advance, note, start
 
     exports_dir = cache_path / "exports"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     rows: list[RosterRow] = []
     stopped = False
+    tool_version = tool_version_hash()
+    preflight: list[tuple[str, RosterRow | None]] = []
+    if refresh:
+        preflight = [("run", None) for _ in names]
+    else:
+        response_cache = ResponseCache(cache_path / "responses.sqlite")
+        try:
+            preflight = [
+                _preflight_character(
+                    name, realm, response_cache, exports_dir, output_dir, tool_version,
+                    max_age_minutes * 60,
+                )
+                for name in names
+            ]
+        finally:
+            response_cache.close()
+    needs_normal_path = any(action == "run" for action, _ in preflight)
+    defs = None
+    defs_ctx = None
 
     start(4 * len(names), "Starting raid roster")
-    for index, name in enumerate(names, start=1):
-        with timed(f"{name}@{realm} | total per character"):
-            if stopped:
-                rows.append(placeholder_row(name, realm, NOT_RUN, "An earlier character stopped the roster."))
-                continue
-
-            note(f"Character {index} of {len(names)}: {name}")
-            code = run.run_character(
-                name, realm, str(cache_path), refresh, False, quick=True,
-                max_age_minutes=max_age_minutes, start_progress=False,
-            )
-            if code == 3:
-                rows.append(placeholder_row(name, realm, NOT_FOUND, "Character does not exist."))
-                continue
-            if code == 4:
-                rows.append(placeholder_row(name, realm, FAILED, STOP_NOTE))
-                stopped = True
-                continue
-            if code != 0:
-                rows.append(placeholder_row(name, realm, FAILED, f"Character run failed (exit code {code})."))
-                continue
-
-            stem = f"{name.lower()}-{realm.lower()}-quick"
-            report_path = exports_dir / f"{stem}.json"
-            html_path = exports_dir / f"{stem}-pve.html"
-            target_html = output_dir / html_path.name
-            try:
-                report = json.loads(report_path.read_text(encoding="utf-8"))
-                snapshot_paths = sorted(
-                    (cache_path / "snapshots").glob(f"{name.lower()}-{realm.lower()}-*.json"),
-                    key=lambda path: path.stat().st_mtime,
-                )
-                if not snapshot_paths:
-                    raise FileNotFoundError(f"No snapshot found for {name}@{realm}.")
-                snapshot_data = json.loads(snapshot_paths[-1].read_text(encoding="utf-8"))
-                sections = snapshot_data["sections"]
-                from_cache = all(
-                    sections[key]["origin"] == "cache"
-                    for key in ("json_summary", "html_summary", "talents")
-                )
-                row = build_row(report, target_html.name, from_cache)
-                if not html_path.is_file():
-                    raise FileNotFoundError(f"Quick report HTML is missing for {name}@{realm}.")
-                with timed(f"{name}@{realm} | copy to output folder"):
-                    if html_path.resolve() != target_html.resolve():
-                        shutil.copyfile(html_path, target_html)
-            except (OSError, ValueError, KeyError, TypeError) as exc:
-                print(f"Could not assemble roster row for {name}: {exc}", file=sys.stderr)
-                rows.append(placeholder_row(name, realm, FAILED, f"Could not build report row: {exc}"))
-                continue
-            rows.append(row)
-
-    run_time = datetime.now()
-    summary_path = output_dir / summary_file_name(run_time)
-    with timed("summary rendering"):
-        rendered = render_summary(rows, realm, run_time)
-    with tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", newline="", dir=output_dir,
-        prefix=f".{summary_path.name}.", suffix=".tmp", delete=False,
-    ) as temporary:
-        temporary.write(rendered)
-        temporary_path = Path(temporary.name)
     try:
-        temporary_path.replace(summary_path)
-    except OSError:
+        if needs_normal_path:
+            with timed("definition loading"):
+                defs, defs_ctx = snapshot.load_definition_sources()
+
+        for index, name in enumerate(names, start=1):
+            with timed(f"{name}@{realm} | total per character"):
+                if stopped:
+                    rows.append(placeholder_row(name, realm, NOT_RUN, "An earlier character stopped the roster."))
+                    continue
+
+                action, cached_row = preflight[index - 1]
+                stem = f"{name.lower()}-{realm.lower()}-quick"
+                html_path = exports_dir / f"{stem}-pve.html"
+                target_html = output_dir / html_path.name
+                if action in ("skip", "copy") and cached_row is not None:
+                    note(f"Character {index} of {len(names)}: {name} (unchanged, skipped)")
+                    if action == "copy":
+                        try:
+                            with timed(f"{name}@{realm} | copy to output folder"):
+                                if html_path.resolve() != target_html.resolve():
+                                    shutil.copyfile(html_path, target_html)
+                        except OSError as exc:
+                            print(f"Could not copy quick report for {name}: {exc}", file=sys.stderr)
+                            rows.append(placeholder_row(name, realm, FAILED, f"Could not copy report: {exc}"))
+                            advance(f"{name}: skipped", 4)
+                            continue
+                    rows.append(cached_row)
+                    advance(f"{name}: unchanged, skipped", 4)
+                    continue
+
+                note(f"Character {index} of {len(names)}: {name}")
+                code = run.run_character(
+                    name, realm, str(cache_path), refresh, False, quick=True,
+                    max_age_minutes=max_age_minutes, start_progress=False,
+                    defs=defs, definitions_preloaded=True, tool_version=tool_version,
+                )
+                if code == 3:
+                    rows.append(placeholder_row(name, realm, NOT_FOUND, "Character does not exist."))
+                    continue
+                if code == 4:
+                    rows.append(placeholder_row(name, realm, FAILED, STOP_NOTE))
+                    stopped = True
+                    continue
+                if code != 0:
+                    rows.append(placeholder_row(name, realm, FAILED, f"Character run failed (exit code {code})."))
+                    continue
+
+                report_path = exports_dir / f"{stem}.json"
+                try:
+                    report = json.loads(report_path.read_text(encoding="utf-8"))
+                    snapshot_paths = sorted(
+                        (cache_path / "snapshots").glob(f"{name.lower()}-{realm.lower()}-*.json"),
+                        key=lambda path: path.stat().st_mtime,
+                    )
+                    if not snapshot_paths:
+                        raise FileNotFoundError(f"No snapshot found for {name}@{realm}.")
+                    snapshot_data = json.loads(snapshot_paths[-1].read_text(encoding="utf-8"))
+                    sections = snapshot_data["sections"]
+                    from_cache = all(
+                        sections[key]["origin"] == "cache"
+                        for key in ("json_summary", "html_summary", "talents")
+                    )
+                    row = build_row(report, target_html.name, from_cache)
+                    if not html_path.is_file():
+                        raise FileNotFoundError(f"Quick report HTML is missing for {name}@{realm}.")
+                    with timed(f"{name}@{realm} | copy to output folder"):
+                        if html_path.resolve() != target_html.resolve():
+                            shutil.copyfile(html_path, target_html)
+                except (OSError, UnicodeError, ValueError, KeyError, TypeError) as exc:
+                    print(f"Could not assemble roster row for {name}: {exc}", file=sys.stderr)
+                    rows.append(placeholder_row(name, realm, FAILED, f"Could not build report row: {exc}"))
+                    continue
+                rows.append(row)
+
+        run_time = datetime.now()
+        summary_path = output_dir / summary_file_name(run_time)
+        with timed("summary rendering"):
+            rendered = render_summary(rows, realm, run_time)
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="", dir=output_dir,
+            prefix=f".{summary_path.name}.", suffix=".tmp", delete=False,
+        ) as temporary:
+            temporary.write(rendered)
+            temporary_path = Path(temporary.name)
         try:
-            temporary_path.unlink()
-        except FileNotFoundError:
-            pass
-        raise
-    return rows, summary_path
+            temporary_path.replace(summary_path)
+        except OSError:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+            raise
+        return rows, summary_path
+    finally:
+        if needs_normal_path:
+            snapshot.close_definition_sources(defs, defs_ctx)
 
 
 def main(argv: list[str] | None = None) -> int:

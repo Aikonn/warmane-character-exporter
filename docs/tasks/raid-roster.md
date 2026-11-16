@@ -25,6 +25,8 @@ When assembling a raid, paste a list of character names, choose the realm, and g
 
 - Reuse the quick path: `run_character(..., quick=True)` per character, one character at a time, existing 1 s spacing and budget.
 - Cache age for the roster (owner): reuse cached character data younger than 2 hours; "Refresh all" ignores the cache. Pass the age as a parameter (`max_age_seconds`) through snapshot/fetch; do not change the 15 minute default for single-character runs.
+- Before normal execution, compare the three fresh response-cache bodies and the quick export fingerprint. The tool-version hash covers package Python files, bundled definitions, and the optional client-path config and is computed once per roster run. This check does not fetch data or load definitions. If the fingerprint matches, retain the existing per-character report when its HTML fingerprint matches; otherwise copy the matching export HTML. A stale cache entry, missing or mismatched export, or `--refresh` takes the normal quick path.
+- When any character needs the normal path, load client data and definitions once for the roster run, share them with each snapshot, and close them after the run. Single-character runs keep their existing per-run loading behavior.
 - Errors (owner: ok, to be tuned): a character that does not exist marks its row "not found" and the run continues; an access block, rate limit or budget exhaustion stops the run, and the summary is still written for the characters done so far, with the rest marked "not run".
 - Open point for the implementer: how the armory answers for a non-existent character is not yet verified. Check it with one live request (for example a random 12-letter name) and add a sanitized fixture before coding the "not found" branch.
 
@@ -32,6 +34,7 @@ When assembling a raid, paste a list of character names, choose the realm, and g
 
 - Everything goes into the one folder the user selected; no subfolder.
 - Per character: `<name>-<realm>-quick-pve.html` (same file as today's quick report; a later run overwrites it).
+- Quick export JSON stores its content fingerprint in `fingerprint`; the PvE report stores the same value in a `warmane-fingerprint` meta tag. These fields are also written for single-character reports; they do not change visible report content.
 - Summary: `raid-YYYY-MM-DD-HHMM.html` (local time of the run).
 - New CLI entry point so it works without the launcher, for example:
   `python -m warmane_exporter.roster --realm Onyxia --names-file names.txt --output-dir DIR [--refresh] [--max-age-minutes 120]`

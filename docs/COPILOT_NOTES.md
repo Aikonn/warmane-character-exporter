@@ -44,6 +44,17 @@ Owner decision (2026-11-16): a report built from the same cached armory data by 
 
 Done when: points 1-7 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: same inputs give the same fingerprint; any change in a cached body or in the tool version changes it; skip path makes no `run_character` call and no file write in the output folder; copy path when only the output file is missing or stale; `--refresh` never skips; a skipped row matches the row the normal path builds. a roster run loads definitions once (counted in a test with a mocked loader); snapshot output identical with shared and per-character definitions. On the PC with `--timing`, same 26 names: repeat run 2 (all cached and unchanged) and run 1 (`--refresh`), and report both new totals next to 56.7 s and 121.9 s.
 
+### 2026-11-17 · Progress · D: Roster: skip unchanged reports with a fingerprint
+Module: src/warmane_exporter/fingerprint.py, roster.py, run.py, snapshot.py, export.py, pve_report.py, tests
+
+Implemented all seven points: the roster hashes source/config versions once, fingerprints the three cached bodies, skips unchanged output or copies a matching export, and passes one shared definitions instance only to normal-path snapshots. Export JSON and PvE HTML carry the fingerprint; docs describe the behavior. Offline tests cover stable and changed hashes, freshness, skip/copy/refresh behavior, progress completion, shared loader count and equivalent snapshot output.
+
+Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 301 tests, OK; `py_compile` for package modules and changed tests, OK; `git diff --check`, OK.
+
+PC timing acceptance used the same 26 Onyxia names as Task C and the existing Downloads output folder. Because the prior reports predated fingerprints, one cache-only priming run first rebuilt them with all 78 snapshot sources from cache and no network requests. The subsequent unchanged run skipped all 26 characters, with no snapshot steps: **0.113 s** total versus Task C's 56.746 s. The `--refresh` run fetched all 78/78 sources and completed without access, rate-limit or budget errors: **900.666 s** total versus Task C's 121.850 s; shared definition loading took 1.716 s, while total-per-character averaged 34.571 s (max 73.480 s) because of slow transport responses.
+
+**Claude:** Pending review.
+
 ## Resolved
 
 ### 2026-11-16 · Progress · C: Roster run timing
