@@ -132,9 +132,10 @@ def build_row(report: dict[str, Any], report_file: str, from_cache: bool) -> Ros
 
     Pure function. Use the same functions the PvE report uses, so the numbers match the
     character's own page: ``gearscore.character_score(report["equipment"], class)`` and
-    ``checks.run_checks(report)``. Main tree per specialization is its ``label`` when the
-    specialization has points, otherwise "-". issue_texts contains all issue texts in
-    ``run_checks`` order, with a slot prefix for gear findings.
+    ``checks.run_checks(report)``. Main tree per specialization is the named tree with the
+    most reported points, otherwise "-"; when per-tree names are unavailable, fall back to
+    the specialization label. Pad to two entries when fewer specs are present. issue_texts
+    contains all issue texts in ``run_checks`` order, with a slot prefix for gear findings.
     """
     identity = report["identity"]
     name = identity["name"]
@@ -144,12 +145,28 @@ def build_row(report: dict[str, Any], report_file: str, from_cache: bool) -> Ros
     findings = run_checks(report)
     snapshot_time = report.get("snapshot_time")
     data_time = float(snapshot_time) if isinstance(snapshot_time, (int, float)) else None
-    main_trees = [
-        spec.get("label") or "-"
-        if sum(points for points in (spec.get("split") or []) if isinstance(points, int)) > 0
-        else "-"
-        for spec in report.get("specializations") or []
-    ]
+    main_trees = []
+    for spec in report.get("specializations") or []:
+        split = spec.get("split") or []
+        if not any(isinstance(points, int) and points > 0 for points in split):
+            main_trees.append("-")
+            continue
+
+        tree_names = spec.get("trees") or [
+            tree.get("tree") for tree in spec.get("talent_detail") or []
+        ]
+        main_index = max(
+            (index for index, points in enumerate(split) if isinstance(points, int)),
+            key=lambda index: split[index],
+            default=None,
+        )
+        main_tree = (
+            tree_names[main_index]
+            if main_index is not None and main_index < len(tree_names)
+            else None
+        )
+        main_trees.append(main_tree or spec.get("label") or "-")
+    main_trees.extend("-" for _ in range(max(0, 2 - len(main_trees))))
     issues = findings["issues"]
     return RosterRow(
         name=name,

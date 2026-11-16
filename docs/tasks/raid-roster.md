@@ -43,7 +43,7 @@ Same style as the other reports: one self-contained HTML file, inline CSS, all a
 Columns:
 1. Name
 2. Class
-3. Main tree per specialization: the talent tree with the most points, for example "Holy / Discipline"; "-" for a specialization with no points (owner: tree names, no point numbers)
+3. Main tree per specialization: the named talent tree with the most points, for example "Holy / Discipline"; "-" for a specialization with no points or when a second specialization is not exposed (owner: tree names, no point numbers)
 4. GearScore
 5. Average item level
 6. Issues (count)

@@ -27,6 +27,13 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 Do the two tasks in order: A, then B. Commit and report each separately.
 
+### 2026-11-16 · Progress · Roster summary main-tree fallback
+Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
+
+Fixed a roster row that showed "-" when the sole specialization had no specialization label. The main tree now comes from the highest reported per-tree point total and its tree name; the output pads a missing second specialization with "-".
+
+Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests -p test_roster.py` — 22 tests, OK; `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 284 tests, OK. No live requests.
+
 ### 2026-11-16 · Progress · Roster summary sorting and Data age
 Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
 

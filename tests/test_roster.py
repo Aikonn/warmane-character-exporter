@@ -92,6 +92,20 @@ class RosterRowTests(unittest.TestCase):
         self.assertEqual(row.data_time, self.report["snapshot_time"])
         self.assertTrue(row.from_cache)
 
+    def test_derives_main_tree_and_pads_a_missing_second_spec(self):
+        report = json.loads(json.dumps(self.report))
+        report["specializations"] = [{
+            "label": None,
+            "split": [14, 0, 57],
+            "trees": ["Discipline", "Holy", "Shadow"],
+        }]
+
+        row = build_row(report, "Mélora-Onyxia-quick-pve.html", from_cache=False)
+        html = render_summary([row], "Onyxia", datetime(2026, 11, 15, 10, 30))
+
+        self.assertEqual(row.main_trees, ["Shadow", "-"])
+        self.assertIn('<td data-sort="shadow / -">Shadow / -</td>', html)
+
     def test_build_row_keeps_all_issue_texts_in_check_order(self):
         issues = [{"text": "first"}, {"text": "second"}, {"text": "third"}]
         with mock.patch("warmane_exporter.roster.run_checks", return_value={
