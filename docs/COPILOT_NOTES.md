@@ -25,10 +25,19 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-16 · Progress · Updater launcher restart flag
+Module: Start-Report.ps1
+
+The Update click handler uses shared state to request restart; `Read-Link` copies it to the script flag after its dialog returns. No other `$script:` assignments occur inside `.GetNewClosure()` blocks. The success message includes the manual-start fallback; the fallback behavior was not needed.
+
+Verification: PowerShell parser and isolated success-handler closure checks pass; `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passes 278 tests. Owner-PC retest of a one-commit-behind ZIP copy: update and automatic relaunch worked, and the subsequent check reported "Up to date".
+
 ### 2026-11-16 · Issue · Launcher restart PC acceptance pending
 Module: Start-Report.ps1
 
 The restart flag now passes through the shared hashtable; no other `$script:` assignments occur inside `.GetNewClosure()` blocks. The success message includes the manual-start fallback. PowerShell parser and isolated success-handler closure checks pass; `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passes 278 tests. The owner reports the ZIP copy is updated with the fix. This notes-only commit makes it one commit behind so automatic restart and the subsequent "Up to date" check can be tested.
+
+Owner-PC retest: the owner reports that update and automatic relaunch worked; the subsequent check showed "Up to date".
 
 ### 2026-11-16 · Task · Updater: fix the launcher restart flag
 Module: Start-Report.ps1, docs/tasks/update-feature.md (spec text already updated)
