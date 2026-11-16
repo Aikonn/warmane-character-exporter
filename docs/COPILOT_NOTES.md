@@ -30,6 +30,8 @@ Module: src/warmane_exporter/updater.py, Start-Report.ps1
 
 Implementation, 12 focused updater tests, the 278-test offline suite, and the PowerShell parser check pass. Owner-PC checks confirm a Git clone shows the clone message with Update now disabled, and a fresh ZIP shows "Up to date" rather than "git_clone". Older ZIPs predate the updater and cannot check for updates. A PC Update now run found one changed file, but the restart raised `ExitException`: `exit 0` ran inside a WinForms click callback. The callback now closes both dialogs and defers restart/exit to the top level. Re-test Update now; the owner tests with his brother.
 
+Owner-PC follow-up: updating the same ZIP copy again showed an error, but after closing and reopening it, Check for updates reported "Up to date". The running launcher still used the old script while the update copied the fix; this notes change enables a fresh test with the fixed launcher. The successful restart remains unverified.
+
 ### 2026-11-16 · Task · Update from GitHub: updater module and Settings window
 Module: src/warmane_exporter/updater.py, Start-Report.ps1, README.md
 
