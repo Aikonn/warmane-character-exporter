@@ -25,7 +25,17 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-(none)
+### 2026-11-16 · Task · Update from GitHub: updater module and Settings window
+Module: src/warmane_exporter/updater.py, Start-Report.ps1, README.md
+
+Spec: `docs/tasks/update-feature.md`. Skeleton with docstrings: `updater.py`. No live requests to GitHub in tests (inject `http_get`); one manual `check` run on the PC is allowed.
+
+1. Implement every function in `updater.py` as its docstring and the spec say.
+2. Tests in `tests/test_updater.py` as listed in the spec (Tests section), no network.
+3. Launcher: "⚙ Settings" button on the main dialog and the `Show-Settings` window (spec, Launcher section). Single-character and roster flows unchanged.
+4. README: short "Updating" section (Settings > Check for updates > Update now; manual update = Download ZIP again and extract over the folder; a Git clone uses git pull).
+
+Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts and the new test names); on the PC, in your Git clone, Settings > Check for updates shows the Git clone text and Update now stays disabled; `python -m warmane_exporter.updater check` run in a copy made with Download ZIP of an older commit prints `update_available` with the expected files (paste the JSON, shortened). The owner tests Update now with his brother.
 
 ## Resolved
 

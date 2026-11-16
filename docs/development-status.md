@@ -470,3 +470,8 @@ No third-party definition site is needed. Enchant and gem texts come from the cl
 
 ## Quick report
 - `run --quick` (launcher: radio button in the first dialog, last choice remembered in `.warmane-cache/launcher-mode.txt`) fetches only the 3 snapshot requests and builds `<name>-<realm>-quick-pve.html`: raid readiness, equipment, talents, glyphs and professions. Statistics, achievements, reputation and mounts are neither fetched nor shown, even if cached from an earlier full run.
+
+## Update from GitHub (designed 2026-11-16)
+- Owner decisions: Settings is a button on the main dialog opening a separate Settings window (not a tab); testers use Download ZIP, so the updater needs no Git; no automatic check for now (a later one needs a visible opt-out).
+- Check compares the Git blob hash of each local file with the tree of the latest commit on main (2 GitHub API requests); Update downloads that commit as a zip and copies it over the program folder, keeping .tools, .warmane-cache and the config. A Git clone is never overwritten.
+- Spec `docs/tasks/update-feature.md`, skeleton `src/warmane_exporter/updater.py`; implementation is the open Copilot task.
