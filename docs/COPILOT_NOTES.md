@@ -25,6 +25,11 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-16 · Issue · Launcher restart PC acceptance pending
+Module: Start-Report.ps1
+
+The restart flag now passes through the shared hashtable; no other `$script:` assignments occur inside `.GetNewClosure()` blocks. The success message includes the manual-start fallback. PowerShell parser and isolated success-handler closure checks pass; `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passes 278 tests. Owner-PC ZIP update and automatic restart remain unverified; commit and push are needed before the owner can test a one-commit-behind ZIP copy.
+
 ### 2026-11-16 · Task · Updater: fix the launcher restart flag
 Module: Start-Report.ps1, docs/tasks/update-feature.md (spec text already updated)
 

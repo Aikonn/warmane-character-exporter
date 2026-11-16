@@ -154,7 +154,7 @@ function Invoke-Updater([string]$command) {
     }
 }
 
-function Show-Settings([System.Windows.Forms.Form]$owner) {
+function Show-Settings([System.Windows.Forms.Form]$owner, [hashtable]$shared) {
     $settings = New-Object System.Windows.Forms.Form
     $settings.Text = "Settings"
     $settings.StartPosition = "CenterParent"
@@ -284,8 +284,8 @@ function Show-Settings([System.Windows.Forms.Form]$owner) {
             return
         }
         if ($run.ExitCode -eq 0 -and $result.status -eq "updated") {
-            Show-Message "Updated. The launcher will now restart." "Warmane Character Exporter"
-            $script:restartLauncher = $true
+            Show-Message "Updated. The launcher will now restart. If it does not open, start Start-Report.cmd again." "Warmane Character Exporter"
+            $shared.Restart = $true
             $settings.Close()
             $owner.Close()
             return
@@ -299,6 +299,7 @@ function Show-Settings([System.Windows.Forms.Form]$owner) {
 }
 
 function Read-Link {
+    $shared = @{ Restart = $false }
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "Warmane Character Exporter"
     $form.StartPosition = "CenterScreen"
@@ -355,7 +356,7 @@ function Read-Link {
     $settingsButton.Location = New-Object System.Drawing.Point(12, 190)
     $settingsButton.Cursor = [System.Windows.Forms.Cursors]::Hand
     $settingsButton.Font = $form.Font
-    $settingsButton.Add_Click({ Show-Settings $form }.GetNewClosure())
+    $settingsButton.Add_Click({ Show-Settings $form $shared }.GetNewClosure())
     $cancel = New-Object System.Windows.Forms.Button
     $cancel.Text = "Cancel"
     $cancel.Size = New-Object System.Drawing.Size(100, 28)
@@ -367,7 +368,9 @@ function Read-Link {
     while ($true) {
         $form.TopMost = $true      # appears in front once; the user can still put other windows over it
         $form.Add_Shown({ $form.Activate(); $form.TopMost = $false })
-        if ($form.ShowDialog() -ne "OK") { return $null }
+        $dialogResult = $form.ShowDialog()
+        $script:restartLauncher = $shared.Restart
+        if ($dialogResult -ne "OK") { return $null }
         if ($rosterButton.Checked) {
             $script:RosterMode = $true
             try { Set-Content -Path $modeFile -Value "roster" -Encoding ASCII } catch { }
