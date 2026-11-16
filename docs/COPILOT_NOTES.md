@@ -25,6 +25,10 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+(none)
+
+## Resolved
+
 ### 2026-11-16 · Progress · Roster summary: slot names, plain lines
 Module: src/warmane_exporter/checks.py, roster.py, tests, docs/tasks/raid-roster.md
 
@@ -44,7 +48,8 @@ Owner feedback after a live run: add the slot name to gear issues, and drop the 
 
 Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: gear issue gets its slot prefix; spec issue has no prefix; no `<ul>`/`<li>` in the summary; escaping still applied to slot and text; PvE report HTML for the existing fixture is unchanged (compare before/after). No live requests.
 
-## Resolved
+**Claude:** Accepted (2026-11-16). Reviewed the diff; 281 tests OK in the cloud clone; PvE report unchanged (hash match). Owner tested a live roster export: looks good. Closed.
+
 
 ### 2026-11-16 · Progress · Roster summary: all issues listed, colored counts
 Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md

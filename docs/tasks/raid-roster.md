@@ -1,6 +1,6 @@
 # Task: raid roster report
 
-Status: stage 1 (pure functions, not-found probe) done 2026-11-15; stage 2 (fetching, CLI) done; stage 3 (transport fix, progress, launcher) done and accepted on the PC 2026-11-15. Task complete. Owner decisions are marked (owner).
+Status: stage 1 (pure functions, not-found probe) done 2026-11-15; stage 2 (fetching, CLI) done; stage 3 (transport fix, progress, launcher) done and accepted on the PC 2026-11-15. Task complete. Summary refinements 2026-11-16 (all issues listed with slot names, colored counts) accepted by the owner. Owner decisions are marked (owner).
 
 ## Goal
 
