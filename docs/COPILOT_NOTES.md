@@ -25,7 +25,9 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-Do the two tasks in order: A, then B. Commit and report each separately.
+(none)
+
+## Resolved
 
 ### 2026-11-16 · Progress · Roster summary: WotLK class colors
 Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
@@ -86,7 +88,8 @@ Owner wants the standard class colors in the roster summary only (not character 
 
 Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: each of the ten classes maps to its CSS class and hex value; unknown class gets none; PvE report HTML unchanged. No live requests; the owner checks the look on his next roster run.
 
-## Resolved
+**Claude:** Accepted A, B and the main-tree fallback (2026-11-16). Reviewed the diff; 286 tests OK in the cloud clone. Sort script matches the spec: only sortable headers have handlers, numeric/text/epoch keys, not-OK rows pinned to the bottom, empty values last, name order without JavaScript; one script only in the roster summary, PvE report untouched. Class colors use the WotLK 3.3.5 values with readable text. Main-tree fallback (tree with most points, padded to two specs) is a fair fix of a real bug, even though outside the task: next time report it as an **Issue** first. B was committed although its note says "waiting for the owner's visual check"; fine here, but keep notes and commits consistent. Owner checks the look on his next roster run; any change will be a new task.
+
 
 ### 2026-11-16 · Progress · Roster summary: slot names, plain lines
 Module: src/warmane_exporter/checks.py, roster.py, tests, docs/tasks/raid-roster.md
