@@ -25,6 +25,20 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-16 · Task · Roster summary: slot names in issues, plain lines
+Module: src/warmane_exporter/checks.py, roster.py, tests
+
+Owner feedback after a live run: add the slot name to gear issues, and drop the bullet list to save space.
+
+1. `checks.py`: gear findings (`check_gear`: no enchant, empty sockets, meta gem, belt buckle, armor type) get an extra key `"slot"` with the item's slot name as in the equipment entry. Spec findings get no slot key. Keep `area` and `text` unchanged, so the PvE report output does not change.
+2. `roster.py`: `issue_texts` entries become `"<Slot>: <text>"` when the issue has a slot (for example `Chest: No enchant.`, `Hands: 1 empty gem socket(s).`), otherwise the text alone.
+3. Issues list rendering: no bullets. Each issue on its own line (for example `<div class="issues">` with one `<div>` per issue, or `<br>`-separated lines), same small font, no left padding. Slot part may be bold or slightly darker if it stays compact; keep CSS classes, no inline styles.
+4. Update `docs/tasks/raid-roster.md` (Summary page) to match.
+
+Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: gear issue gets its slot prefix; spec issue has no prefix; no `<ul>`/`<li>` in the summary; escaping still applied to slot and text; PvE report HTML for the existing fixture is unchanged (compare before/after). No live requests.
+
+## Resolved
+
 ### 2026-11-16 · Progress · Roster summary: all issues listed, colored counts
 Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
 
@@ -44,7 +58,8 @@ Owner wants to see how the summary looks with every issue listed, and counts tha
 
 Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: all issues listed in order; escaping inside the list; classes for 0, 1-3 and 4+ issues and warnings; non-OK row still shows the status note. No live requests: the owner judges the look on his next roster run.
 
-## Resolved
+**Claude:** Accepted (2026-11-16). Reviewed the diff; 280 tests OK in the cloud clone. Owner checked a live roster run: looks good; follow-up below.
+
 
 ### 2026-11-16 · Progress · Updater launcher restart flag
 Module: Start-Report.ps1
