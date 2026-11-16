@@ -1,6 +1,6 @@
 # Task: update from GitHub (Settings window)
 
-Status: designed 2026-11-16, waiting for implementation. Owner decisions are marked (owner).
+Status: implemented 2026-11-16 (updater module, Settings window, 278 tests); restart after update being fixed. Owner decisions are marked (owner).
 
 ## Goal
 
@@ -98,7 +98,7 @@ Settings window (`Show-Settings`), `FixedDialog`, no maximize, centered on the p
   - `error`: the message, in dark red.
 - Latest line: `<date as yyyy-MM-dd HH:mm local> "<commit message first line>"`, or "-".
 - Check for updates: runs `updater check` with the same Python and environment as the reports (`PYTHONPATH`, `PYTHONIOENCODING=utf-8`) as a hidden process; the window stays responsive (poll `HasExited` with `DoEvents`, as `Invoke-ProgressProcess` does). Parse stdout with `ConvertFrom-Json`. If stdout is not valid JSON, show "Check failed." and the last stderr line.
-- Update now: enabled only after a check with status `update_available`. Confirm with YesNo: "Download the latest version (about 4 MB) from GitHub and replace the program files? Reports, cache and Python stay." On Yes: status "Updating...", buttons disabled, run `updater apply`. On exit 0 with `updated`: message "Updated. The launcher will now restart.", then `Start-Process wscript.exe` with `//nologo "<root>\Start-Report.vbs"` and `exit 0`. On other results: show the message and keep the window open.
+- Update now: enabled only after a check with status `update_available`. Confirm with YesNo: "Download the latest version (about 4 MB) from GitHub and replace the program files? Reports, cache and Python stay." On Yes: status "Updating...", buttons disabled, run `updater apply`. On exit 0 with `updated`: message "Updated. The launcher will now restart. If it does not open, start Start-Report.cmd again.", close both dialogs and set a restart flag through a hashtable passed in from `Read-Link` (not `$script:` inside a closure); at top level, after `Read-Link` returns, `Start-Process wscript.exe` with `//nologo "<root>\Start-Report.vbs"` and `exit 0` (not inside a WinForms event handler: `exit` there raises ExitException). On other results: show the message and keep the window open.
 - Manual update: a LinkLabel; clicking opens https://github.com/Aikonn/warmane-character-exporter in the default browser.
 - Close: closes Settings (also Esc).
 
@@ -112,3 +112,5 @@ Inject the HTTP getter (`http_get(url) -> bytes`) and use temp folders:
 - `extract_update`: rejects `..` member, absolute member, two top folders, missing `src/warmane_exporter/__init__.py`.
 - `apply_update`: replaces changed files, adds missing, deletes stale, leaves `.warmane-cache/x`, `.tools/python312/x`, `warmane-character-exporter.config` and a git-ignored `library/acore/extra.db` untouched; refuses a Git clone with exit 2.
 - `main`: prints exactly one JSON object; exit codes 0 / 1 / 2.
+
+Note for testers: copies downloaded before the updater existed (before 2026-11-16) have no Settings button; download the ZIP once more by hand, after that Update now works.

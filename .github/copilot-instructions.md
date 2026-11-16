@@ -111,6 +111,11 @@ Implement the specification's transport safeguards before multi-page retrieval. 
 - Keep live-character contents out of fixed assertions unless using a dated fixture. Equipment changes alone are not parser failures.
 - Report which checks actually ran, their commands/results, and what remains untested. Do not claim passing tests without running them.
 
+## PowerShell launcher pitfalls
+
+- A `.GetNewClosure()` script block runs in its own dynamic module: `$script:x = ...` inside it does not change the launcher's variable. Share state through a hashtable created outside (`$state = @{}`; `$state.X = ...`).
+- Do not call `exit` inside a WinForms event handler (raises ExitException); set a flag, close the forms, and act at top level.
+
 ## Repository hygiene and collaboration
 
 - Make small, reviewable changes tied to the approved milestone.

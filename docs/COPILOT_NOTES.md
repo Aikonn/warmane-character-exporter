@@ -25,12 +25,14 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-### 2026-11-16 · Proposal · Close after update instead of restarting
-Module: Start-Report.ps1, docs/tasks/update-feature.md
+### 2026-11-16 · Task · Updater: fix the launcher restart flag
+Module: Start-Report.ps1, docs/tasks/update-feature.md (spec text already updated)
 
-Owner-PC retest with the fixed launcher: no error appeared and the application closed, but no new instance launched. The owner suggests telling the user to relaunch the application manually after a successful update, then closing it, instead of automatically restarting.
+1. Do not assign `$script:` variables inside `.GetNewClosure()` script blocks. In `Read-Link` create `$shared = @{ Restart = $false }`, pass it to `Show-Settings $form $shared`, set `$shared.Restart = $true` in the Update click handler (a hashtable is shared by reference), and after `$form.ShowDialog()` returns in `Read-Link` set `$script:restartLauncher = $shared.Restart` (Read-Link is a normal function, so `$script:` works there). Grep the launcher for other `$script:` assignments inside `GetNewClosure()` blocks and fix them the same way.
+2. Success message: "Updated. The launcher will now restart. If it does not open, start Start-Report.cmd again."
+3. Fallback only if point 1 still gives no new window on the PC: message "Updated. Please start Start-Report.cmd again.", close, no `Start-Process`; note it in Progress and change the spec line.
 
-Done when: Claude reviews the proposed change; if accepted, the success message asks the user to relaunch and the launcher closes without starting a new instance.
+Done when: PowerShell parser check passes; `python -m unittest discover -s tests` passes (counts); on the PC, a Download ZIP copy one commit behind, Settings > Check > Update now shows the message, the launcher closes and opens again by itself (or, with the fallback, closes and opens fine when started by hand), and Check then says "Up to date".
 
 ### 2026-11-16 · Issue · Owner-PC updater acceptance pending
 Module: src/warmane_exporter/updater.py, Start-Report.ps1
@@ -38,6 +40,8 @@ Module: src/warmane_exporter/updater.py, Start-Report.ps1
 Implementation, 12 focused updater tests, the 278-test offline suite, and the PowerShell parser check pass. Owner-PC checks confirm a Git clone shows the clone message with Update now disabled, and a fresh ZIP shows "Up to date" rather than "git_clone". Older ZIPs predate the updater and cannot check for updates. A PC Update now run found one changed file, but the restart raised `ExitException`: `exit 0` ran inside a WinForms click callback. The callback now closes both dialogs and defers restart/exit to the top level. Re-test Update now; the owner tests with his brother.
 
 Owner-PC follow-up: updating the same ZIP copy again showed an error, but after closing and reopening it, Check for updates reported "Up to date". The running launcher still used the old script while the update copied the fix; this notes change enables a fresh test with the fixed launcher. The successful restart remains unverified.
+
+**Claude:** Code accepted except the restart (2026-11-16): reviewed the diff of `updater.py`, `test_updater.py`, `Start-Report.ps1` and README; 278 tests OK in the cloud clone (1 skipped). Zip checks (unsafe paths, symlinks, one top folder, required files), protected paths and the temp-file copy match the spec. Stays open until the restart task above passes on the PC.
 
 ### 2026-11-16 · Task · Update from GitHub: updater module and Settings window
 Module: src/warmane_exporter/updater.py, Start-Report.ps1, README.md
@@ -51,7 +55,20 @@ Spec: `docs/tasks/update-feature.md`. Skeleton with docstrings: `updater.py`. No
 
 Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts and the new test names); on the PC, in your Git clone, Settings > Check for updates shows the Git clone text and Update now stays disabled; `python -m warmane_exporter.updater check` run in a copy made with Download ZIP of an older commit prints `update_available` with the expected files (paste the JSON, shortened). The owner tests Update now with his brother.
 
+**Claude:** Points 1, 2 and 4 accepted and the Git clone check passed on the PC; point 3 stays open for the restart (see the restart task).
+
 ## Resolved
+
+### 2026-11-16 · Proposal · Close after update instead of restarting
+Module: Start-Report.ps1, docs/tasks/update-feature.md
+
+Owner-PC retest with the fixed launcher: no error appeared and the application closed, but no new instance launched. The owner suggests telling the user to relaunch the application manually after a successful update, then closing it, instead of automatically restarting.
+
+Done when: Claude reviews the proposed change; if accepted, the success message asks the user to relaunch and the launcher closes without starting a new instance.
+
+**Claude:** Root cause found (2026-11-16), so the restart stays, with a fallback. In `Show-Settings` the Update click handler is a `.GetNewClosure()` script block. A closure runs in its own dynamic module, so `$script:restartLauncher = $true` sets a variable in that module, not in Start-Report.ps1. The top-level flag stays `$false`, `Read-Link` returns `$null`, and the launcher exits normally: no error, no new instance, exactly what the PC showed. The ExitException before was the same scope issue. Fix in the Task below. If the restart still does not open a window on the PC after the fix, switch to the owner's proposal (close and ask to relaunch) in the same task without asking again.
+
+
 
 ### 2026-11-15 · Progress · Raid roster, stage 3 implementation
 Module: `transport.py`, `roster.py`, `run.py`, `Start-Report.ps1`
