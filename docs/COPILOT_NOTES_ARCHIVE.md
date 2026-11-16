@@ -2,6 +2,42 @@
 
 Resolved entries moved out of `COPILOT_NOTES.md` to keep it short. Newest first. Read only when an old decision is needed.
 
+### 2026-11-16 · Progress · C: Roster run timing
+Module: src/warmane_exporter/roster.py, snapshot.py, export.py
+
+Added opt-in roster timing (`--timing` / `WARMANE_TIMING=1`) with stderr and cache-log output. The owner ran both measurements on the PC with the same 26 characters. Snapshot provenance confirms all three sections were network-fetched for 26/26 characters in run 1 and served from cache for 26/26 in run 2.
+
+| Step | Run 1 avg | Run 1 max | Run 2 avg | Run 2 max |
+|---|---:|---:|---:|---:|
+| Definition loading | 1.828s | 2.054s | 1.794s | 1.864s |
+| Cache lookup / network fetch | 2.474s | 2.533s | 0.011s | 0.016s |
+| Snapshot build and save | 0.316s | 0.417s | 0.308s | 0.359s |
+| Export JSON | 0.002s | 0.002s | 0.002s | 0.002s |
+| Export Markdown | 0.000s | 0.001s | 0.000s | 0.001s |
+| Export PvE HTML | 0.001s | 0.002s | 0.001s | 0.001s |
+| Copy to output folder | 0.001s | 0.001s | 0.001s | 0.002s |
+| Total per character | 4.684s | 4.890s | 2.180s | 2.251s |
+| Summary rendering | <0.001s | <0.001s | <0.001s | <0.001s |
+
+Total run: run 1 **121.850s**; run 2 **56.746s**. Definition loading dominates run 2 (1.794s average per character); cache lookup/network fetch falls to 0.011s average. Summary rendering values are below the log's 0.001s display resolution.
+
+Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 289 tests, OK, including `test_timing_off_emits_no_timing_output`, `test_timing_logs_steps_to_stderr_and_file_when_enabled`, and `test_export_cli_records_each_format_timing`. Python compilation and `git diff --check` pass. Task C remains open for Claude's review; Task D has not started.
+
+### 2026-11-16 · Task · C: Roster run timing (measure only)
+Module: src/warmane_exporter/roster.py, run.py, snapshot.py, export.py
+
+Owner: roster runs are slow even when every character comes from the cache. Measure where the time goes before changing anything.
+
+1. Add timing that is off by default and on with `--timing` on `roster` (or env var `WARMANE_TIMING=1`). For each character log the duration of: definition loading (client data, client-export.json, items.db), cache lookup / network fetch, snapshot build and save, export (JSON, Markdown, PvE HTML), copy to the output folder. Also log total per character and total run, plus summary rendering. Write the lines to stderr and to `.warmane-cache/timing-<YYYYMMDD-HHMM>.log`. No behaviour change when timing is off.
+2. Owner runs on the PC, same names both times (about 10 characters on one realm):
+   - Run 1: launcher or CLI with "Refresh all" (`--refresh`).
+   - Run 2: a few minutes later, normal run (everything should come from the cache).
+3. In the Progress entry, paste a short table per run: average and max per step, total run time, and say which step dominates in run 2.
+
+Done when: points 1-3 hold; `python -m unittest discover -s tests` passes (report counts), with a test that timing off produces no timing output; both runs measured on the PC and the table is in the Progress entry. Do not optimise anything in this task.
+
+**Claude:** Accepted (2026-11-16). Reviewed the diff (timing is opt-in, no behaviour change); 289 tests OK in the cloud clone. Reading of the numbers: in the cached run, definition loading is 1.79 s of 2.18 s per character (82 %); the export itself is about 5 ms. So the fingerprint skip gives the big win for unchanged characters, and loading the definitions once per roster run helps every run, including "Refresh all" (about 26 x 1.8 s = 47 s of run 1). Added as point 7 of task D. The 2.5 s network time per character in run 1 is the request spacing rule: leave it.
+
 ### 2026-11-16 · Progress · Roster summary: WotLK class colors
 Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
 

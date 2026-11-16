@@ -25,6 +25,17 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-17 · Issue · Roster refresh provokes armory rate limits
+Module: transport.py, budget.py, roster.py (raised by Claude, waiting for the owner's decision)
+
+Task D's `--refresh` run of 26 characters (78 requests at 1 s spacing) hit the armory rate limit about 9-13 times; each time the transport waited 60 s and retried. Task C's identical run 37 minutes earlier had none, so the limit is probably a rolling window. Project rule (handoff): stop on the first error, never provoke a rate limit. Today the roster only stops after the transport has retried three times.
+
+Proposed fix (task E, after the owner decides the spacing):
+1. Roster runs: slower spacing between live requests (proposal 3 s; 26 characters with all requests about 4 minutes). Single-character runs unchanged.
+2. Roster runs: the first rate-limited response stops the run (exit 4, no 60 s retry); done characters keep their rows, the rest are "not run", the summary is still written. The fingerprint skip makes the next run continue cheaply.
+
+## Resolved
+
 ### 2026-11-16 · Task · D: Roster: skip unchanged reports with a fingerprint
 Module: src/warmane_exporter/roster.py, export.py, pve_report.py (fingerprint field only), tests
 
@@ -60,46 +71,7 @@ PC timing acceptance used the same 26 Onyxia names as Task C and the existing Do
 
 The refresh completed without access, rate-limit or budget errors. Shared definition loading took 1.716 s; total-per-character averaged 34.571 s (max 73.480 s) because of slow transport responses.
 
-**Claude:** Pending review.
 
-**Claude:** Code accepted (2026-11-17). Reviewed the diff; 301 tests OK in the cloud clone. Preflight reads only the response cache and the export files, cache keys match `fetch_validated`, freshness uses the same max age, any mismatch or read error falls back to the normal path, and definitions load once and only when a character needs the normal path. Stays open until the owner's two timing runs on the PC are recorded here (Done when).
-
-## Resolved
-
-### 2026-11-16 · Progress · C: Roster run timing
-Module: src/warmane_exporter/roster.py, snapshot.py, export.py
-
-Added opt-in roster timing (`--timing` / `WARMANE_TIMING=1`) with stderr and cache-log output. The owner ran both measurements on the PC with the same 26 characters. Snapshot provenance confirms all three sections were network-fetched for 26/26 characters in run 1 and served from cache for 26/26 in run 2.
-
-| Step | Run 1 avg | Run 1 max | Run 2 avg | Run 2 max |
-|---|---:|---:|---:|---:|
-| Definition loading | 1.828s | 2.054s | 1.794s | 1.864s |
-| Cache lookup / network fetch | 2.474s | 2.533s | 0.011s | 0.016s |
-| Snapshot build and save | 0.316s | 0.417s | 0.308s | 0.359s |
-| Export JSON | 0.002s | 0.002s | 0.002s | 0.002s |
-| Export Markdown | 0.000s | 0.001s | 0.000s | 0.001s |
-| Export PvE HTML | 0.001s | 0.002s | 0.001s | 0.001s |
-| Copy to output folder | 0.001s | 0.001s | 0.001s | 0.002s |
-| Total per character | 4.684s | 4.890s | 2.180s | 2.251s |
-| Summary rendering | <0.001s | <0.001s | <0.001s | <0.001s |
-
-Total run: run 1 **121.850s**; run 2 **56.746s**. Definition loading dominates run 2 (1.794s average per character); cache lookup/network fetch falls to 0.011s average. Summary rendering values are below the log's 0.001s display resolution.
-
-Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 289 tests, OK, including `test_timing_off_emits_no_timing_output`, `test_timing_logs_steps_to_stderr_and_file_when_enabled`, and `test_export_cli_records_each_format_timing`. Python compilation and `git diff --check` pass. Task C remains open for Claude's review; Task D has not started.
-
-### 2026-11-16 · Task · C: Roster run timing (measure only)
-Module: src/warmane_exporter/roster.py, run.py, snapshot.py, export.py
-
-Owner: roster runs are slow even when every character comes from the cache. Measure where the time goes before changing anything.
-
-1. Add timing that is off by default and on with `--timing` on `roster` (or env var `WARMANE_TIMING=1`). For each character log the duration of: definition loading (client data, client-export.json, items.db), cache lookup / network fetch, snapshot build and save, export (JSON, Markdown, PvE HTML), copy to the output folder. Also log total per character and total run, plus summary rendering. Write the lines to stderr and to `.warmane-cache/timing-<YYYYMMDD-HHMM>.log`. No behaviour change when timing is off.
-2. Owner runs on the PC, same names both times (about 10 characters on one realm):
-   - Run 1: launcher or CLI with "Refresh all" (`--refresh`).
-   - Run 2: a few minutes later, normal run (everything should come from the cache).
-3. In the Progress entry, paste a short table per run: average and max per step, total run time, and say which step dominates in run 2.
-
-Done when: points 1-3 hold; `python -m unittest discover -s tests` passes (report counts), with a test that timing off produces no timing output; both runs measured on the PC and the table is in the Progress entry. Do not optimise anything in this task.
-
-**Claude:** Accepted (2026-11-16). Reviewed the diff (timing is opt-in, no behaviour change); 289 tests OK in the cloud clone. Reading of the numbers: in the cached run, definition loading is 1.79 s of 2.18 s per character (82 %); the export itself is about 5 ms. So the fingerprint skip gives the big win for unchanged characters, and loading the definitions once per roster run helps every run, including "Refresh all" (about 26 x 1.8 s = 47 s of run 1). Added as point 7 of task D. The 2.5 s network time per character in run 1 is the request spacing rule: leave it.
+**Claude:** Code accepted (2026-11-17). Reviewed the diff; 301 tests OK in the cloud clone. Preflight reads only the response cache and the export files, cache keys match `fetch_validated`, freshness uses the same max age, any mismatch or read error falls back to the normal path, and definitions load once and only when a character needs the normal path. Timing runs recorded: cached and unchanged 56.7 s -> 0.1 s. Accepted and closed. The 900 s refresh run is not slow transport: 13 of 26 characters took 62-73 s in the network step, which is the transport's 60 s cooldown after a rate-limited response (cooldown schedule 60/120/240 s; `transport-state.json` holds a host cooldown, and the budget counted 87 requests for 78 sources). So the armory rate-limited us about every second character and the transport retried. Request pacing did not change in task D (same 1 s spacing as task C, whose refresh run had no rate limit), so this is not a regression of D. Note for Copilot: a run that waited out rate limits is not "without rate-limit errors"; report such waits as an **Issue**. Also leave `**Claude:**` lines to Claude. Follow-up: Issue below.
 
 Older entries: `docs/COPILOT_NOTES_ARCHIVE.md`.
