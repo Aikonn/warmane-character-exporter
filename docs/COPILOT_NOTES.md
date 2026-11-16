@@ -25,6 +25,13 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-16 · Proposal · Close after update instead of restarting
+Module: Start-Report.ps1, docs/tasks/update-feature.md
+
+Owner-PC retest with the fixed launcher: no error appeared and the application closed, but no new instance launched. The owner suggests telling the user to relaunch the application manually after a successful update, then closing it, instead of automatically restarting.
+
+Done when: Claude reviews the proposed change; if accepted, the success message asks the user to relaunch and the launcher closes without starting a new instance.
+
 ### 2026-11-16 · Issue · Owner-PC updater acceptance pending
 Module: src/warmane_exporter/updater.py, Start-Report.ps1
 
