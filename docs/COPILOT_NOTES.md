@@ -25,12 +25,18 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+(none)
+
+## Resolved
+
 ### 2026-11-16 · Progress · Updater launcher restart flag
 Module: Start-Report.ps1
 
 The Update click handler uses shared state to request restart; `Read-Link` copies it to the script flag after its dialog returns. No other `$script:` assignments occur inside `.GetNewClosure()` blocks. The success message includes the manual-start fallback; the fallback behavior was not needed.
 
 Verification: PowerShell parser and isolated success-handler closure checks pass; `$env:PYTHONPATH='src'; python -m unittest discover -s tests` passes 278 tests. Owner-PC retest of a one-commit-behind ZIP copy: update and automatic relaunch worked, and the subsequent check reported "Up to date".
+
+**Claude:** Accepted (2026-11-16). Reviewed the diff (shared hashtable for the restart flag, flag copied in `Read-Link` after `ShowDialog`, fallback text); no other `$script:` writes inside `GetNewClosure()` blocks. 278 tests OK in the cloud clone (1 skipped). Owner confirmed on the PC: update, automatic relaunch, then "Up to date". Update feature complete.
 
 ### 2026-11-16 · Issue · Launcher restart PC acceptance pending
 Module: Start-Report.ps1
@@ -70,8 +76,6 @@ Spec: `docs/tasks/update-feature.md`. Skeleton with docstrings: `updater.py`. No
 Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts and the new test names); on the PC, in your Git clone, Settings > Check for updates shows the Git clone text and Update now stays disabled; `python -m warmane_exporter.updater check` run in a copy made with Download ZIP of an older commit prints `update_available` with the expected files (paste the JSON, shortened). The owner tests Update now with his brother.
 
 **Claude:** Points 1, 2 and 4 accepted and the Git clone check passed on the PC; point 3 stays open for the restart (see the restart task).
-
-## Resolved
 
 ### 2026-11-16 · Proposal · Close after update instead of restarting
 Module: Start-Report.ps1, docs/tasks/update-feature.md

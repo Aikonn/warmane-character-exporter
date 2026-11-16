@@ -11,7 +11,7 @@ Project: Warmane Character Exporter (repo Aikonn/warmane-character-exporter, loc
 ## Conventions
 
 - Ask the user only at the end, at most 400 characters, labeled "Action needed:" or "Decision needed:". Commands for the user in one fenced PowerShell block starting with "Clear-Host;". Short replies, no emojis.
-- Tests: `$env:PYTHONPATH="src"; python -m unittest discover -s tests` (fixture-based, no network). 237 tests pass on Linux at 458809e.
+- Tests: `$env:PYTHONPATH="src"; python -m unittest discover -s tests` (fixture-based, no network). 278 tests pass on Linux (2026-11-16).
 - Claude's cloud sandbox cannot reach armory.warmane.com reliably; live runs happen on the PC. Claude can read the PC folder (including git-ignored .warmane-cache/exports) through the desktop app bridge.
 
 ## Access rules
@@ -20,13 +20,13 @@ Project: Warmane Character Exporter (repo Aikonn/warmane-character-exporter, loc
 - GitHub (updater only): unauthenticated REST API and codeload zip for this repo, only when the user clicks Check for updates / Update now; at most 3 requests per click; no retries.
 - Respect robots.txt and terms of every third-party site before any request. wago.tools disallows automated access. Cavernoftime and EvoWoW blocked automated access; their terms were never reviewed.
 
-## State (2026-11-15)
+## State (2026-11-16)
 
 - End to end for any character: quick report (3 requests: raid readiness, gear, talents, glyphs, professions) and PvE report (about 28 requests: plus WotLK raid boss kills, raid achievements, emblems, reputation, mounts). Launcher Start-Report.cmd bootstraps a portable Python.
 - Definitions without the game client: client-export.json (texts) and AzerothCore items.db (item facts, sockets, set ids). GearScore, socket/meta/set bonus activation, stat totals, raid readiness checks are in.
 - Icecrown Citadel and Ruby Sanctum (Halion 10/25 normal/heroic) appear in the boss-kill tables and in the Fall of the Lich King / Lich King raid achievements. The armory tracks only Halion for Ruby Sanctum, not the mini-bosses.
 - Raid roster (done 2026-11-15): launcher option and `python -m warmane_exporter.roster` create quick reports for up to 40 names plus a timestamped HTML summary; cache reused for 120 minutes, "Refresh all" ignores it; not-found rows continue, access block / rate limit stops the run. Spec: docs/tasks/raid-roster.md.
-- Update from GitHub (designed 2026-11-16, task open): Settings button in the launcher; Check for updates compares local files with main via the GitHub API (no Git needed, testers use Download ZIP); Update now downloads main as a zip and copies it over the program files. Requests only on click. Spec: docs/tasks/update-feature.md.
+- Update from GitHub (done 2026-11-16): Settings button in the launcher; Check for updates compares local files with main via the GitHub API (no Git needed, testers use Download ZIP); Update now downloads main as a zip and copies it over the program files. Requests only on click. Spec: docs/tasks/update-feature.md.
 - Known gaps: active spec, conditional spell text, armory heroic kill counts sometimes copy normal counts (marked with *).
 
 ## Backlog (candidates, not approved)

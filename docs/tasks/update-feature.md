@@ -1,6 +1,6 @@
 # Task: update from GitHub (Settings window)
 
-Status: implemented 2026-11-16 (updater module, Settings window, 278 tests); restart after update being fixed. Owner decisions are marked (owner).
+Status: done and accepted on the PC 2026-11-16 (check, update, automatic relaunch). Owner decisions are marked (owner).
 
 ## Goal
 
