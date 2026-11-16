@@ -31,6 +31,18 @@ MAX_NAMES = 40
 DEFAULT_MAX_AGE_MINUTES = 120
 ARMORY_URL = "https://armory.warmane.com/character/{name}/{realm}/summary"
 STOP_NOTE = "Stopped roster: access block, rate limit, or request budget exhausted."
+CLASS_STYLES = {
+    "death knight": ("cls-death-knight", "#C41F3B", "#fff"),
+    "druid": ("cls-druid", "#FF7D0A", "#111"),
+    "hunter": ("cls-hunter", "#ABD473", "#111"),
+    "mage": ("cls-mage", "#69CCF0", "#111"),
+    "paladin": ("cls-paladin", "#F58CBA", "#111"),
+    "priest": ("cls-priest", "#FFFFFF", "#111"),
+    "rogue": ("cls-rogue", "#FFF569", "#111"),
+    "shaman": ("cls-shaman", "#0070DE", "#fff"),
+    "warlock": ("cls-warlock", "#9482C9", "#111"),
+    "warrior": ("cls-warrior", "#C79C6E", "#111"),
+}
 
 # Row status values.
 OK = "ok"
@@ -241,8 +253,9 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
             classes.append("count-high")
         return f'<span class="{" ".join(classes)}">{value}</span>'
 
-    def sortable_cell(content: str, sort_key: str) -> str:
-        return f'<td data-sort="{escape(sort_key, quote=True)}">{content}</td>'
+    def sortable_cell(content: str, sort_key: str, cell_class: str | None = None) -> str:
+        class_attr = f' class="{cell_class}"' if cell_class else ""
+        return f'<td{class_attr} data-sort="{escape(sort_key, quote=True)}">{content}</td>'
 
     table_rows: list[str] = []
     for row in sort_rows(rows):
@@ -266,6 +279,7 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
                 f'<a href="{escape(row.report_file, quote=True)}">Open</a>'
                 if row.report_file else ""
             )
+            class_style = CLASS_STYLES.get((row.class_name or "").casefold())
             data_age = ""
             if row.data_time is not None and row.from_cache is not None:
                 timestamp = datetime.fromtimestamp(row.data_time).strftime("%Y-%m-%d %H:%M")
@@ -280,7 +294,11 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
                 )
             cells = [
                 sortable_cell(escape(row.name), row.name.casefold()),
-                sortable_cell(escape(row.class_name or ""), (row.class_name or "").casefold()),
+                sortable_cell(
+                    escape(row.class_name or ""),
+                    (row.class_name or "").casefold(),
+                    class_style[0] if class_style else None,
+                ),
                 sortable_cell(
                     escape(" / ".join(row.main_trees)),
                     " / ".join(row.main_trees).casefold(),
@@ -316,6 +334,10 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
         f'<th class="sortable" data-type="{sort_type}">{heading}</th>'
         if sort_type is not None else f"<th>{heading}</th>"
         for heading, sort_type in headings
+    )
+    class_style_rules = "".join(
+        f".{css_class}{{background:{background};color:{foreground}}}"
+        for css_class, background, foreground in CLASS_STYLES.values()
     )
     sort_script = """<script>
 const headers = document.querySelectorAll("th.sortable");
@@ -367,7 +389,8 @@ headers.forEach(header => header.addEventListener("click", () => {
         ".status{color:#666;font-style:italic}"
         ".issues{font-size:.8em;margin:.1em 0}"
         ".count-issue{color:#b00020}.count-warn{color:#a65a00}.count-high{font-weight:700}"
-        "</style>\n</head>\n<body>\n"
+        + class_style_rules
+        + "</style>\n</head>\n<body>\n"
         f"<h1>Raid roster - {escape(realm)}</h1>\n"
         f"<p>Run time: {escape(run_time.strftime('%Y-%m-%d %H:%M'))}; "
         f"characters: {len(rows)}; from cache: {cached_count}; not OK: {not_ok_count}.</p>\n"

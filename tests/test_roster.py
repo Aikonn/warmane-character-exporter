@@ -227,7 +227,7 @@ class SummaryRenderingTests(unittest.TestCase):
         html = render_summary([row], "Onyxia", datetime(2026, 11, 15, 10, 30))
 
         self.assertIn(
-            '<td data-sort="alpha">Alpha</td><td data-sort="priest">Priest</td>'
+            '<td data-sort="alpha">Alpha</td><td class="cls-priest" data-sort="priest">Priest</td>'
             '<td data-sort="holy / discipline">Holy / Discipline</td>'
             '<td data-sort="4800">4800</td><td data-sort="245.5">245.5</td>'
             '<td data-sort="2"><span class="count-issue">2</span></td>'
@@ -240,6 +240,54 @@ class SummaryRenderingTests(unittest.TestCase):
             self.assertNotIn(f'<th class="sortable" data-type="text">{heading}</th>', html)
             self.assertNotIn(f'<th class="sortable" data-type="num">{heading}</th>', html)
         self.assertIn(".sortable{cursor:pointer}", html)
+
+    def test_class_colors_use_the_wotlk_335_palette(self):
+        palette = {
+            "Death Knight": ("cls-death-knight", "#C41F3B", "#fff"),
+            "Druid": ("cls-druid", "#FF7D0A", "#111"),
+            "Hunter": ("cls-hunter", "#ABD473", "#111"),
+            "Mage": ("cls-mage", "#69CCF0", "#111"),
+            "Paladin": ("cls-paladin", "#F58CBA", "#111"),
+            "Priest": ("cls-priest", "#FFFFFF", "#111"),
+            "Rogue": ("cls-rogue", "#FFF569", "#111"),
+            "Shaman": ("cls-shaman", "#0070DE", "#fff"),
+            "Warlock": ("cls-warlock", "#9482C9", "#111"),
+            "Warrior": ("cls-warrior", "#C79C6E", "#111"),
+        }
+        rows = [
+            RosterRow(name=name, realm="Onyxia", status=OK, class_name=name)
+            for name in palette
+        ]
+        html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
+
+        for class_name, (css_class, background, foreground) in palette.items():
+            with self.subTest(class_name=class_name):
+                self.assertIn(
+                    f'<td class="{css_class}" data-sort="{class_name.casefold()}">{class_name}</td>',
+                    html,
+                )
+                self.assertIn(
+                    f".{css_class}{{background:{background};color:{foreground}}}",
+                    html,
+                )
+                self.assertEqual(html.count(f".{css_class}{{"), 1)
+
+        pve_html = render_pve_html(build_pve_report({"identity": {"name": "X", "realm": "Onyxia"}}))
+        self.assertNotIn("cls-", pve_html)
+
+    def test_unknown_or_missing_class_has_no_color_class(self):
+        rows = [
+            RosterRow(name="Unknown", realm="Onyxia", status=OK, class_name="Evoker"),
+            RosterRow(name="Missing", realm="Onyxia", status=OK),
+        ]
+        html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
+        unknown_row = next(line for line in html.splitlines() if 'data-sort="unknown">Unknown' in line)
+        missing_row = next(line for line in html.splitlines() if 'data-sort="missing">Missing' in line)
+
+        self.assertIn('<td data-sort="evoker">Evoker</td>', unknown_row)
+        self.assertIn('<td data-sort=""></td>', missing_row)
+        self.assertNotIn('class="cls-', unknown_row)
+        self.assertNotIn('class="cls-', missing_row)
 
     def test_count_classes_for_zero_low_and_high_counts(self):
         rows = [

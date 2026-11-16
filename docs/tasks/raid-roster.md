@@ -63,6 +63,22 @@ Columns:
   the selected sort. Sortable headers use a pointer cursor. The page has one small inline
   script at the end of `<body>` and makes no network requests; character reports remain
   script-free.
+- Class cells use the WotLK 3.3.5 class color as their background, with dark text except
+  for Death Knight and Shaman, which use white text. The Priest cell keeps its table border;
+  unknown or missing classes get no color class. These styles affect only the roster summary.
+
+| Class | Background |
+|---|---|
+| Death Knight | `#C41F3B` |
+| Druid | `#FF7D0A` |
+| Hunter | `#ABD473` |
+| Mage | `#69CCF0` |
+| Paladin | `#F58CBA` |
+| Priest | `#FFFFFF` |
+| Rogue | `#FFF569` |
+| Shaman | `#0070DE` |
+| Warlock | `#9482C9` |
+| Warrior | `#C79C6E` |
 - OK rows show issue texts as compact plain lines in the Issues list column (no bullets or left padding); it is empty when there are no issues. Gear issue lines include the equipment slot name; spec issue lines do not.
 - Non-zero issue counts are red, non-zero warning counts are orange, and counts of 4 or more are bold; zero counts stay plain. Use CSS classes, not inline styles.
 - Rows with status "not found", "not run" or "failed" keep the name and armory link and show the status and reason in the Issues list column (marked gray italic); other cells empty.

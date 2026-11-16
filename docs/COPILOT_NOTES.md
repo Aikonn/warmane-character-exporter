@@ -27,6 +27,13 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 Do the two tasks in order: A, then B. Commit and report each separately.
 
+### 2026-11-16 · Progress · Roster summary: WotLK class colors
+Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
+
+Added the WotLK 3.3.5 class backgrounds to roster Class cells, using white text for Death Knight and Shaman and dark text for the other classes. Unknown or missing classes remain uncolored; character-report HTML is unchanged. Waiting for the owner's visual check before committing.
+
+Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests -p test_roster.py` — 24 tests, OK; `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 286 tests, OK. No live requests.
+
 ### 2026-11-16 · Progress · Roster summary main-tree fallback
 Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
 
