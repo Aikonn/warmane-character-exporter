@@ -25,6 +25,20 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-17 · Task · E: Adaptive request spacing, visible waits, Stop button
+Module: transport.py, snapshot.py, roster.py, run.py, progress.py, Start-Report.ps1, tests
+
+Owner decisions (2026-11-17). Applies to every live run (single character and roster); the roster benefits most.
+
+1. Adaptive spacing per run (one process): start at 1 s between live requests. After the first rate-limited response, raise it to 3 s. After 3 more rate-limited responses in the same run, raise it to 5 s. Never lower it within the run; the next run starts at 1 s again. The state must be shared by all requests of the run, also across characters in a roster (today each `snapshot.main` builds its own orchestrator), for example a small run-level pacing object passed in or kept at module level. Constants in one place (`1, 3, 5` seconds, threshold 3).
+2. Rate-limited response: keep today's behaviour of honouring Retry-After or the cooldown schedule (60/120/240 s with jitter) and retrying the same request; keep going after a successful retry. If one request is still rate-limited after the transport's maximum retries, stop as today (exit 4; roster: remaining characters "not run", summary written).
+3. Visible waits: during any wait longer than 2 s (cooldown or spacing), the progress text says so, updated about every 5 s, for example `Armory rate limit: waiting 45 s before the next request (spacing now 3 s)`. The percent does not move during waits. Also print one plain log line per rate-limit event (time, URL kind, wait, new spacing) to stderr and, when timing is on, to the timing log.
+4. Roster summary header: add the number of rate-limit waits and the final spacing when any happened (for example `rate-limit waits: 4, spacing 5 s`).
+5. Stop button in the launcher progress window (all modes), next to the progress text. Roster: the launcher writes a stop request file (for example `.warmane-cache/stop-request`), the roster checks it before each character and during waits (at least every second), then stops cleanly: done characters keep their rows, the rest are `not run` with note "stopped by user", the summary is written and opened. If the process has not ended 15 s after Stop, kill it as today. Single-character modes: Stop asks for confirmation and kills the process, as the window close does today. Remove a stale stop file at the start of every run.
+6. Update `docs/tasks/raid-roster.md` and README (rate limits, Stop button).
+
+Done when: points 1-6 hold; `python -m unittest discover -s tests` passes (report counts), with tests (fake clock and fake responses, no network) for: spacing 1 s -> 3 s after the first rate limit -> 5 s after 3 more, kept across two characters of one roster run and reset in a new run; wait progress text and the log line; summary header counts; stop file stops the roster before the next character and during a wait, with "stopped by user" rows and a written summary; stale stop file removed at start. On the PC: one roster run where the Stop button is pressed mid-run (paste the summary header line). A rate limit on the PC is not required; do not try to provoke one.
+
 ### 2026-11-17 · Issue · Roster refresh provokes armory rate limits
 Module: transport.py, budget.py, roster.py (raised by Claude, waiting for the owner's decision)
 
@@ -33,6 +47,9 @@ Task D's `--refresh` run of 26 characters (78 requests at 1 s spacing) hit the a
 Proposed fix (task E, after the owner decides the spacing):
 1. Roster runs: slower spacing between live requests (proposal 3 s; 26 characters with all requests about 4 minutes). Single-character runs unchanged.
 2. Roster runs: the first rate-limited response stops the run (exit 4, no 60 s retry); done characters keep their rows, the rest are "not run", the summary is still written. The fingerprint skip makes the next run continue cheaply.
+
+**Claude:** Owner decided (2026-11-17): keep 1 s, slow down step by step when rate-limited, keep going, show the wait, add a Stop button. He also observes that rate limits depend on network or region (his brother hits them more, sometimes right after the first armory page in a browser). Task E below.
+
 
 ## Resolved
 

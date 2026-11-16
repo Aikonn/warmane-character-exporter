@@ -16,7 +16,7 @@ Project: Warmane Character Exporter (repo Aikonn/warmane-character-exporter, loc
 
 ## Access rules
 
-- Warmane armory: plain HTTP, fixed browser-like User-Agent, requests 1 s apart, one character at a time, daily budget 500 (`python -m warmane_exporter.budget`). Stop on the first error. Never provoke a rate limit. No User-Agent rotation or evasion.
+- Warmane armory: plain HTTP, fixed browser-like User-Agent, requests 1 s apart, one character at a time, daily budget 500 (`python -m warmane_exporter.budget`). Never provoke a rate limit on purpose. When the armory rate-limits anyway, slow down instead of giving up (owner decision 2026-11-17): honour the cooldown / Retry-After, then raise the spacing to 3 s, and after more rate limits to 5 s (task E). The owner observes rate limits depend on the network or region (his brother's connection hits them more, sometimes right after the first armory page visit in a browser), not only on our request rate. Stop on access blocks and an exhausted budget. No User-Agent rotation or evasion.
 - GitHub (updater only): unauthenticated REST API and codeload zip for this repo, only when the user clicks Check for updates / Update now; at most 3 requests per click; no retries.
 - Respect robots.txt and terms of every third-party site before any request. wago.tools disallows automated access. Cavernoftime and EvoWoW blocked automated access; their terms were never reviewed.
 
