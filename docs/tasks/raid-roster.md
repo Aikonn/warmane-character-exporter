@@ -48,13 +48,15 @@ Columns:
 5. Average item level
 6. Issues (count)
 7. Warnings (count)
-8. First issue as short text (empty when none)
+8. Issues list: all issue texts in `run_checks` order, one item per line, HTML-escaped
 9. Report: relative link to the local quick report file
 10. Armory: link to https://armory.warmane.com/character/NAME/REALM/summary
 11. Data age (cached at, or "fresh")
 
 - Rows sorted by name (owner).
-- Rows with status "not found", "not run" or "failed" keep the name and armory link and show the status and reason in the First issue column (marked gray italic); other cells empty.
+- OK rows show issue texts as a compact `<ul class="issues">` in the Issues list column; it is empty when there are no issues.
+- Non-zero issue counts are red, non-zero warning counts are orange, and counts of 4 or more are bold; zero counts stay plain. Use CSS classes, not inline styles.
+- Rows with status "not found", "not run" or "failed" keep the name and armory link and show the status and reason in the Issues list column (marked gray italic); other cells empty.
 - Header line: realm, run time, number of characters, how many came from cache.
 - Professions are not shown (owner).
 

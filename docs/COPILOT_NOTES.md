@@ -25,6 +25,13 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-16 · Progress · Roster summary: all issues listed, colored counts
+Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
+
+`RosterRow.issue_texts` now keeps every `run_checks` issue in order. The summary renders the escaped compact Issues list, colors non-zero issue/warning counts, bolds counts of 4+, and leaves zero counts plain. Non-OK status notes remain gray and italic. The roster task spec now matches.
+
+Verification: `python -m unittest discover -s tests -p test_roster.py` — 18 tests, OK, including `test_build_row_keeps_all_issue_texts_in_check_order`, `test_render_summary_escapes_each_issue_in_the_list`, and `test_count_classes_for_zero_low_and_high_counts`. `python -m unittest discover -s tests` — 280 tests, OK. No live requests.
+
 ### 2026-11-16 · Task · Roster summary: all issues listed, colored counts
 Module: src/warmane_exporter/roster.py, tests/test_roster.py
 

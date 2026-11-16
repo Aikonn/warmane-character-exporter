@@ -82,12 +82,25 @@ class RosterRowTests(unittest.TestCase):
         self.assertEqual(row.average_item_level, pve["gearscore"]["average_item_level"])
         self.assertEqual(row.issues, len(pve["checks"]["issues"]))
         self.assertEqual(row.warnings, len(pve["checks"]["warnings"]))
-        self.assertEqual(row.first_issue, pve["checks"]["issues"][0]["text"])
+        self.assertEqual(
+            row.issue_texts,
+            [issue["text"] for issue in pve["checks"]["issues"]],
+        )
         self.assertEqual(row.data_time, self.report["snapshot_time"])
         self.assertTrue(row.from_cache)
         html = render_summary([row], "Onyxia", datetime(2026, 11, 15, 10, 30))
         cached_at = datetime.fromtimestamp(row.data_time).strftime("%Y-%m-%d %H:%M")
         self.assertIn(f"cached at {cached_at}", html)
+
+    def test_build_row_keeps_all_issue_texts_in_check_order(self):
+        issues = [{"text": "first"}, {"text": "second"}, {"text": "third"}]
+        with mock.patch("warmane_exporter.roster.run_checks", return_value={
+            "issues": issues,
+            "warnings": [],
+        }):
+            row = build_row(self.report, "Mélora-Onyxia-quick-pve.html", from_cache=False)
+
+        self.assertEqual(row.issue_texts, ["first", "second", "third"])
 
     def test_placeholder_rows_keep_identity_and_armory_link_only(self):
         for status in (NOT_FOUND, NOT_RUN, FAILED):
@@ -109,7 +122,7 @@ class SummaryRenderingTests(unittest.TestCase):
     def test_summary_file_name_uses_local_timestamp(self):
         self.assertEqual(summary_file_name(datetime(2026, 11, 15, 9, 7)), "raid-2026-11-15-0907.html")
 
-    def test_render_summary_escapes_name_and_issue_text(self):
+    def test_render_summary_escapes_each_issue_in_the_list(self):
         row = RosterRow(
             name="A<b>",
             realm="Onyxia",
@@ -118,9 +131,9 @@ class SummaryRenderingTests(unittest.TestCase):
             main_trees=["Holy"],
             gearscore=123,
             average_item_level=200,
-            issues=1,
+            issues=2,
             warnings=0,
-            first_issue="Missing <enchant>",
+            issue_texts=["Missing <enchant>", "Second & final"],
             report_file="A-b-Onyxia-quick-pve.html",
             armory_url="https://armory.warmane.com/character/A%3Cb%3E/Onyxia/summary",
             from_cache=False,
@@ -131,18 +144,47 @@ class SummaryRenderingTests(unittest.TestCase):
 
         self.assertIn("A&lt;b&gt;", html)
         self.assertIn("Missing &lt;enchant&gt;", html)
+        self.assertIn(
+            '<ul class="issues"><li>Missing &lt;enchant&gt;</li><li>Second &amp; final</li></ul>',
+            html,
+        )
         self.assertNotIn("A<b>", html)
         self.assertNotIn("Missing <enchant>", html)
         self.assertIn("fresh", html)
         self.assertIn("characters: 2; from cache: 0; not OK: 1", html)
         self.assertIn('href="A-b-Onyxia-quick-pve.html"', html)
         self.assertIn("https://armory.warmane.com/character/A%3Cb%3E/Onyxia/summary", html)
+        self.assertIn("<th>Issues list</th>", html)
         self.assertNotIn("<script", html)
         self.assertEqual(not_found_html.count("<td>"), 11)
         self.assertEqual(not_found_html.count("<td></td>"), 8)
         self.assertIn('<span class="status">not found: not found</span>', not_found_html)
         self.assertIn(".status{color:#666;font-style:italic}", html)
         self.assertIn('<a href="https://armory.warmane.com/character/Absent/Onyxia/summary">Armory</a>', not_found_html)
+
+    def test_count_classes_for_zero_low_and_high_counts(self):
+        rows = [
+            RosterRow(name="Zero", realm="Onyxia", status=OK, issues=0, warnings=0),
+            RosterRow(name="Low", realm="Onyxia", status=OK, issues=1, warnings=3),
+            RosterRow(name="High", realm="Onyxia", status=OK, issues=4, warnings=4),
+        ]
+        html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
+
+        self.assertIn("<td>0</td><td>0</td><td></td>", html)
+        self.assertIn(
+            '<td><span class="count-issue">1</span></td>'
+            '<td><span class="count-warn">3</span></td><td></td>',
+            html,
+        )
+        self.assertIn(
+            '<td><span class="count-issue count-high">4</span></td>'
+            '<td><span class="count-warn count-high">4</span></td><td></td>',
+            html,
+        )
+        self.assertIn(".count-issue{color:#b00020}", html)
+        self.assertIn(".count-warn{color:#a65a00}", html)
+        self.assertIn(".count-high{font-weight:700}", html)
+        self.assertIn(".issues{font-size:.8em;margin:.1em 0;padding-left:1.2em}", html)
 
 
 class RosterRunTests(unittest.TestCase):

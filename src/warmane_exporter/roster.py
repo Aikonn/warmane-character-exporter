@@ -58,7 +58,7 @@ class RosterRow:
     average_item_level: float | None = None
     issues: int | None = None
     warnings: int | None = None
-    first_issue: str | None = None
+    issue_texts: list[str] = field(default_factory=list)
     report_file: str | None = None      # file name relative to the output folder
     armory_url: str = ""
     data_time: float | None = None      # snapshot_time of the export (epoch seconds)
@@ -133,7 +133,8 @@ def build_row(report: dict[str, Any], report_file: str, from_cache: bool) -> Ros
     Pure function. Use the same functions the PvE report uses, so the numbers match the
     character's own page: ``gearscore.character_score(report["equipment"], class)`` and
     ``checks.run_checks(report)``. Main tree per specialization is its ``label`` when the
-    specialization has points, otherwise "-". first_issue is the text of the first issue.
+    specialization has points, otherwise "-". issue_texts contains all issue texts in
+    ``run_checks`` order.
     """
     identity = report["identity"]
     name = identity["name"]
@@ -160,7 +161,7 @@ def build_row(report: dict[str, Any], report_file: str, from_cache: bool) -> Ros
         average_item_level=score["average_item_level"],
         issues=len(issues),
         warnings=len(findings["warnings"]),
-        first_issue=issues[0]["text"] if issues else None,
+        issue_texts=[issue["text"] for issue in issues],
         report_file=report_file,
         armory_url=_armory_url(name, realm),
         data_time=data_time,
@@ -196,15 +197,26 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
 
     Header: realm, run time, number of characters, how many came from cache, and how many
     rows are not OK. Table columns, in order: Name, Class, Main trees ("Holy / Discipline"),
-    GearScore, Avg item level, Issues, Warnings, First issue, Report (relative link),
+    GearScore, Avg item level, Issues, Warnings, Issues list, Report (relative link),
     Armory (link), Data age. Every armory-derived text is HTML-escaped.
     """
     cached_count = sum(row.from_cache is True for row in rows)
     not_ok_count = sum(row.status != OK for row in rows)
     headings = (
         "Name", "Class", "Main trees", "GearScore", "Avg item level", "Issues", "Warnings",
-        "First issue", "Report", "Armory", "Data age",
+        "Issues list", "Report", "Armory", "Data age",
     )
+
+    def count_cell(value: int | None, color_class: str) -> str:
+        if value is None:
+            return ""
+        if value == 0:
+            return "0"
+        classes = [color_class]
+        if value >= 4:
+            classes.append("count-high")
+        return f'<span class="{" ".join(classes)}">{value}</span>'
+
     table_rows: list[str] = []
     for row in sort_rows(rows):
         armory = (
@@ -226,15 +238,22 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
                 data_age = f"cached at {cached_at}"
             elif row.from_cache is False:
                 data_age = "fresh"
+            issue_list = ""
+            if row.issue_texts:
+                issue_list = (
+                    '<ul class="issues">'
+                    + "".join(f"<li>{escape(text)}</li>" for text in row.issue_texts)
+                    + "</ul>"
+                )
             cells = [
                 escape(row.name),
                 escape(row.class_name or ""),
                 escape(" / ".join(row.main_trees)),
                 "" if row.gearscore is None else str(row.gearscore),
                 "" if row.average_item_level is None else f"{row.average_item_level:g}",
-                "" if row.issues is None else str(row.issues),
-                "" if row.warnings is None else str(row.warnings),
-                escape(row.first_issue or ""),
+                count_cell(row.issues, "count-issue"),
+                count_cell(row.warnings, "count-warn"),
+                issue_list,
                 report_link,
                 armory,
                 escape(data_age),
@@ -253,6 +272,8 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
         "th,td{border:1px solid #bbb;padding:.35em .6em;text-align:left;vertical-align:top}"
         "th{background:#eee}"
         ".status{color:#666;font-style:italic}"
+        ".issues{font-size:.8em;margin:.1em 0;padding-left:1.2em}"
+        ".count-issue{color:#b00020}.count-warn{color:#a65a00}.count-high{font-weight:700}"
         "</style>\n</head>\n<body>\n"
         f"<h1>Raid roster - {escape(realm)}</h1>\n"
         f"<p>Run time: {escape(run_time.strftime('%Y-%m-%d %H:%M'))}; "
