@@ -51,7 +51,14 @@ Implemented all seven points: the roster hashes source/config versions once, fin
 
 Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 301 tests, OK; `py_compile` for package modules and changed tests, OK; `git diff --check`, OK.
 
-PC timing acceptance used the same 26 Onyxia names as Task C and the existing Downloads output folder. Because the prior reports predated fingerprints, one cache-only priming run first rebuilt them with all 78 snapshot sources from cache and no network requests. The subsequent unchanged run skipped all 26 characters, with no snapshot steps: **0.113 s** total versus Task C's 56.746 s. The `--refresh` run fetched all 78/78 sources and completed without access, rate-limit or budget errors: **900.666 s** total versus Task C's 121.850 s; shared definition loading took 1.716 s, while total-per-character averaged 34.571 s (max 73.480 s) because of slow transport responses.
+PC timing acceptance used the same 26 Onyxia names as Task C and the existing Downloads output folder. Because the prior reports predated fingerprints, one cache-only priming run first rebuilt them with all 78 snapshot sources from cache and no network requests.
+
+| Run (26 characters) | Task C | Task D | Result |
+|---|---:|---:|---|
+| Cached, unchanged | 56.746 s | **0.113 s** | 26/26 skipped; no snapshot steps |
+| `--refresh` | 121.850 s | **900.666 s** | 78/78 sources fetched |
+
+The refresh completed without access, rate-limit or budget errors. Shared definition loading took 1.716 s; total-per-character averaged 34.571 s (max 73.480 s) because of slow transport responses.
 
 **Claude:** Pending review.
 
