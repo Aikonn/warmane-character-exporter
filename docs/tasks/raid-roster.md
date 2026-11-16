@@ -52,9 +52,17 @@ Columns:
    (for example `Chest: No enchant.`), one plain line per issue, HTML-escaped
 9. Report: relative link to the local quick report file
 10. Armory: link to https://armory.warmane.com/character/NAME/REALM/summary
-11. Data age (cached at, or "fresh")
+11. Data age (`YYYY-MM-DD HH:MM (from cache)` or `YYYY-MM-DD HH:MM (fresh)`, local time)
 
-- Rows sorted by name (owner).
+- Without JavaScript, rows are sorted by name (owner).
+- In the summary only, Name, Class, Main trees, GearScore, Avg item level, Issues, Warnings
+  and Data age are clickable sort columns. Each click sorts ascending; clicking the active
+  column again sorts descending. The active heading shows ▲ or ▼, text compares
+  case-insensitively, numeric values compare numerically, and empty values stay last.
+- When JavaScript is enabled, non-OK rows stay at the bottom in name order regardless of
+  the selected sort. Sortable headers use a pointer cursor. The page has one small inline
+  script at the end of `<body>` and makes no network requests; character reports remain
+  script-free.
 - OK rows show issue texts as compact plain lines in the Issues list column (no bullets or left padding); it is empty when there are no issues. Gear issue lines include the equipment slot name; spec issue lines do not.
 - Non-zero issue counts are red, non-zero warning counts are orange, and counts of 4 or more are bold; zero counts stay plain. Use CSS classes, not inline styles.
 - Rows with status "not found", "not run" or "failed" keep the name and armory link and show the status and reason in the Issues list column (marked gray italic); other cells empty.

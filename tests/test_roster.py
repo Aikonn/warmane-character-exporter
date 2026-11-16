@@ -7,7 +7,7 @@ from unittest import mock
 from contextlib import redirect_stdout
 import io
 
-from warmane_exporter.pve_report import build_pve_report
+from warmane_exporter.pve_report import build_pve_report, render_html as render_pve_html
 from warmane_exporter import progress
 from warmane_exporter.roster import (
     FAILED,
@@ -91,9 +91,6 @@ class RosterRowTests(unittest.TestCase):
         )
         self.assertEqual(row.data_time, self.report["snapshot_time"])
         self.assertTrue(row.from_cache)
-        html = render_summary([row], "Onyxia", datetime(2026, 11, 15, 10, 30))
-        cached_at = datetime.fromtimestamp(row.data_time).strftime("%Y-%m-%d %H:%M")
-        self.assertIn(f"cached at {cached_at}", html)
 
     def test_build_row_keeps_all_issue_texts_in_check_order(self):
         issues = [{"text": "first"}, {"text": "second"}, {"text": "third"}]
@@ -154,7 +151,7 @@ class SummaryRenderingTests(unittest.TestCase):
         )
         not_found = placeholder_row("Absent", "Onyxia", NOT_FOUND)
         html = render_summary([row, not_found], "Onyxia", datetime(2026, 11, 15, 10, 30))
-        not_found_html = next(line for line in html.splitlines() if "<td>Absent</td>" in line)
+        not_found_html = next(line for line in html.splitlines() if 'data-sort="absent">Absent</td>' in line)
 
         self.assertIn("A&lt;b&gt;", html)
         self.assertIn("&lt;Head &amp;&gt;: Missing &lt;enchant&gt;", html)
@@ -168,17 +165,67 @@ class SummaryRenderingTests(unittest.TestCase):
         self.assertNotIn("Missing <enchant>", html)
         self.assertNotIn("<ul", html)
         self.assertNotIn("<li", html)
-        self.assertIn("fresh", html)
         self.assertIn("characters: 2; from cache: 0; not OK: 1", html)
         self.assertIn('href="A-b-Onyxia-quick-pve.html"', html)
         self.assertIn("https://armory.warmane.com/character/A%3Cb%3E/Onyxia/summary", html)
         self.assertIn("<th>Issues list</th>", html)
-        self.assertNotIn("<script", html)
-        self.assertEqual(not_found_html.count("<td>"), 11)
-        self.assertEqual(not_found_html.count("<td></td>"), 8)
+        self.assertEqual(html.count("<script>"), 1)
+        self.assertEqual(html.count("</script>"), 1)
+        pve_html = render_pve_html(build_pve_report({"identity": {"name": "X", "realm": "Onyxia"}}))
+        self.assertEqual(pve_html.count("<script"), 0)
+        self.assertEqual(not_found_html.count("<td"), 11)
+        self.assertEqual(not_found_html.count("<td></td>"), 1)
+        self.assertIn('<tr class="not-ok"><td data-sort="absent">Absent</td>', not_found_html)
         self.assertIn('<span class="status">not found: not found</span>', not_found_html)
         self.assertIn(".status{color:#666;font-style:italic}", html)
         self.assertIn('<a href="https://armory.warmane.com/character/Absent/Onyxia/summary">Armory</a>', not_found_html)
+
+    def test_data_age_format_is_zero_padded_for_cached_and_fresh_rows(self):
+        rows = [
+            RosterRow(name="Cached", realm="Onyxia", status=OK, data_time=1234567890, from_cache=True),
+            RosterRow(name="Fresh", realm="Onyxia", status=OK, data_time=1234567890, from_cache=False),
+        ]
+        with mock.patch("warmane_exporter.roster.datetime") as local_datetime:
+            local_datetime.fromtimestamp.return_value = datetime(2026, 1, 6, 9, 4)
+            html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
+
+        self.assertIn('data-sort="1234567890">2026-01-06 09:04 (from cache)</td>', html)
+        self.assertIn('data-sort="1234567890">2026-01-06 09:04 (fresh)</td>', html)
+        self.assertEqual(local_datetime.fromtimestamp.call_count, 2)
+
+    def test_sortable_cells_have_text_numeric_and_epoch_sort_keys(self):
+        row = RosterRow(
+            name="Alpha",
+            realm="Onyxia",
+            status=OK,
+            class_name="Priest",
+            main_trees=["Holy", "Discipline"],
+            gearscore=4800,
+            average_item_level=245.5,
+            issues=2,
+            warnings=3,
+            issue_texts=["An issue"],
+            report_file="Alpha-Onyxia-quick-pve.html",
+            armory_url="https://armory.warmane.com/character/Alpha/Onyxia/summary",
+            data_time=1234567890,
+            from_cache=True,
+        )
+        html = render_summary([row], "Onyxia", datetime(2026, 11, 15, 10, 30))
+
+        self.assertIn(
+            '<td data-sort="alpha">Alpha</td><td data-sort="priest">Priest</td>'
+            '<td data-sort="holy / discipline">Holy / Discipline</td>'
+            '<td data-sort="4800">4800</td><td data-sort="245.5">245.5</td>'
+            '<td data-sort="2"><span class="count-issue">2</span></td>'
+            '<td data-sort="3"><span class="count-warn">3</span></td>',
+            html,
+        )
+        self.assertIn('<td data-sort="1234567890">', html)
+        for heading in ("Issues list", "Report", "Armory"):
+            self.assertIn(f"<th>{heading}</th>", html)
+            self.assertNotIn(f'<th class="sortable" data-type="text">{heading}</th>', html)
+            self.assertNotIn(f'<th class="sortable" data-type="num">{heading}</th>', html)
+        self.assertIn(".sortable{cursor:pointer}", html)
 
     def test_count_classes_for_zero_low_and_high_counts(self):
         rows = [
@@ -188,15 +235,18 @@ class SummaryRenderingTests(unittest.TestCase):
         ]
         html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
 
-        self.assertIn("<td>0</td><td>0</td><td></td>", html)
         self.assertIn(
-            '<td><span class="count-issue">1</span></td>'
-            '<td><span class="count-warn">3</span></td><td></td>',
+            '<td data-sort="0">0</td><td data-sort="0">0</td><td></td>',
             html,
         )
         self.assertIn(
-            '<td><span class="count-issue count-high">4</span></td>'
-            '<td><span class="count-warn count-high">4</span></td><td></td>',
+            '<td data-sort="1"><span class="count-issue">1</span></td>'
+            '<td data-sort="3"><span class="count-warn">3</span></td><td></td>',
+            html,
+        )
+        self.assertIn(
+            '<td data-sort="4"><span class="count-issue count-high">4</span></td>'
+            '<td data-sort="4"><span class="count-warn count-high">4</span></td><td></td>',
             html,
         )
         self.assertIn(".count-issue{color:#b00020}", html)

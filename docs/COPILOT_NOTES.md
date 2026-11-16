@@ -27,6 +27,13 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 Do the two tasks in order: A, then B. Commit and report each separately.
 
+### 2026-11-16 · Progress · Roster summary sorting and Data age
+Module: src/warmane_exporter/roster.py, tests/test_roster.py, docs/tasks/raid-roster.md
+
+Added sortable roster columns with numeric/text/epoch keys, local zero-padded Data age labels, status rows pinned after OK rows when JavaScript runs, and one inline summary-only script. The summary task spec documents the columns and behavior.
+
+Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests -p test_roster.py` — 21 tests, OK; `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 283 tests, OK; `py -3.12 -m py_compile src\warmane_exporter\roster.py tests\test_roster.py` and `git diff --check` passed. No live requests. Owner browser check remains.
+
 ### 2026-11-16 · Task · A: Roster summary: click-to-sort columns, Data age format
 Module: src/warmane_exporter/roster.py, tests/test_roster.py
 

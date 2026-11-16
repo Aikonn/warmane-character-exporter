@@ -196,18 +196,22 @@ def summary_file_name(now: datetime) -> str:
 
 
 def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str:
-    """Self-contained HTML summary page in the style of pve_report (inline CSS, no scripts).
+    """Render a self-contained HTML roster summary with client-side sortable columns.
 
     Header: realm, run time, number of characters, how many came from cache, and how many
     rows are not OK. Table columns, in order: Name, Class, Main trees ("Holy / Discipline"),
     GearScore, Avg item level, Issues, Warnings, Issues list, Report (relative link),
-    Armory (link), Data age. Every armory-derived text is HTML-escaped.
+    Armory (link), Data age. The first seven columns and Data age sort on click; other
+    columns are not sortable. Non-OK rows stay at the bottom in name order when sorting.
+    Without JavaScript, rows remain in name order. Every armory-derived text is HTML-escaped.
     """
     cached_count = sum(row.from_cache is True for row in rows)
     not_ok_count = sum(row.status != OK for row in rows)
     headings = (
-        "Name", "Class", "Main trees", "GearScore", "Avg item level", "Issues", "Warnings",
-        "Issues list", "Report", "Armory", "Data age",
+        ("Name", "text"), ("Class", "text"), ("Main trees", "text"),
+        ("GearScore", "num"), ("Avg item level", "num"), ("Issues", "num"),
+        ("Warnings", "num"), ("Issues list", None), ("Report", None),
+        ("Armory", None), ("Data age", "num"),
     )
 
     def count_cell(value: int | None, color_class: str) -> str:
@@ -220,6 +224,9 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
             classes.append("count-high")
         return f'<span class="{" ".join(classes)}">{value}</span>'
 
+    def sortable_cell(content: str, sort_key: str) -> str:
+        return f'<td data-sort="{escape(sort_key, quote=True)}">{content}</td>'
+
     table_rows: list[str] = []
     for row in sort_rows(rows):
         armory = (
@@ -229,18 +236,24 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
         if row.status != OK:
             reason = row.note or row.status
             status_note = f'<span class="status">{escape(row.status)}: {escape(reason)}</span>'
-            cells = [escape(row.name), *([""] * 6), status_note, "", armory, ""]
+            cells = [
+                sortable_cell(escape(row.name), row.name.casefold()),
+                *(sortable_cell("", "") for _ in range(6)),
+                f"<td>{status_note}</td>",
+                "<td></td>",
+                f"<td>{armory}</td>",
+                sortable_cell("", ""),
+            ]
         else:
             report_link = (
                 f'<a href="{escape(row.report_file, quote=True)}">Open</a>'
                 if row.report_file else ""
             )
             data_age = ""
-            if row.from_cache is True and row.data_time is not None:
-                cached_at = datetime.fromtimestamp(row.data_time).strftime("%Y-%m-%d %H:%M")
-                data_age = f"cached at {cached_at}"
-            elif row.from_cache is False:
-                data_age = "fresh"
+            if row.data_time is not None and row.from_cache is not None:
+                timestamp = datetime.fromtimestamp(row.data_time).strftime("%Y-%m-%d %H:%M")
+                freshness = "from cache" if row.from_cache else "fresh"
+                data_age = f"{timestamp} ({freshness})"
             issue_list = ""
             if row.issue_texts:
                 issue_list = (
@@ -249,21 +262,81 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
                     + "</div>"
                 )
             cells = [
-                escape(row.name),
-                escape(row.class_name or ""),
-                escape(" / ".join(row.main_trees)),
-                "" if row.gearscore is None else str(row.gearscore),
-                "" if row.average_item_level is None else f"{row.average_item_level:g}",
-                count_cell(row.issues, "count-issue"),
-                count_cell(row.warnings, "count-warn"),
-                issue_list,
-                report_link,
-                armory,
-                escape(data_age),
+                sortable_cell(escape(row.name), row.name.casefold()),
+                sortable_cell(escape(row.class_name or ""), (row.class_name or "").casefold()),
+                sortable_cell(
+                    escape(" / ".join(row.main_trees)),
+                    " / ".join(row.main_trees).casefold(),
+                ),
+                sortable_cell(
+                    "" if row.gearscore is None else str(row.gearscore),
+                    "" if row.gearscore is None else str(row.gearscore),
+                ),
+                sortable_cell(
+                    "" if row.average_item_level is None else f"{row.average_item_level:g}",
+                    "" if row.average_item_level is None else str(row.average_item_level),
+                ),
+                sortable_cell(
+                    count_cell(row.issues, "count-issue"),
+                    "" if row.issues is None else str(row.issues),
+                ),
+                sortable_cell(
+                    count_cell(row.warnings, "count-warn"),
+                    "" if row.warnings is None else str(row.warnings),
+                ),
+                f"<td>{issue_list}</td>",
+                f"<td>{report_link}</td>",
+                f"<td>{armory}</td>",
+                sortable_cell(
+                    escape(data_age),
+                    "" if not data_age else str(row.data_time),
+                ),
             ]
-        table_rows.append("<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>")
+        row_class = ' class="not-ok"' if row.status != OK else ""
+        table_rows.append(f"<tr{row_class}>" + "".join(cells) + "</tr>")
 
-    table_head = "".join(f"<th>{heading}</th>" for heading in headings)
+    table_head = "".join(
+        f'<th class="sortable" data-type="{sort_type}">{heading}</th>'
+        if sort_type is not None else f"<th>{heading}</th>"
+        for heading, sort_type in headings
+    )
+    sort_script = """<script>
+const headers = document.querySelectorAll("th.sortable");
+const body = document.querySelector("tbody");
+let activeHeader = null;
+let descending = false;
+function sortRows(column, type, reverse) {
+  const rows = Array.from(body.rows);
+  rows.sort((a, b) => {
+    const aBad = a.classList.contains("not-ok");
+    const bBad = b.classList.contains("not-ok");
+    if (aBad !== bBad) return aBad ? 1 : -1;
+    if (aBad) return a.cells[0].dataset.sort.localeCompare(b.cells[0].dataset.sort);
+    const av = a.cells[column].dataset.sort || "";
+    const bv = b.cells[column].dataset.sort || "";
+    if (!av || !bv) return av ? -1 : bv ? 1 : 0;
+    const order = type === "num" ? Number(av) - Number(bv) : av.localeCompare(bv);
+    return reverse ? -order : order;
+  });
+  rows.forEach(row => body.appendChild(row));
+}
+sortRows(0, "text", false);
+headers.forEach(header => header.addEventListener("click", () => {
+  descending = activeHeader === header ? !descending : false;
+  activeHeader = header;
+  sortRows(header.cellIndex, header.dataset.type, descending);
+  headers.forEach(item => {
+    item.removeAttribute("aria-sort");
+    const marker = item.querySelector(".sort-marker");
+    if (marker) marker.remove();
+  });
+  header.setAttribute("aria-sort", descending ? "descending" : "ascending");
+  const marker = document.createElement("span");
+  marker.className = "sort-marker";
+  marker.textContent = descending ? " ▼" : " ▲";
+  header.appendChild(marker);
+}));
+</script>"""
     return (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n"
         '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
@@ -273,7 +346,7 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
         "h1{border-bottom:2px solid #444;padding-bottom:.2em}"
         "table{border-collapse:collapse;width:100%;margin:.6em 0;font-size:.92em}"
         "th,td{border:1px solid #bbb;padding:.35em .6em;text-align:left;vertical-align:top}"
-        "th{background:#eee}"
+        "th{background:#eee}.sortable{cursor:pointer}"
         ".status{color:#666;font-style:italic}"
         ".issues{font-size:.8em;margin:.1em 0}"
         ".count-issue{color:#b00020}.count-warn{color:#a65a00}.count-high{font-weight:700}"
@@ -283,7 +356,7 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
         f"characters: {len(rows)}; from cache: {cached_count}; not OK: {not_ok_count}.</p>\n"
         "<table>\n<thead><tr>" + table_head + "</tr></thead>\n<tbody>\n"
         + "\n".join(table_rows)
-        + "\n</tbody>\n</table>\n</body>\n</html>\n"
+        + "\n</tbody>\n</table>\n" + sort_script + "\n</body>\n</html>\n"
     )
 
 
