@@ -27,6 +27,27 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 Do the two tasks in order: C, then D. Commit and report each separately. D starts only after Claude has read the C measurements.
 
+### 2026-11-16 · Progress · C: Roster run timing
+Module: src/warmane_exporter/roster.py, snapshot.py, export.py
+
+Added opt-in roster timing (`--timing` / `WARMANE_TIMING=1`) with stderr and cache-log output. The owner ran both measurements on the PC with the same 26 characters. Snapshot provenance confirms all three sections were network-fetched for 26/26 characters in run 1 and served from cache for 26/26 in run 2.
+
+| Step | Run 1 avg | Run 1 max | Run 2 avg | Run 2 max |
+|---|---:|---:|---:|---:|
+| Definition loading | 1.828s | 2.054s | 1.794s | 1.864s |
+| Cache lookup / network fetch | 2.474s | 2.533s | 0.011s | 0.016s |
+| Snapshot build and save | 0.316s | 0.417s | 0.308s | 0.359s |
+| Export JSON | 0.002s | 0.002s | 0.002s | 0.002s |
+| Export Markdown | 0.000s | 0.001s | 0.000s | 0.001s |
+| Export PvE HTML | 0.001s | 0.002s | 0.001s | 0.001s |
+| Copy to output folder | 0.001s | 0.001s | 0.001s | 0.002s |
+| Total per character | 4.684s | 4.890s | 2.180s | 2.251s |
+| Summary rendering | <0.001s | <0.001s | <0.001s | <0.001s |
+
+Total run: run 1 **121.850s**; run 2 **56.746s**. Definition loading dominates run 2 (1.794s average per character); cache lookup/network fetch falls to 0.011s average. Summary rendering values are below the log's 0.001s display resolution.
+
+Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 289 tests, OK, including `test_timing_off_emits_no_timing_output`, `test_timing_logs_steps_to_stderr_and_file_when_enabled`, and `test_export_cli_records_each_format_timing`. Python compilation and `git diff --check` pass. Task C remains open for Claude's review; Task D has not started.
+
 ### 2026-11-16 · Task · C: Roster run timing (measure only)
 Module: src/warmane_exporter/roster.py, run.py, snapshot.py, export.py
 

@@ -15,7 +15,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from time import time
+from time import perf_counter, time
 from typing import Any, Callable
 from urllib.parse import quote
 
@@ -27,6 +27,7 @@ from .http_client import UrllibHttpClient
 from .identity import SUPPORTED_HOST, SUPPORTED_REALMS
 from .summary_parser import parse_summary_capture_html
 from .talents_parser import parse_talents_capture_html
+from .timing import record_timing, timed, timing_active, timing_total
 from .transport import RequestOrchestrator, TransportConfig
 from .warmane_api import api_summary_url, parse_api_summary
 
@@ -148,9 +149,20 @@ def build_snapshot(
     reject_dir: Path | None = None,
     **options: Any,
 ) -> dict[str, Any]:
+    fetch_elapsed = 0.0
+
+    def fetch(url: str, source: str, parser: Callable[..., Any], **kwargs: Any) -> FetchResult:
+        nonlocal fetch_elapsed
+        started = perf_counter() if timing_active() else None
+        try:
+            return fetch_validated(url, source, parser, **kwargs)
+        finally:
+            if started is not None:
+                fetch_elapsed += perf_counter() - started
+
     common = dict(cache=cache, orchestrator=orchestrator, client=client, now_fn=now_fn,
                   reject_dir=reject_dir, **options)
-    json_res = fetch_validated(api_summary_url(name, realm), "warmane-json-summary", parse_api_summary, **common)
+    json_res = fetch(api_summary_url(name, realm), "warmane-json-summary", parse_api_summary, **common)
     if json_res.status == "not_found":
         html_res = FetchResult("not_run", None, "none", None, "Not run: character does not exist.")
         talents_res = FetchResult("not_run", None, "none", None, "Not run: character does not exist.")
@@ -158,13 +170,13 @@ def build_snapshot(
         html_res = FetchResult("not_run", None, "none", None, "Not run: host access was blocked.")
         talents_res = FetchResult("not_run", None, "none", None, "Not run: host access was blocked.")
     else:
-        html_res = fetch_validated(character_page_url(name, realm, "summary"), "warmane-html-summary",
-                                   _validate_summary_html, **common)
+        html_res = fetch(character_page_url(name, realm, "summary"), "warmane-html-summary",
+                         _validate_summary_html, **common)
         if html_res.status in ("failed_rate_limited", "failed_access_blocked") or html_res.stop_reason:
             talents_res = FetchResult("not_run", None, "none", None, "Not run: host access was blocked.")
         else:
-            talents_res = fetch_validated(character_page_url(name, realm, "talents"), "warmane-html-talents",
-                                          _validate_talents_html, **common)
+            talents_res = fetch(character_page_url(name, realm, "talents"), "warmane-html-talents",
+                                _validate_talents_html, **common)
 
     notes: list[str] = []
     if defs is not None:
@@ -180,7 +192,7 @@ def build_snapshot(
     sections = {"json_summary": _section(json_res), "html_summary": _section(html_res),
                 "talents": _section(talents_res)}
     ok_count = sum(1 for s in sections.values() if s["status"] == "ok")
-    return {
+    result = {
         "schema": SNAPSHOT_SCHEMA,
         "generated_at": now_fn(),
         "character": {"name": name, "realm": SUPPORTED_REALMS[realm.strip().lower()]},
@@ -188,6 +200,8 @@ def build_snapshot(
         "notes": notes,
         "sections": sections,
     }
+    record_timing(f"{name}@{realm} | cache lookup / network fetch", fetch_elapsed)
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -215,26 +229,30 @@ def main(argv: list[str] | None = None) -> int:
 
     defs_ctx = None
     client_defs = None
-    if not args.no_client:
-        try:
-            from .client_definitions import ClientDefinitions
-            from .config import find_config_path, load_config, resolve_wow_client_dir
-            from .mpq_reader import ClientData
+    with timed(f"{args.name}@{args.realm} | definition loading"):
+        if not args.no_client:
+            try:
+                from .client_definitions import ClientDefinitions
+                from .config import find_config_path, load_config, resolve_wow_client_dir
+                from .mpq_reader import ClientData
 
-            data_dir = resolve_wow_client_dir(load_config(find_config_path(None))) / "Data"
-            defs_ctx = ClientData(data_dir)
-            client_defs = ClientDefinitions(defs_ctx.__enter__())
-        except Exception as exc:  # the client is optional; continue with other sources
-            print(f"Note: game client unavailable ({exc}).", file=sys.stderr)
-            client_defs = None
-    from .definitions import load_definitions
+                data_dir = resolve_wow_client_dir(load_config(find_config_path(None))) / "Data"
+                defs_ctx = ClientData(data_dir)
+                client_defs = ClientDefinitions(defs_ctx.__enter__())
+            except Exception as exc:  # the client is optional; continue with other sources
+                print(f"Note: game client unavailable ({exc}).", file=sys.stderr)
+                client_defs = None
+        from .definitions import load_definitions
 
-    defs = load_definitions(client_defs, Path("library"))
+        defs = load_definitions(client_defs, Path("library"))
     if defs is None:
         print("Note: no definition source (no client, no library/acore/items.db; run acore_cli fetch).", file=sys.stderr)
     else:
         print("Definition sources: " + ", ".join(defs.source_names), file=sys.stderr)
 
+    fetch_label = f"{args.name}@{args.realm} | cache lookup / network fetch"
+    fetch_before = timing_total(fetch_label) if timing_active() else 0.0
+    build_started = perf_counter() if timing_active() else None
     try:
         snapshot = build_snapshot(
             args.name, args.realm, cache, orchestrator, budgeted_client(cache_dir), defs=defs,
@@ -253,7 +271,13 @@ def main(argv: list[str] | None = None) -> int:
         if defs_ctx is not None:
             defs_ctx.__exit__(None, None, None)
 
+    fetch_elapsed = timing_total(fetch_label) - fetch_before if build_started is not None else 0.0
+    build_elapsed = (
+        max(0.0, perf_counter() - build_started - fetch_elapsed)
+        if build_started is not None else 0.0
+    )
     if snapshot["sections"]["json_summary"]["status"] == "not_found":
+        record_timing(f"{args.name}@{args.realm} | snapshot build and save", build_elapsed)
         print("json_summary: not_found (network) Character does not exist.")
         print("complete: False")
         return 3
@@ -262,7 +286,10 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = int(snapshot["generated_at"])
     out_path = out_dir / f"{args.name.lower()}-{snapshot['character']['realm'].lower()}-{stamp}.json"
+    save_started = perf_counter() if build_started is not None else None
     out_path.write_text(json.dumps(snapshot, indent=2, ensure_ascii=False), encoding="utf-8")
+    save_elapsed = perf_counter() - save_started if save_started is not None else 0.0
+    record_timing(f"{args.name}@{args.realm} | snapshot build and save", build_elapsed + save_elapsed)
     for key, section in snapshot["sections"].items():
         print(f"{key}: {section['status']} ({section['origin']}) {section['detail']}")
     print(f"complete: {snapshot['complete']}")

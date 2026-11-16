@@ -1,11 +1,13 @@
 """Raid roster: quick PvE report for a list of characters plus one summary page.
 
-python -m warmane_exporter.roster --realm Onyxia --names-file names.txt --output-dir DIR [--refresh] [--max-age-minutes 120]
+python -m warmane_exporter.roster --realm Onyxia --names-file names.txt --output-dir DIR [--refresh] [--max-age-minutes 120] [--timing]
 
 Specification: docs/tasks/raid-roster.md. For each name the quick path of run.py is used
 (3 live requests, none when the cache is younger than --max-age-minutes). Each character's
 quick report is copied into DIR as <name>-<realm>-quick-pve.html and a summary page
 raid-YYYY-MM-DD-HHMM.html is written next to them. Everything goes into DIR, no subfolder.
+Timing is opt-in with --timing or WARMANE_TIMING=1; it is written to stderr and
+.warmane-cache/timing-YYYYMMDD-HHMM.log.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from urllib.parse import quote
 
 from .checks import run_checks
 from .gearscore import character_score
+from .timing import TimingLog, activate, timed, timing_requested
 
 REALMS = ("Onyxia", "Icecrown")
 MAX_NAMES = 40
@@ -401,7 +404,7 @@ headers.forEach(header => header.addEventListener("click", () => {
 
 
 def run_roster(names: list[str], realm: str, output_dir: Path, cache_dir: str,
-               refresh: bool, max_age_minutes: int) -> tuple[list[RosterRow], Path]:
+               refresh: bool, max_age_minutes: int, timing: bool = False) -> tuple[list[RosterRow], Path]:
     """Run the quick report for each name in order, then write the summary.
 
     - One character at a time through the quick path of run.py, with the cache age passed
@@ -413,11 +416,21 @@ def run_roster(names: list[str], realm: str, output_dir: Path, cache_dir: str,
       continue.
     - Copy each quick report HTML into output_dir (overwrite), write the summary there
       atomically (temp name, then rename). Returns the rows and the summary path.
+    - With ``timing`` or WARMANE_TIMING=1, log per-character steps and total run time to
+      stderr and timing-YYYYMMDD-HHMM.log in cache_dir.
     """
+    cache_path = Path(cache_dir)
+    log = TimingLog(cache_path) if timing_requested(timing) else None
+    with activate(log):
+        with timed("total run"):
+            return _run_roster(names, realm, output_dir, cache_path, refresh, max_age_minutes)
+
+
+def _run_roster(names: list[str], realm: str, output_dir: Path, cache_path: Path,
+                refresh: bool, max_age_minutes: int) -> tuple[list[RosterRow], Path]:
     from . import run
     from .progress import note, start
 
-    cache_path = Path(cache_dir)
     exports_dir = cache_path / "exports"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -426,58 +439,61 @@ def run_roster(names: list[str], realm: str, output_dir: Path, cache_dir: str,
 
     start(4 * len(names), "Starting raid roster")
     for index, name in enumerate(names, start=1):
-        if stopped:
-            rows.append(placeholder_row(name, realm, NOT_RUN, "An earlier character stopped the roster."))
-            continue
+        with timed(f"{name}@{realm} | total per character"):
+            if stopped:
+                rows.append(placeholder_row(name, realm, NOT_RUN, "An earlier character stopped the roster."))
+                continue
 
-        note(f"Character {index} of {len(names)}: {name}")
-        code = run.run_character(
-            name, realm, str(cache_path), refresh, False, quick=True,
-            max_age_minutes=max_age_minutes, start_progress=False,
-        )
-        if code == 3:
-            rows.append(placeholder_row(name, realm, NOT_FOUND, "Character does not exist."))
-            continue
-        if code == 4:
-            rows.append(placeholder_row(name, realm, FAILED, STOP_NOTE))
-            stopped = True
-            continue
-        if code != 0:
-            rows.append(placeholder_row(name, realm, FAILED, f"Character run failed (exit code {code})."))
-            continue
+            note(f"Character {index} of {len(names)}: {name}")
+            code = run.run_character(
+                name, realm, str(cache_path), refresh, False, quick=True,
+                max_age_minutes=max_age_minutes, start_progress=False,
+            )
+            if code == 3:
+                rows.append(placeholder_row(name, realm, NOT_FOUND, "Character does not exist."))
+                continue
+            if code == 4:
+                rows.append(placeholder_row(name, realm, FAILED, STOP_NOTE))
+                stopped = True
+                continue
+            if code != 0:
+                rows.append(placeholder_row(name, realm, FAILED, f"Character run failed (exit code {code})."))
+                continue
 
-        stem = f"{name.lower()}-{realm.lower()}-quick"
-        report_path = exports_dir / f"{stem}.json"
-        html_path = exports_dir / f"{stem}-pve.html"
-        target_html = output_dir / html_path.name
-        try:
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-            snapshot_paths = sorted(
-                (cache_path / "snapshots").glob(f"{name.lower()}-{realm.lower()}-*.json"),
-                key=lambda path: path.stat().st_mtime,
-            )
-            if not snapshot_paths:
-                raise FileNotFoundError(f"No snapshot found for {name}@{realm}.")
-            snapshot_data = json.loads(snapshot_paths[-1].read_text(encoding="utf-8"))
-            sections = snapshot_data["sections"]
-            from_cache = all(
-                sections[key]["origin"] == "cache"
-                for key in ("json_summary", "html_summary", "talents")
-            )
-            row = build_row(report, target_html.name, from_cache)
-            if not html_path.is_file():
-                raise FileNotFoundError(f"Quick report HTML is missing for {name}@{realm}.")
-            if html_path.resolve() != target_html.resolve():
-                shutil.copyfile(html_path, target_html)
-        except (OSError, ValueError, KeyError, TypeError) as exc:
-            print(f"Could not assemble roster row for {name}: {exc}", file=sys.stderr)
-            rows.append(placeholder_row(name, realm, FAILED, f"Could not build report row: {exc}"))
-            continue
-        rows.append(row)
+            stem = f"{name.lower()}-{realm.lower()}-quick"
+            report_path = exports_dir / f"{stem}.json"
+            html_path = exports_dir / f"{stem}-pve.html"
+            target_html = output_dir / html_path.name
+            try:
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                snapshot_paths = sorted(
+                    (cache_path / "snapshots").glob(f"{name.lower()}-{realm.lower()}-*.json"),
+                    key=lambda path: path.stat().st_mtime,
+                )
+                if not snapshot_paths:
+                    raise FileNotFoundError(f"No snapshot found for {name}@{realm}.")
+                snapshot_data = json.loads(snapshot_paths[-1].read_text(encoding="utf-8"))
+                sections = snapshot_data["sections"]
+                from_cache = all(
+                    sections[key]["origin"] == "cache"
+                    for key in ("json_summary", "html_summary", "talents")
+                )
+                row = build_row(report, target_html.name, from_cache)
+                if not html_path.is_file():
+                    raise FileNotFoundError(f"Quick report HTML is missing for {name}@{realm}.")
+                with timed(f"{name}@{realm} | copy to output folder"):
+                    if html_path.resolve() != target_html.resolve():
+                        shutil.copyfile(html_path, target_html)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                print(f"Could not assemble roster row for {name}: {exc}", file=sys.stderr)
+                rows.append(placeholder_row(name, realm, FAILED, f"Could not build report row: {exc}"))
+                continue
+            rows.append(row)
 
     run_time = datetime.now()
     summary_path = output_dir / summary_file_name(run_time)
-    rendered = render_summary(rows, realm, run_time)
+    with timed("summary rendering"):
+        rendered = render_summary(rows, realm, run_time)
     with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", newline="", dir=output_dir,
         prefix=f".{summary_path.name}.", suffix=".tmp", delete=False,
@@ -512,6 +528,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cache-dir", default=".warmane-cache")
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--max-age-minutes", type=int, default=DEFAULT_MAX_AGE_MINUTES)
+    parser.add_argument("--timing", action="store_true", help="log roster step timings to stderr and the cache directory")
     args = parser.parse_args(argv)
 
     canonical_realm = _canonical_realm(args.realm)
@@ -544,7 +561,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         rows, summary_path = run_roster(
             parsed.names, canonical_realm, args.output_dir, args.cache_dir,
-            args.refresh, args.max_age_minutes,
+            args.refresh, args.max_age_minutes, timing=args.timing,
         )
     except OSError as exc:
         print(f"Error writing roster output: {exc}", file=sys.stderr)

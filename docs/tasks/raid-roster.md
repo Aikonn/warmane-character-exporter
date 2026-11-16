@@ -88,6 +88,9 @@ Columns:
 ## Structure
 
 - `roster.py`: input parsing (pure, tested), orchestration loop, summary row building from each character's quick export JSON (pure, tested), HTML rendering.
+- The roster CLI accepts `--timing` or `WARMANE_TIMING=1` to report definition loading,
+  cache/network fetch, snapshot build/save, JSON/Markdown/PvE HTML export, output copy,
+  per-character and run totals, and summary rendering to stderr and the cache timing log.
 - Reuse `checks.run_checks` and `gearscore.character_score` results already in the quick export; do not recompute differently.
 - Tests: input cleanup cases, row building from a fixture export, sorting, not-found and not-run rows, HTML escaping. No network in tests.
 

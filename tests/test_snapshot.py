@@ -2,12 +2,15 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest import mock
+from contextlib import redirect_stderr
+import io
 
 from warmane_exporter.budget import BudgetExhausted
 from warmane_exporter.cache import ResponseCache
 from warmane_exporter.checkpoint import ProbeCheckpointStore
 from warmane_exporter.http_client import HttpResponse
 from warmane_exporter.snapshot import build_snapshot, character_page_url
+from warmane_exporter.timing import TimingLog, activate
 from warmane_exporter.transport import RequestOrchestrator, TransportConfig
 
 FIX = Path("tests/fixtures")
@@ -58,10 +61,13 @@ class SnapshotTests(unittest.TestCase):
         snap = build_snapshot("Aikka", "Onyxia", self.cache, self.orch, client, now_fn=lambda: 5000.0)
         self.assertTrue(snap["complete"], snap["sections"])
         self.assertEqual(len(client.urls), 3)
-        again = build_snapshot("Aikka", "Onyxia", self.cache, self.orch, client, now_fn=lambda: 5100.0)
+        timing_log = TimingLog(self.root / "timing")
+        with activate(timing_log), redirect_stderr(io.StringIO()):
+            again = build_snapshot("Aikka", "Onyxia", self.cache, self.orch, client, now_fn=lambda: 5100.0)
         self.assertEqual(len(client.urls), 3)
         self.assertEqual({s["origin"] for s in again["sections"].values()}, {"cache"})
         self.assertIn("Client definitions not applied (no client data).", snap["notes"])
+        self.assertGreater(timing_log.totals["Aikka@Onyxia | cache lookup / network fetch"], 0)
 
     def test_invalid_html_fails_only_that_section_and_is_saved_for_debugging(self) -> None:
         client = RoutingClient({})
@@ -115,7 +121,9 @@ class SnapshotTests(unittest.TestCase):
                 for key in ("json_summary", "html_summary", "talents")
             },
         }
-        with mock.patch("warmane_exporter.definitions.load_definitions", return_value=None), \
+        timing_log = TimingLog(self.root / "timing")
+        with activate(timing_log), redirect_stderr(io.StringIO()), \
+             mock.patch("warmane_exporter.definitions.load_definitions", return_value=None), \
              mock.patch("warmane_exporter.snapshot.budgeted_client"), \
              mock.patch("warmane_exporter.snapshot.build_snapshot", return_value=complete) as build:
             code = __import__("warmane_exporter.snapshot", fromlist=["main"]).main([
@@ -124,6 +132,8 @@ class SnapshotTests(unittest.TestCase):
             ])
         self.assertEqual(code, 0)
         self.assertEqual(build.call_args.kwargs["max_age_seconds"], 7200)
+        self.assertIn("Aikka@Onyxia | definition loading", timing_log.totals)
+        self.assertIn("Aikka@Onyxia | snapshot build and save", timing_log.totals)
 
     def test_snapshot_cli_returns_four_for_budget_exhaustion(self):
         snapshot_module = __import__("warmane_exporter.snapshot", fromlist=["main"])

@@ -1,8 +1,13 @@
+import io
+import json
+import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from test_report import SNAP
-from warmane_exporter.export import build_full_report, render_full_markdown
+from warmane_exporter.export import build_full_report, main, render_full_markdown
+from warmane_exporter.timing import TimingLog, activate
 
 FIX = Path(__file__).parent / "fixtures" / "real"
 
@@ -28,6 +33,19 @@ class ExportTests(unittest.TestCase):
         md = render_full_markdown(r)
         for needle in ("## Achievements", "- Respecs: 8", "## Reputation", "Blue Wind Rider", "Mojo"):
             self.assertIn(needle, md)
+
+    def test_export_cli_records_each_format_timing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "cache"
+            snapshots = cache / "snapshots"
+            snapshots.mkdir(parents=True)
+            (snapshots / "x-onyxia-123.json").write_text(json.dumps(SNAP), encoding="utf-8")
+            timing_log = TimingLog(Path(tmp) / "timing")
+            with activate(timing_log), redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
+                code = main(["X", "Onyxia", "--cache-dir", str(cache)])
+        self.assertEqual(code, 0)
+        for label in ("export JSON", "export Markdown", "export PvE HTML"):
+            self.assertIn(f"X@Onyxia | {label}", timing_log.totals)
 
 
 if __name__ == "__main__":

@@ -40,6 +40,7 @@ python -m warmane_exporter.roster --realm Onyxia --names Aikka,Bezduse --output-
 - `run` executes snapshot, reputation, mounts, achievements, statistics and export, stops at the first failing step, and resumes when started again.
 - `--offline` rebuilds from cached data only; `--refresh` ignores the 24 h cache.
 - `roster` creates one quick report per name and a timestamped HTML summary; cached character data is reused for up to 120 minutes by default.
+- For roster performance measurements, pass `--timing` or set `WARMANE_TIMING=1`; step timings go to stderr and `.warmane-cache/timing-YYYYMMDD-HHMM.log`.
 - Output: `.warmane-cache/exports/<name>-<realm>.json` and `.md`.
 - A PvE export costs about 28 requests per character, a quick report 3, `--full` about 90.
 

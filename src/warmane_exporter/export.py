@@ -19,6 +19,7 @@ from .mounts_parser import parse_mounts_page
 from .report import build_report, render_markdown
 from .reputation_parser import parse_reputation_page
 from .collect import summarize
+from .timing import timed
 
 
 def _newest(directory: Path, pattern: str) -> Path | None:
@@ -154,11 +155,16 @@ def main(argv: list[str] | None = None) -> int:
         )
     out_dir = Path(args.output_dir) if args.output_dir else cache_dir / "exports"
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / f"{stem}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    (out_dir / f"{stem}.md").write_text(render_full_markdown(report), encoding="utf-8")
+    with timed(f"{args.name}@{args.realm} | export JSON"):
+        (out_dir / f"{stem}.json").write_text(
+            json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    with timed(f"{args.name}@{args.realm} | export Markdown"):
+        (out_dir / f"{stem}.md").write_text(render_full_markdown(report), encoding="utf-8")
     from .pve_report import write_html
 
-    html_path = write_html(report, out_dir / f"{stem}-pve.html")
+    with timed(f"{args.name}@{args.realm} | export PvE HTML"):
+        html_path = write_html(report, out_dir / f"{stem}-pve.html")
     print(f"snapshot: {snapshot_path.name}")
     print(f"missing sections: {report['missing_sections'] or 'none'}")
     if "achievements" in report:

@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from unittest import mock
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import io
 
 from warmane_exporter.pve_report import build_pve_report, render_html as render_pve_html
@@ -441,6 +441,10 @@ class RosterRunTests(unittest.TestCase):
                 with redirect_stdout(io.StringIO()):
                     self.assertEqual(main(args), 0)
                 self.assertEqual(runner.call_args.args[-1], 90)
+            with mock.patch("warmane_exporter.roster.run_roster", return_value=([], output)) as runner:
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(main(args + ["--timing"]), 0)
+                self.assertTrue(runner.call_args.kwargs["timing"])
             with mock.patch(
                 "warmane_exporter.roster.run_roster",
                 return_value=([placeholder_row("Alice", "Onyxia", FAILED, STOP_NOTE)], output),
@@ -453,6 +457,34 @@ class RosterRunTests(unittest.TestCase):
                         "--realm", "Onyxia", "--names", "A1", "--output-dir", tmp,
                     ]), 2)
                 runner.assert_not_called()
+
+    def test_timing_off_emits_no_timing_output(self):
+        self.seed_success("Alice")
+        stderr = io.StringIO()
+        with mock.patch.dict("os.environ", {"WARMANE_TIMING": ""}), \
+             mock.patch("warmane_exporter.run.run_character", return_value=0), \
+             redirect_stderr(stderr):
+            run_roster(["Alice"], "Onyxia", self.output, str(self.cache), False, 120)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(list(self.cache.glob("timing-*.log")), [])
+
+    def test_timing_logs_steps_to_stderr_and_file_when_enabled(self):
+        self.seed_success("Alice")
+        stderr = io.StringIO()
+        with mock.patch.dict("os.environ", {"WARMANE_TIMING": "1"}), \
+             mock.patch("warmane_exporter.run.run_character", return_value=0), \
+             redirect_stderr(stderr):
+            run_roster(["Alice"], "Onyxia", self.output, str(self.cache), False, 120)
+
+        lines = stderr.getvalue().splitlines()
+        self.assertTrue(any("Alice@Onyxia | total per character" in line for line in lines))
+        self.assertTrue(any("Alice@Onyxia | copy to output folder" in line for line in lines))
+        self.assertTrue(any("summary rendering" in line for line in lines))
+        self.assertTrue(any("total run" in line for line in lines))
+        log_files = list(self.cache.glob("timing-*.log"))
+        self.assertEqual(len(log_files), 1)
+        self.assertRegex(log_files[0].name, r"^timing-\d{8}-\d{4}\.log$")
+        self.assertEqual(log_files[0].read_text(encoding="utf-8").splitlines(), lines)
 
     def test_cli_reads_names_file(self):
         with tempfile.TemporaryDirectory() as tmp:
