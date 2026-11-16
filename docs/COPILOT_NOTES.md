@@ -25,7 +25,45 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-(none)
+Do the two tasks in order: A, then B. Commit and report each separately.
+
+### 2026-11-16 · Task · A: Roster summary: click-to-sort columns, Data age format
+Module: src/warmane_exporter/roster.py, tests/test_roster.py
+
+Owner decisions (2026-11-16): sorting only in the roster summary, not in character reports. One inline script, no extra file.
+
+1. Data age text: `YYYY-MM-DD HH:MM (from cache)` for cached rows and `YYYY-MM-DD HH:MM (fresh)` for fetched rows, local time, zero-padded (`2026-01-06 09:04`). Empty for non-OK rows.
+2. Sortable columns: Name, Class, Main trees, GearScore, Avg item level, Issues, Warnings, Data age. Not sortable: Issues list, Report, Armory (no click handler, no sort marker).
+3. Each sortable cell carries `data-sort` with its sort key: numbers as plain numbers (GearScore, item level, counts), Data age as epoch seconds, text columns as lower-case text. Header cells of sortable columns get a class (for example `sortable`) and `data-type="num"` or `"text"`.
+4. One inline `<script>` at the end of `<body>` (about 20-30 lines, plain JavaScript, no libraries, no network): click a sortable header to sort ascending, click again for descending, show ▲/▼ on the active header, numeric compare for `num`, `localeCompare` for text, empty values last. Rows with status other than OK (mark them with a class such as `not-ok`) always stay at the bottom in name order. Without JavaScript the page stays sorted by name as today.
+5. Pointer cursor on sortable headers. Update `render_summary` docstring and `docs/tasks/raid-roster.md` Summary page section (columns, Data age format, sorting).
+
+Done when: points 1-5 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: Data age text for cached and fresh rows with zero padding (fixed timestamp, timezone-independent test); `data-sort` values on numeric, text and Data age cells; non-sortable headers have no sortable class; exactly one `<script>` in the summary and none in the PvE report HTML; non-OK rows carry the bottom-row class. No live requests; the owner tests sorting in the browser.
+
+### 2026-11-16 · Task · B: Roster summary: WoW class colors
+Module: src/warmane_exporter/roster.py, tests/test_roster.py
+
+Owner wants the standard class colors in the roster summary only (not character reports). Use the WotLK 3.3.5 values of Blizzard's `RAID_CLASS_COLORS` (Mage, Warlock and Shaman differ from today's retail values):
+
+| Class | Hex |
+|---|---|
+| Death Knight | C41F3B |
+| Druid | FF7D0A |
+| Hunter | ABD473 |
+| Mage | 69CCF0 |
+| Paladin | F58CBA |
+| Priest | FFFFFF |
+| Rogue | FFF569 |
+| Shaman | 0070DE |
+| Warlock | 9482C9 |
+| Warrior | C79C6E |
+
+1. Class colors as text on a white page are unreadable for Priest (white) and Rogue (yellow). So color the Class cell background with the class color and keep dark text; Shaman (dark blue) and Death Knight (dark red) get white text instead. Priest cell keeps the table border so the white cell stays visible.
+2. One CSS class per class (for example `cls-death-knight`, `cls-priest`) defined once in the style block; the cell gets the class by name. Unknown or missing class: no color class.
+3. Sorting from task A still works on the Class column.
+4. Update `docs/tasks/raid-roster.md` Summary page section.
+
+Done when: points 1-4 hold; `python -m unittest discover -s tests` passes (report counts), with tests for: each of the ten classes maps to its CSS class and hex value; unknown class gets none; PvE report HTML unchanged. No live requests; the owner checks the look on his next roster run.
 
 ## Resolved
 

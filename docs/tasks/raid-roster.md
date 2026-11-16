@@ -38,7 +38,7 @@ When assembling a raid, paste a list of character names, choose the realm, and g
 
 ## Summary page
 
-Same style as the other reports: one self-contained HTML file, inline CSS, no scripts, all armory text HTML-escaped.
+Same style as the other reports: one self-contained HTML file, inline CSS, all armory text HTML-escaped, no external files. Exception (owner, 2026-11-16): the roster summary carries one small inline script for click-to-sort columns; character reports stay script-free.
 
 Columns:
 1. Name
