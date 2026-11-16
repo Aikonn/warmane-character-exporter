@@ -33,6 +33,7 @@ class GearChecks(unittest.TestCase):
         r = run_checks(report(eq))
         self.assertEqual(len(r["issues"]), 1)
         self.assertIn("No enchant", r["issues"][0]["text"])
+        self.assertEqual(r["issues"][0]["slot"], "Head")
 
     def test_rings_only_for_enchanters(self):
         ring = [item("Finger 1", "finger", enchant_id=None, enchant=None)]
@@ -50,11 +51,13 @@ class GearChecks(unittest.TestCase):
         eq = [item("Chest", sockets_empty=2),
               item("Head", "head", gem_details=[{"text": "meta"}], gem_states=["inactive"]),
               item("Waist", "waist", sockets=["Red"], buckle=False)]
-        found = texts(run_checks(report(eq)), "issues")
+        result = run_checks(report(eq))
+        found = texts(result, "issues")
         self.assertEqual(len(found), 3)
         self.assertTrue(any("2 empty gem" in f for f in found))
         self.assertTrue(any("Meta gem is not active" in f for f in found))
         self.assertTrue(any("Eternal Belt Buckle missing" in f for f in found))
+        self.assertEqual({finding["slot"] for finding in result["issues"]}, {"Chest", "Head", "Waist"})
 
     def test_belt_without_socket_data_is_not_judged(self):
         self.assertEqual(run_checks(report([item("Waist", "waist", sockets=None)]))["issues"], [])
@@ -65,6 +68,7 @@ class GearChecks(unittest.TestCase):
         self.assertEqual(r["issues"], [])
         self.assertEqual(len(r["warnings"]), 1)
         self.assertIn("Leather armor; a Warrior can wear plate", r["warnings"][0]["text"])
+        self.assertEqual(r["warnings"][0]["slot"], "Chest")
 
 
 class SpecChecks(unittest.TestCase):
@@ -72,6 +76,7 @@ class SpecChecks(unittest.TestCase):
         spec = {"label": "Spec 1", "split": [50, 20, 0], "glyphs": [{"category": "major"}] * 2}
         r = run_checks(report([], specs=[spec]))
         self.assertEqual(len(r["issues"]), 2)
+        self.assertNotIn("slot", r["issues"][0])
 
     def test_empty_second_spec_is_a_warning_not_issues(self):
         spec2 = {"label": "Spec 2", "split": [0, 0, 0], "glyphs": []}

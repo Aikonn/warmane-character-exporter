@@ -84,7 +84,10 @@ class RosterRowTests(unittest.TestCase):
         self.assertEqual(row.warnings, len(pve["checks"]["warnings"]))
         self.assertEqual(
             row.issue_texts,
-            [issue["text"] for issue in pve["checks"]["issues"]],
+            [
+                f"{issue['slot']}: {issue['text']}" if issue.get("slot") is not None else issue["text"]
+                for issue in pve["checks"]["issues"]
+            ],
         )
         self.assertEqual(row.data_time, self.report["snapshot_time"])
         self.assertTrue(row.from_cache)
@@ -101,6 +104,17 @@ class RosterRowTests(unittest.TestCase):
             row = build_row(self.report, "Mélora-Onyxia-quick-pve.html", from_cache=False)
 
         self.assertEqual(row.issue_texts, ["first", "second", "third"])
+
+    def test_build_row_prefixes_gear_issue_but_not_spec_issue(self):
+        report = json.loads(json.dumps(self.report))
+        report["specializations"][0]["split"] = [57, 12, 0]
+
+        row = build_row(report, "Mélora-Onyxia-quick-pve.html", from_cache=False)
+
+        self.assertEqual(row.issue_texts, [
+            "Head: No enchant.",
+            "2 unspent talent point(s) (69 of 71 spent).",
+        ])
 
     def test_placeholder_rows_keep_identity_and_armory_link_only(self):
         for status in (NOT_FOUND, NOT_RUN, FAILED):
@@ -133,7 +147,7 @@ class SummaryRenderingTests(unittest.TestCase):
             average_item_level=200,
             issues=2,
             warnings=0,
-            issue_texts=["Missing <enchant>", "Second & final"],
+            issue_texts=["<Head &>: Missing <enchant>", "Second & final"],
             report_file="A-b-Onyxia-quick-pve.html",
             armory_url="https://armory.warmane.com/character/A%3Cb%3E/Onyxia/summary",
             from_cache=False,
@@ -143,13 +157,17 @@ class SummaryRenderingTests(unittest.TestCase):
         not_found_html = next(line for line in html.splitlines() if "<td>Absent</td>" in line)
 
         self.assertIn("A&lt;b&gt;", html)
+        self.assertIn("&lt;Head &amp;&gt;: Missing &lt;enchant&gt;", html)
         self.assertIn("Missing &lt;enchant&gt;", html)
         self.assertIn(
-            '<ul class="issues"><li>Missing &lt;enchant&gt;</li><li>Second &amp; final</li></ul>',
+            '<div class="issues"><div>&lt;Head &amp;&gt;: Missing &lt;enchant&gt;</div>'
+            '<div>Second &amp; final</div></div>',
             html,
         )
         self.assertNotIn("A<b>", html)
         self.assertNotIn("Missing <enchant>", html)
+        self.assertNotIn("<ul", html)
+        self.assertNotIn("<li", html)
         self.assertIn("fresh", html)
         self.assertIn("characters: 2; from cache: 0; not OK: 1", html)
         self.assertIn('href="A-b-Onyxia-quick-pve.html"', html)
@@ -184,7 +202,7 @@ class SummaryRenderingTests(unittest.TestCase):
         self.assertIn(".count-issue{color:#b00020}", html)
         self.assertIn(".count-warn{color:#a65a00}", html)
         self.assertIn(".count-high{font-weight:700}", html)
-        self.assertIn(".issues{font-size:.8em;margin:.1em 0;padding-left:1.2em}", html)
+        self.assertIn(".issues{font-size:.8em;margin:.1em 0}", html)
 
 
 class RosterRunTests(unittest.TestCase):

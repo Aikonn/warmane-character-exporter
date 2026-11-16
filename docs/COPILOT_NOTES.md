@@ -25,6 +25,13 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-16 · Progress · Roster summary: slot names, plain lines
+Module: src/warmane_exporter/checks.py, roster.py, tests, docs/tasks/raid-roster.md
+
+Gear findings now include their equipment slot; spec findings do not. Roster issue lines prefix gear text with the slot and render escaped plain lines without bullets or left padding. The roster task spec matches.
+
+Verification: `python -m unittest discover -s tests -p test_checks.py` — 10 tests, OK; `python -m unittest discover -s tests -p test_roster.py` — 19 tests, OK; `python -m unittest discover -s tests` — 281 tests, OK. The roster tests cover gear/spec prefixes, no `<ul>`/`<li>`, and escaping slot and text. PvE HTML from `roster-report-synthetic.json` was 4,459 characters both before and after; SHA-256 matched (`dbb583c307daccd736379b0541b2fe5315702b16f3260451448b623838452e77`). No live requests.
+
 ### 2026-11-16 · Task · Roster summary: slot names in issues, plain lines
 Module: src/warmane_exporter/checks.py, roster.py, tests
 

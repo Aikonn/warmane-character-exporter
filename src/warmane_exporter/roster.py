@@ -134,7 +134,7 @@ def build_row(report: dict[str, Any], report_file: str, from_cache: bool) -> Ros
     character's own page: ``gearscore.character_score(report["equipment"], class)`` and
     ``checks.run_checks(report)``. Main tree per specialization is its ``label`` when the
     specialization has points, otherwise "-". issue_texts contains all issue texts in
-    ``run_checks`` order.
+    ``run_checks`` order, with a slot prefix for gear findings.
     """
     identity = report["identity"]
     name = identity["name"]
@@ -161,7 +161,10 @@ def build_row(report: dict[str, Any], report_file: str, from_cache: bool) -> Ros
         average_item_level=score["average_item_level"],
         issues=len(issues),
         warnings=len(findings["warnings"]),
-        issue_texts=[issue["text"] for issue in issues],
+        issue_texts=[
+            f"{issue['slot']}: {issue['text']}" if issue.get("slot") is not None else issue["text"]
+            for issue in issues
+        ],
         report_file=report_file,
         armory_url=_armory_url(name, realm),
         data_time=data_time,
@@ -241,9 +244,9 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
             issue_list = ""
             if row.issue_texts:
                 issue_list = (
-                    '<ul class="issues">'
-                    + "".join(f"<li>{escape(text)}</li>" for text in row.issue_texts)
-                    + "</ul>"
+                    '<div class="issues">'
+                    + "".join(f"<div>{escape(text)}</div>" for text in row.issue_texts)
+                    + "</div>"
                 )
             cells = [
                 escape(row.name),
@@ -272,7 +275,7 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
         "th,td{border:1px solid #bbb;padding:.35em .6em;text-align:left;vertical-align:top}"
         "th{background:#eee}"
         ".status{color:#666;font-style:italic}"
-        ".issues{font-size:.8em;margin:.1em 0;padding-left:1.2em}"
+        ".issues{font-size:.8em;margin:.1em 0}"
         ".count-issue{color:#b00020}.count-warn{color:#a65a00}.count-high{font-weight:700}"
         "</style>\n</head>\n<body>\n"
         f"<h1>Raid roster - {escape(realm)}</h1>\n"

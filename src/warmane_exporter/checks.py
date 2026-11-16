@@ -28,12 +28,18 @@ def _finding(level: str, area: str, text: str) -> dict[str, str]:
     return {"level": level, "area": area, "text": text}
 
 
+def _gear_finding(level: str, item: dict[str, Any], text: str) -> dict[str, Any]:
+    finding = _finding(level, _label(item), text)
+    finding["slot"] = item.get("slot")
+    return finding
+
+
 def _has_profession(report: dict[str, Any], name: str) -> bool:
     return any(isinstance(p, dict) and (p.get("name") or "").lower() == name.lower() for p in report.get("professions") or [])
 
 
-def check_gear(report: dict[str, Any]) -> list[dict[str, str]]:
-    out: list[dict[str, str]] = []
+def check_gear(report: dict[str, Any]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
     cls = (report.get("identity") or {}).get("class")
     enchanting = _has_profession(report, "Enchanting")
     for item in report.get("equipment") or []:
@@ -48,18 +54,18 @@ def check_gear(report: dict[str, Any]) -> list[dict[str, str]]:
             needs = enchanting
         if needs and not item.get("enchant_id") and not item.get("enchant"):
             why = " (the character is an Enchanter)" if slot in ("Finger 1", "Finger 2") else ""
-            out.append(_finding("issue", _label(item), f"No enchant{why}."))
+            out.append(_gear_finding("issue", item, f"No enchant{why}."))
         if item.get("sockets_empty"):
-            out.append(_finding("issue", _label(item), f"{item['sockets_empty']} empty gem socket(s)."))
+            out.append(_gear_finding("issue", item, f"{item['sockets_empty']} empty gem socket(s)."))
         for gem, state in zip(item.get("gem_details") or [], item.get("gem_states") or []):
             if state == "inactive":
-                out.append(_finding("issue", _label(item), f"Meta gem is not active: {gem.get('text') or 'meta gem'}."))
+                out.append(_gear_finding("issue", item, f"Meta gem is not active: {gem.get('text') or 'meta gem'}."))
         if slot == "Waist" and item.get("sockets") is not None and not item.get("buckle"):
-            out.append(_finding("issue", _label(item), f"{BUCKLE_NAME} missing (extra gem socket on the belt)."))
+            out.append(_gear_finding("issue", item, f"{BUCKLE_NAME} missing (extra gem socket on the belt)."))
         best = BEST_ARMOR.get(cls or "")
         sub = item.get("item_subclass")
         if best and slot in ARMOR_SLOTS and item.get("item_class") == 4 and sub in ARMOR_NAMES and sub < best:
-            out.append(_finding("warning", _label(item), f"{ARMOR_NAMES[sub].capitalize()} armor; a {cls} can wear {ARMOR_NAMES[best]}."))
+            out.append(_gear_finding("warning", item, f"{ARMOR_NAMES[sub].capitalize()} armor; a {cls} can wear {ARMOR_NAMES[best]}."))
     return out
 
 
