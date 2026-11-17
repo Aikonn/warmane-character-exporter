@@ -30,12 +30,14 @@ from .checks import run_checks
 from .fingerprint import cached_fingerprint, html_fingerprint, tool_version_hash
 from .gearscore import character_score
 from .timing import TimingLog, activate, timed, timing_requested
+from .transport import StopRequested, reset_run_pacing
 
 REALMS = ("Onyxia", "Icecrown")
 MAX_NAMES = 40
 DEFAULT_MAX_AGE_MINUTES = 120
 ARMORY_URL = "https://armory.warmane.com/character/{name}/{realm}/summary"
 STOP_NOTE = "Stopped roster: access block, rate limit, or request budget exhausted."
+USER_STOP_NOTE = "stopped by user"
 CLASS_STYLES = {
     "death knight": ("cls-death-knight", "#C41F3B", "#fff"),
     "druid": ("cls-druid", "#FF7D0A", "#111"),
@@ -264,11 +266,17 @@ def summary_file_name(now: datetime) -> str:
     return now.strftime("raid-%Y-%m-%d-%H%M.html")
 
 
-def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str:
+def render_summary(
+    rows: list[RosterRow],
+    realm: str,
+    run_time: datetime,
+    rate_limit_waits: int = 0,
+    final_spacing_seconds: float = 1.0,
+) -> str:
     """Render a self-contained HTML roster summary with client-side sortable columns.
 
-    Header: realm, run time, number of characters, how many came from cache, and how many
-    rows are not OK. Table columns, in order: Name, Class, Main trees ("Holy / Discipline"),
+    Header: realm, run time, number of characters, cache count, non-OK count, and rate-limit
+    waits/final spacing when a rate limit occurred. Table columns, in order: Name, Class, Main trees ("Holy / Discipline"),
     GearScore, Avg item level, Issues, Warnings, Issues list, Report (relative link),
     Armory (link), Data age. The first seven columns and Data age sort on click; other
     columns are not sortable. Non-OK rows stay at the bottom in name order when sorting.
@@ -379,6 +387,11 @@ def render_summary(rows: list[RosterRow], realm: str, run_time: datetime) -> str
         f".{css_class}{{background:{background};color:{foreground}}}"
         for css_class, background, foreground in CLASS_STYLES.values()
     )
+    rate_limit_summary = (
+        f"; rate-limit waits: {rate_limit_waits}, spacing {final_spacing_seconds:g} s"
+        if rate_limit_waits
+        else ""
+    )
     sort_script = """<script>
 const headers = document.querySelectorAll("th.sortable");
 const body = document.querySelector("tbody");
@@ -433,7 +446,8 @@ headers.forEach(header => header.addEventListener("click", () => {
         + "</style>\n</head>\n<body>\n"
         f"<h1>Raid roster - {escape(realm)}</h1>\n"
         f"<p>Run time: {escape(run_time.strftime('%Y-%m-%d %H:%M'))}; "
-        f"characters: {len(rows)}; from cache: {cached_count}; not OK: {not_ok_count}.</p>\n"
+        f"characters: {len(rows)}; from cache: {cached_count}; not OK: {not_ok_count}"
+        f"{rate_limit_summary}.</p>\n"
         "<table>\n<thead><tr>" + table_head + "</tr></thead>\n<tbody>\n"
         + "\n".join(table_rows)
         + "\n</tbody>\n</table>\n" + sort_script + "\n</body>\n</html>\n"
@@ -472,11 +486,15 @@ def _run_roster(names: list[str], realm: str, output_dir: Path, cache_path: Path
     from . import snapshot
     from .progress import advance, note, start
 
+    stop_request = cache_path / "stop-request"
+    stop_request.unlink(missing_ok=True)
+    pacing = reset_run_pacing(stop_request)
     exports_dir = cache_path / "exports"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     rows: list[RosterRow] = []
     stopped = False
+    stopped_by_user = False
     tool_version = tool_version_hash()
     preflight: list[tuple[str, RosterRow | None]] = []
     if refresh:
@@ -505,6 +523,13 @@ def _run_roster(names: list[str], realm: str, output_dir: Path, cache_path: Path
 
         for index, name in enumerate(names, start=1):
             with timed(f"{name}@{realm} | total per character"):
+                if stopped_by_user:
+                    rows.append(placeholder_row(name, realm, NOT_RUN, USER_STOP_NOTE))
+                    continue
+                if stop_request.exists():
+                    rows.append(placeholder_row(name, realm, NOT_RUN, USER_STOP_NOTE))
+                    stopped_by_user = True
+                    continue
                 if stopped:
                     rows.append(placeholder_row(name, realm, NOT_RUN, "An earlier character stopped the roster."))
                     continue
@@ -530,11 +555,16 @@ def _run_roster(names: list[str], realm: str, output_dir: Path, cache_path: Path
                     continue
 
                 note(f"Character {index} of {len(names)}: {name}")
-                code = run.run_character(
-                    name, realm, str(cache_path), refresh, False, quick=True,
-                    max_age_minutes=max_age_minutes, start_progress=False,
-                    defs=defs, definitions_preloaded=True, tool_version=tool_version,
-                )
+                try:
+                    code = run.run_character(
+                        name, realm, str(cache_path), refresh, False, quick=True,
+                        max_age_minutes=max_age_minutes, start_progress=False,
+                        defs=defs, definitions_preloaded=True, tool_version=tool_version,
+                    )
+                except StopRequested:
+                    rows.append(placeholder_row(name, realm, NOT_RUN, USER_STOP_NOTE))
+                    stopped_by_user = True
+                    continue
                 if code == 3:
                     rows.append(placeholder_row(name, realm, NOT_FOUND, "Character does not exist."))
                     continue
@@ -576,7 +606,9 @@ def _run_roster(names: list[str], realm: str, output_dir: Path, cache_path: Path
         run_time = datetime.now()
         summary_path = output_dir / summary_file_name(run_time)
         with timed("summary rendering"):
-            rendered = render_summary(rows, realm, run_time)
+            rendered = render_summary(
+                rows, realm, run_time, pacing.rate_limit_events, pacing.spacing_seconds,
+            )
         with tempfile.NamedTemporaryFile(
             mode="w", encoding="utf-8", newline="", dir=output_dir,
             prefix=f".{summary_path.name}.", suffix=".tmp", delete=False,

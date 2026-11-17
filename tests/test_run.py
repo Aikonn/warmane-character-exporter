@@ -73,6 +73,29 @@ class RunTests(unittest.TestCase):
             self.assertEqual(run.main(["Aikka"]), 2)
         runner.assert_not_called()
 
+    def test_main_clears_stale_stop_file_and_resets_pacing(self):
+        import tempfile
+        from pathlib import Path
+        from warmane_exporter.transport import reset_run_pacing
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "cache"
+            cache.mkdir()
+            stop_file = cache / "stop-request"
+            stop_file.write_text("stale", encoding="utf-8")
+            pacing = reset_run_pacing()
+            for _ in range(4):
+                pacing.record_rate_limit()
+            self.assertEqual(pacing.spacing_seconds, 5.0)
+
+            with mock.patch.object(run, "run_character", return_value=0):
+                self.assertEqual(run.main([
+                    "Aikka", "Onyxia", "--cache-dir", str(cache), "--offline",
+                ]), 0)
+
+            self.assertFalse(stop_file.exists())
+            self.assertEqual((pacing.rate_limit_events, pacing.spacing_seconds), (0, 1.0))
+
 
 if __name__ == "__main__":
     unittest.main()

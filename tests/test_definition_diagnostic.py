@@ -6,7 +6,7 @@ import unittest
 from warmane_exporter.definition_diagnostic import validate_definition_url, _truncate_body_excerpt
 from warmane_exporter.checkpoint import ProbeCheckpointStore
 from warmane_exporter.http_client import HttpResponse
-from warmane_exporter.transport import RequestOrchestrator, TransportConfig
+from warmane_exporter.transport import RequestOrchestrator, TransportConfig, reset_run_pacing
 
 
 class DefinitionUrlValidationTests(unittest.TestCase):
@@ -265,6 +265,9 @@ class FakeClient:
 
 
 class DefinitionDiagnosticLiveTests(unittest.TestCase):
+    def setUp(self) -> None:
+        reset_run_pacing()
+
     def test_live_once_success_includes_body_excerpt(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             store = ProbeCheckpointStore(path=Path(tmp_dir) / "checkpoint.json")
@@ -364,10 +367,10 @@ class DefinitionDiagnosticLiveTests(unittest.TestCase):
             self.assertEqual(client.calls, 1)
 
     def test_live_once_with_persisted_cooldown_blocks_request(self) -> None:
-        from time import time
         with TemporaryDirectory() as tmp_dir:
             store = ProbeCheckpointStore(path=Path(tmp_dir) / "checkpoint.json")
-            future_time = time() + 100  # 100 seconds in future
+            now = [0.0]
+            future_time = 100.0
             store.set_cooldown_until("wotlk.cavernoftime.com", future_time)
             
             config = TransportConfig(
@@ -378,10 +381,12 @@ class DefinitionDiagnosticLiveTests(unittest.TestCase):
             sleeps = []
             def mock_sleep(seconds):
                 sleeps.append(seconds)
+                now[0] += seconds
             
             orchestrator = RequestOrchestrator(
                 checkpoint=store,
                 config=config,
+                now_fn=lambda: now[0],
                 sleep_fn=mock_sleep,
             )
             response = HttpResponse(
@@ -394,7 +399,7 @@ class DefinitionDiagnosticLiveTests(unittest.TestCase):
                 url="https://wotlk.cavernoftime.com/spell=14769",
                 client=client,
             )
-            self.assertTrue(len(sleeps) > 0)
+            self.assertEqual(sum(sleeps), 100.0)
 
     def test_body_excerpt_truncated_response(self) -> None:
         with TemporaryDirectory() as tmp_dir:
@@ -452,6 +457,9 @@ class DefinitionDiagnosticLiveTests(unittest.TestCase):
 
 class DefinitionDiagnosticMainIntegrationTests(unittest.TestCase):
     """Integration tests invoking main() with patched argv and mocked HTTP."""
+
+    def setUp(self) -> None:
+        reset_run_pacing()
 
     def test_main_offline_default_zero_network_calls(self) -> None:
         """Offline default should make zero HTTP calls."""

@@ -10,6 +10,8 @@ from contextlib import redirect_stderr, redirect_stdout
 
 from warmane_exporter.pve_report import build_pve_report, render_html as render_pve_html
 from warmane_exporter.cache import ResponseCache
+from warmane_exporter.checkpoint import ProbeCheckpointStore
+from warmane_exporter.http_client import HttpResponse
 from warmane_exporter import progress
 from warmane_exporter.fingerprint import (
     fingerprint_for_bodies,
@@ -32,6 +34,7 @@ from warmane_exporter.roster import (
     STOP_NOTE,
     main,
 )
+from warmane_exporter.transport import RequestOrchestrator, TransportConfig
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -200,6 +203,13 @@ class SummaryRenderingTests(unittest.TestCase):
         self.assertIn('<span class="status">not found: not found</span>', not_found_html)
         self.assertIn(".status{color:#666;font-style:italic}", html)
         self.assertIn('<a href="https://armory.warmane.com/character/Absent/Onyxia/summary">Armory</a>', not_found_html)
+
+    def test_summary_header_includes_rate_limit_wait_count_and_final_spacing(self):
+        html = render_summary(
+            [], "Onyxia", datetime(2026, 11, 17, 10, 30),
+            rate_limit_waits=4, final_spacing_seconds=5,
+        )
+        self.assertIn("rate-limit waits: 4, spacing 5 s", html)
 
     def test_pve_report_exposes_fingerprint_in_html_head(self):
         report = build_pve_report({"identity": {"name": "X", "realm": "Onyxia"}})
@@ -477,6 +487,65 @@ class RosterRunTests(unittest.TestCase):
         html = summary.read_text(encoding="utf-8")
         self.assertIn("not run: An earlier character stopped the roster.", html)
         self.assertTrue((self.output / "alice-onyxia-quick-pve.html").exists())
+
+    def test_stop_file_is_cleared_then_stops_before_next_character(self):
+        for name in ("Alice", "Bob", "Cara"):
+            self.seed_success(name)
+        stop_file = self.cache / "stop-request"
+        self.cache.mkdir(parents=True, exist_ok=True)
+        stop_file.write_text("stale", encoding="utf-8")
+
+        def finish_first_character(name, *args, **kwargs):
+            self.assertEqual(name, "Alice")
+            self.assertFalse(stop_file.exists())
+            stop_file.write_text("stop", encoding="utf-8")
+            return 0
+
+        with mock.patch("warmane_exporter.run.run_character", side_effect=finish_first_character) as runner:
+            rows, summary = run_roster(
+                ["Alice", "Bob", "Cara"], "Onyxia", self.output, str(self.cache), False, 120,
+            )
+
+        self.assertEqual(runner.call_count, 1)
+        self.assertEqual([row.status for row in rows], [OK, NOT_RUN, NOT_RUN])
+        self.assertEqual([row.note for row in rows[1:]], ["stopped by user", "stopped by user"])
+        self.assertTrue(summary.exists())
+        self.assertIn("not run: stopped by user", summary.read_text(encoding="utf-8"))
+        self.assertTrue((self.output / "alice-onyxia-quick-pve.html").exists())
+
+    def test_stop_during_character_writes_summary_with_not_run_rows(self):
+        now = [1_000.0]
+        stop_file = self.cache / "stop-request"
+
+        class RateLimitedClient:
+            def get(self, url, connect_timeout, read_timeout):
+                return HttpResponse(429, {}, "too many requests")
+
+        def stop_during_wait(name, realm, cache_dir, *args, **kwargs):
+            def fake_sleep(seconds):
+                now[0] += seconds
+                stop_file.write_text("stop", encoding="utf-8")
+
+            orchestrator = RequestOrchestrator(
+                checkpoint=ProbeCheckpointStore(path=self.cache / "transport.json"),
+                config=TransportConfig(cooldown_schedule_seconds=(60,), jitter_ratio=0.0),
+                now_fn=lambda: now[0],
+                sleep_fn=fake_sleep,
+                skip_completed=False,
+            )
+            orchestrator.execute_single_request(
+                "https://armory.warmane.com/character/Alice/Onyxia/summary",
+                RateLimitedClient(),
+            )
+
+        with mock.patch("warmane_exporter.run.run_character", side_effect=stop_during_wait) as runner:
+            rows, summary = run_roster(
+                ["Alice", "Bob"], "Onyxia", self.output, str(self.cache), True, 120,
+            )
+        self.assertEqual(runner.call_count, 1)
+        self.assertEqual([row.status for row in rows], [NOT_RUN, NOT_RUN])
+        self.assertTrue(all(row.note == "stopped by user" for row in rows))
+        self.assertTrue(summary.exists())
 
     def test_cli_exit_codes_and_max_age_argument(self):
         with tempfile.TemporaryDirectory() as tmp:

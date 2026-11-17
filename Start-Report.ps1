@@ -494,10 +494,11 @@ if (-not ("Win32.Native" -as [type])) {
     Add-Type -Namespace Win32 -Name Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hWnd);'
 }
 
-function Invoke-ProgressProcess([string]$arguments, [string]$windowTitle) {
+function Invoke-ProgressProcess([string]$arguments, [string]$windowTitle, [switch]$RosterMode) {
     [System.IO.File]::WriteAllText($logOut, "")
     [System.IO.File]::WriteAllText($logErr, "")
     $script:cancelled = $false
+    $progressState = @{ Process = $null; Cancelled = $false }
     $wait = New-Object System.Windows.Forms.Form
     $wait.Text = "Warmane Character Exporter"
     $wait.StartPosition = "CenterScreen"
@@ -516,13 +517,48 @@ function Invoke-ProgressProcess([string]$arguments, [string]$windowTitle) {
     $status = New-Object System.Windows.Forms.Label
     $status.Text = "Starting"
     $status.Location = New-Object System.Drawing.Point(140, 46)
-    $status.Size = New-Object System.Drawing.Size(368, 40)
+    $status.Size = New-Object System.Drawing.Size(250, 40)
+    $stop = New-Object System.Windows.Forms.Button
+    $stop.Text = "Stop"
+    $stop.Location = New-Object System.Drawing.Point(402, 46)
+    $stop.Size = New-Object System.Drawing.Size(106, 28)
+    $stop.Enabled = $false
+    $stop.Add_Click({
+        $processToStop = $progressState.Process
+        if (-not $processToStop -or $processToStop.HasExited) { return }
+        if ($RosterMode) {
+            try {
+                [System.IO.File]::WriteAllText((Join-Path $cache "stop-request"), "stop")
+            } catch {
+                Show-Message ("Could not request a roster stop: " + $_.Exception.Message) "Raid roster reports" "Error"
+                return
+            }
+            $stop.Enabled = $false
+            $status.Text = "Stopping roster and preparing the partial summary..."
+            $deadline = [DateTime]::UtcNow.AddSeconds(15)
+            while (-not $processToStop.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+                [System.Windows.Forms.Application]::DoEvents()
+                Start-Sleep -Milliseconds 100
+            }
+            if (-not $processToStop.HasExited) { try { $processToStop.Kill() } catch { } }
+        } else {
+            $answer = [System.Windows.Forms.MessageBox]::Show(
+                "Stop the export? Data already fetched is kept, so a new run continues where this one stopped.",
+                "Warmane Character Exporter", "YesNo", "Question"
+            )
+            if ($answer -eq "Yes") {
+                $progressState.Cancelled = $true
+                $status.Text = "Stopping export..."
+                try { $processToStop.Kill() } catch { }
+            }
+        }
+    }.GetNewClosure())
     $elapsedLabel = New-Object System.Windows.Forms.Label
     $elapsedLabel.Text = "Elapsed 0:00"
     $elapsedLabel.ForeColor = [System.Drawing.Color]::Gray
     $elapsedLabel.Location = New-Object System.Drawing.Point(12, 100)
     $elapsedLabel.Size = New-Object System.Drawing.Size(496, 65)
-    $wait.Controls.AddRange(@($title, $percentLabel, $status, $elapsedLabel))
+    $wait.Controls.AddRange(@($title, $percentLabel, $status, $stop, $elapsedLabel))
     $wait.Add_FormClosing({
         param($sender, $e)
         if ($script:process -and -not $script:process.HasExited) {
@@ -541,12 +577,14 @@ function Invoke-ProgressProcess([string]$arguments, [string]$windowTitle) {
     $script:process = Start-Process -FilePath $python -ArgumentList $arguments -WorkingDirectory $root -WindowStyle Hidden `
         -RedirectStandardOutput $logOut -RedirectStandardError $logErr -PassThru
     $process = $script:process
+    $progressState.Process = $process
     $null = $process.Handle
+    $stop.Enabled = $true
     $tick = 0
     $lastText = "Starting"
     while (-not $process.HasExited) {
         [System.Windows.Forms.Application]::DoEvents()
-        if ($script:cancelled) { break }
+        if ($script:cancelled -or $progressState.Cancelled) { break }
         Start-Sleep -Milliseconds 100
         $tick++
         if ($tick % 3 -eq 0 -and (Test-Path $logOut)) {
@@ -563,10 +601,12 @@ function Invoke-ProgressProcess([string]$arguments, [string]$windowTitle) {
         $pos = [math]::Abs(([int][math]::Floor($tick / 3) % 10) - 5)
         $track = (0..5 | ForEach-Object { if ($_ -eq $pos) { "o" } else { "." } }) -join " "
         $status.Text = $lastText
-        $elapsedLabel.Text = ("Working  {0}`r`nElapsed {1}:{2:00}. Requests to Warmane are spaced 1 second apart, so this takes a while. The window can be minimized or placed behind other windows." -f $track, [math]::Floor($seconds / 60), ($seconds % 60))
+        $elapsedLabel.Text = ("Working  {0}`r`nElapsed {1}:{2:00}. Requests start 1 second apart; rate limits increase spacing to 3, then 5 seconds. The window can be minimized or placed behind other windows." -f $track, [math]::Floor($seconds / 60), ($seconds % 60))
     }
     $process.WaitForExit()
     $code = $process.ExitCode
+    if ($progressState.Cancelled) { $script:cancelled = $true }
+    $stop.Enabled = $false
     $script:process = $null
     $wait.Close()
     return [int]$code
@@ -656,7 +696,7 @@ if ($script:RosterMode) {
         $nameCount = @($namesText -split '\r?\n' | Where-Object { $_.Trim() }).Count
         $windowTitle = "Creating raid roster reports ($nameCount characters, $($selection.Realm))"
         try {
-            $code = Invoke-ProgressProcess $arguments $windowTitle
+            $code = Invoke-ProgressProcess $arguments $windowTitle -RosterMode
         } finally {
             if (Test-Path $namesPath) { Remove-Item -LiteralPath $namesPath -Force }
         }

@@ -22,6 +22,7 @@ from typing import Any
 from . import collect, discover, export, progress, snapshot
 from .fetch import CHARACTER_MAX_AGE_SECONDS
 from .identity import parse_character_link
+from .transport import reset_run_pacing
 
 ALL_CHARACTERS = (("Aikka", "Onyxia"), ("Aikka", "Icecrown"), ("Bezduse", "Onyxia"), ("Bezduse", "Icecrown"))
 
@@ -124,6 +125,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("give NAME REALM, an armory link, or --all")
     if args.html_output and len(targets) != 1:
         parser.error("--html-output works with one character")
+    stop_request = Path(args.cache_dir) / "stop-request"
+    try:
+        stop_request.unlink(missing_ok=True)
+    except OSError as exc:
+        print(f"Error clearing stale stop request {stop_request}: {exc}", file=sys.stderr)
+        return 1
+    reset_run_pacing()
     for name, realm in targets:
         if run_character(name, realm, args.cache_dir, args.refresh, args.offline, args.full, args.quick) != 0:
             return 1

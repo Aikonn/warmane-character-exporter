@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from math import ceil
+from pathlib import Path
 from random import random
 from time import sleep, time
 from typing import Callable
@@ -23,9 +26,14 @@ CLIENT_SIGNATURE_BLOCK_MARKERS = (
 )
 
 
+ADAPTIVE_REQUEST_SPACING_SECONDS = (1.0, 3.0, 5.0)
+INITIAL_REQUEST_SPACING_SECONDS = ADAPTIVE_REQUEST_SPACING_SECONDS[0]
+RATE_LIMITS_BEFORE_MAX_SPACING = 3
+
+
 @dataclass(frozen=True)
 class TransportConfig:
-    min_request_interval_seconds: float = 1.0
+    min_request_interval_seconds: float = INITIAL_REQUEST_SPACING_SECONDS
     connect_timeout_seconds: float = 10.0
     read_timeout_seconds: float = 30.0
     max_rate_limit_retries: int = 3
@@ -49,6 +57,40 @@ class RequestResult:
     transport_error: str | None = None
 
 
+class StopRequested(Exception):
+    """Raised when a roster stop request is detected during transport."""
+
+
+@dataclass
+class RunPacing:
+    spacing_seconds: float = INITIAL_REQUEST_SPACING_SECONDS
+    rate_limit_events: int = 0
+    stop_file: Path | None = None
+    last_request_time_by_host: dict[str, float] = field(default_factory=dict)
+
+    def reset(self, stop_file: Path | None = None) -> None:
+        self.spacing_seconds = INITIAL_REQUEST_SPACING_SECONDS
+        self.rate_limit_events = 0
+        self.stop_file = stop_file
+        self.last_request_time_by_host.clear()
+
+    def record_rate_limit(self) -> None:
+        self.rate_limit_events += 1
+        if self.rate_limit_events == 1:
+            self.spacing_seconds = ADAPTIVE_REQUEST_SPACING_SECONDS[1]
+        elif self.rate_limit_events >= RATE_LIMITS_BEFORE_MAX_SPACING + 1:
+            self.spacing_seconds = ADAPTIVE_REQUEST_SPACING_SECONDS[2]
+
+
+_RUN_PACING = RunPacing()
+
+
+def reset_run_pacing(stop_file: Path | None = None) -> RunPacing:
+    """Reset shared per-process pacing at the start of a CLI run."""
+    _RUN_PACING.reset(stop_file)
+    return _RUN_PACING
+
+
 @dataclass
 class RequestOrchestrator:
     checkpoint: ProbeCheckpointStore
@@ -57,7 +99,11 @@ class RequestOrchestrator:
     sleep_fn: Callable[[float], None] = sleep
     random_fn: Callable[[], float] = random
     skip_completed: bool = True
-    _last_request_time_by_host: dict[str, float] = field(default_factory=dict)
+    pacing: RunPacing | None = None
+
+    def __post_init__(self) -> None:
+        if self.pacing is None:
+            self.pacing = _RUN_PACING
 
     def execute_single_request(
         self,
@@ -69,6 +115,7 @@ class RequestOrchestrator:
         host = (urlparse(url).hostname or "").lower()
         if not host:
             raise ValueError("URL host is required.")
+        self._raise_if_stopped()
 
         if form is None:
             request_key = f"GET {url}"
@@ -90,12 +137,14 @@ class RequestOrchestrator:
         while True:
             attempts += 1
             self._apply_waits(host)
+            self._raise_if_stopped()
             response = self._post(client, url, form, referer) if form is not None else client.get(
                 url=url,
                 connect_timeout=self.config.connect_timeout_seconds,
                 read_timeout=self.config.read_timeout_seconds,
             )
-            self._last_request_time_by_host[host] = self.now_fn()
+            assert self.pacing is not None
+            self.pacing.last_request_time_by_host[host] = self.now_fn()
 
             classification = classify_response(response)
             if classification == "success":
@@ -114,7 +163,19 @@ class RequestOrchestrator:
 
             if classification == "rate_limited":
                 delay_seconds = self._compute_rate_limit_delay(response=response, retry_index=rate_retries)
+                assert self.pacing is not None
+                self.pacing.record_rate_limit()
                 self._set_host_cooldown(host=host, delay_seconds=delay_seconds)
+                kind = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1] or "request"
+                event = (
+                    f"{datetime.now(tz=timezone.utc).isoformat(timespec='seconds')} "
+                    f"rate limit: {kind}; wait {ceil(delay_seconds)} s; "
+                    f"spacing now {self.pacing.spacing_seconds:g} s"
+                )
+                print(event, file=sys.stderr, flush=True)
+                from .timing import record_event
+
+                record_event(event)
                 if rate_retries >= self.config.max_rate_limit_retries:
                     return RequestResult(
                         status="failed_rate_limited",
@@ -190,16 +251,54 @@ class RequestOrchestrator:
         now = self.now_fn()
         cooldown_until = self.checkpoint.get_cooldown_until(host)
         if cooldown_until is not None and cooldown_until > now:
-            self.sleep_fn(cooldown_until - now)
+            spacing = self._spacing_seconds()
+            self._wait(
+                cooldown_until - now,
+                f"Armory rate limit: waiting {{remaining}} s before the next request (spacing now {spacing:g} s)",
+            )
             now = self.now_fn()
 
-        last = self._last_request_time_by_host.get(host)
+        assert self.pacing is not None
+        last = self.pacing.last_request_time_by_host.get(host)
         if last is None:
             return
         elapsed = now - last
-        remaining = self.config.min_request_interval_seconds - elapsed
+        spacing = self._spacing_seconds()
+        remaining = spacing - elapsed
         if remaining > 0:
-            self.sleep_fn(remaining)
+            self._wait(
+                remaining,
+                f"Armory request spacing: waiting {{remaining}} s before the next request (spacing now {spacing:g} s)",
+            )
+
+    def _spacing_seconds(self) -> float:
+        assert self.pacing is not None
+        return max(self.config.min_request_interval_seconds, self.pacing.spacing_seconds)
+
+    def _raise_if_stopped(self) -> None:
+        assert self.pacing is not None
+        if self.pacing.stop_file is not None and self.pacing.stop_file.exists():
+            raise StopRequested("Roster stop requested by user.")
+
+    def _wait(self, seconds: float, message: str) -> None:
+        from . import progress
+
+        if seconds > 2:
+            progress.note(message.format(remaining=ceil(seconds)))
+        started = self.now_fn()
+        next_update = started + 5.0
+        target = started + seconds
+        while True:
+            self._raise_if_stopped()
+            now = self.now_fn()
+            remaining = target - now
+            if remaining <= 0:
+                return
+            self.sleep_fn(min(1.0, remaining))
+            now = self.now_fn()
+            if seconds > 2 and now >= next_update and now < target:
+                progress.note(message.format(remaining=ceil(target - now)))
+                next_update = now + 5.0
 
     def _compute_rate_limit_delay(self, response: HttpResponse, retry_index: int) -> float:
         retry_after_seconds = parse_retry_after_seconds(

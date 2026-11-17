@@ -26,6 +26,11 @@ class TimingLog:
         with self.path.open("a", encoding="utf-8") as log_file:
             log_file.write(line + "\n")
 
+    def record_event(self, line: str) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a", encoding="utf-8") as log_file:
+            log_file.write(line + "\n")
+
 
 _active_log: ContextVar[TimingLog | None] = ContextVar("warmane_timing_log", default=None)
 
@@ -56,6 +61,12 @@ def record_timing(label: str, duration: float) -> None:
     log = _active_log.get()
     if log is not None:
         log.record(label, duration)
+
+
+def record_event(line: str) -> None:
+    log = _active_log.get()
+    if log is not None:
+        log.record_event(line)
 
 
 @contextmanager

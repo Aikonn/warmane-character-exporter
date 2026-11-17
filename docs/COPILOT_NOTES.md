@@ -25,6 +25,18 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-17 · Progress · E: Adaptive request spacing, visible waits, Stop button
+Module: transport.py, roster.py, run.py, timing.py, Start-Report.ps1, tests
+
+1. Shared per-run spacing transitions 1 -> 3 -> 5 s across character orchestrators and resets next run; fake-clock tests pass.
+2. Preserved Retry-After/cooldown retries and stop-on-exhaustion behavior; transport tests pass.
+3. Long waits keep percent fixed, update progress, and log each rate-limit event to stderr and timing log; fake-clock tests pass.
+4. Roster summary includes rate-limit wait count and final spacing; summary test passes.
+5. Stop file is checked before characters and during waits; stale files are cleared, interrupted rows say "stopped by user", and the summary is written. Initial PC attempts exposed a PowerShell closure-scope bug; after capturing process state, owner retested successfully. PC header: `Run time: 2026-11-17 01:17; characters: 3; from cache: 0; not OK: 3.` The HTML had three "not run: stopped by user" rows.
+6. Updated README and `docs/tasks/raid-roster.md`.
+
+Verification: `PYTHONPATH=src; py -3.12 -m unittest discover -s tests` — 308 tests, OK; `py -3.12 -m compileall -q src tests`, PowerShell script parsing, and `git -c core.whitespace=cr-at-eol diff --check` passed. Tests are offline; no rate limit was provoked.
+
 ### 2026-11-17 · Task · E: Adaptive request spacing, visible waits, Stop button
 Module: transport.py, snapshot.py, roster.py, run.py, progress.py, Start-Report.ps1, tests
 

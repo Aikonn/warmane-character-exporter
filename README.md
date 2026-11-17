@@ -40,6 +40,8 @@ python -m warmane_exporter.roster --realm Onyxia --names Aikka,Bezduse --output-
 - `run` executes snapshot, reputation, mounts, achievements, statistics and export, stops at the first failing step, and resumes when started again.
 - `--offline` rebuilds from cached data only; `--refresh` ignores the 24 h cache.
 - `roster` creates one quick report per name and a timestamped HTML summary; cached character data is reused for up to 120 minutes by default.
+- Live requests start 1 s apart; rate limits trigger the existing cooldown/retry and raise spacing to 3 s after the first event, then 5 s after three further events in that run. Long waits are shown in the progress window and rate-limit events are logged.
+- The progress window's Stop button stops a roster cleanly and opens its partial summary; for a single-character run it asks for confirmation and stops the process. A roster summary records rate-limit waits and final spacing when applicable.
 - For roster performance measurements, pass `--timing` or set `WARMANE_TIMING=1`; step timings go to stderr and `.warmane-cache/timing-YYYYMMDD-HHMM.log`.
 - Output: `.warmane-cache/exports/<name>-<realm>.json` and `.md`.
 - A PvE export costs about 28 requests per character, a quick report 3, `--full` about 90.
@@ -51,7 +53,7 @@ Open **Settings > Check for updates**, then choose **Update now** when an update
 ## Responsible access
 
 - Plain HTTP with a fixed browser-like User-Agent; no rotation, no evasion.
-- Requests are sequential, 1 s apart, within a daily budget (default 500, `python -m warmane_exporter.budget --set N`).
+- Requests are sequential with adaptive 1/3/5 s spacing, within a daily budget (default 500, `python -m warmane_exporter.budget --set N`).
 - Error pages are detected and never cached as data; the tool stops on the first error.
 - Static reference pages go to the local `library/` folder and are reused.
 

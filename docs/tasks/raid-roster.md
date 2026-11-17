@@ -11,6 +11,7 @@ When assembling a raid, paste a list of character names, choose the realm, and g
 - First dialog gets a third choice: "Raid roster: quick report for a list of characters".
 - Roster dialog: multi-line text box (one name per line), realm drop-down (Onyxia, Icecrown; last used is the default, remembered in .warmane-cache/launcher-realm.txt), "Refresh all" checkbox (unchecked by default), output folder chooser (last used folder remembered in .warmane-cache/launcher-roster-folder.txt; default Downloads).
 - The progress window shows "Character N of M: Name" and the existing step progress.
+- A Stop button writes `.warmane-cache/stop-request`; the roster checks it before each character and during transport waits. Stopping keeps completed rows, marks the rest `not run` with note "stopped by user", writes and opens the partial summary. The launcher kills the process if it has not ended within 15 seconds.
 - When done, the summary page opens in the browser.
 
 ## Input cleanup (owner: yes)
@@ -23,7 +24,8 @@ When assembling a raid, paste a list of character names, choose the realm, and g
 
 ## Fetching
 
-- Reuse the quick path: `run_character(..., quick=True)` per character, one character at a time, existing 1 s spacing and budget.
+- Reuse the quick path: `run_character(..., quick=True)` per character, one character at a time, adaptive 1/3/5 s spacing and the existing request budget. Pacing is shared across the roster run and resets for the next run.
+- On a rate limit, keep the cooldown / `Retry-After` wait and retry behavior. Show waits longer than 2 s in progress without advancing the percentage; log each rate-limit event to stderr and to the timing log when enabled.
 - Cache age for the roster (owner): reuse cached character data younger than 2 hours; "Refresh all" ignores the cache. Pass the age as a parameter (`max_age_seconds`) through snapshot/fetch; do not change the 15 minute default for single-character runs.
 - Before normal execution, compare the three fresh response-cache bodies and the quick export fingerprint. The tool-version hash covers package Python files, bundled definitions, and the optional client-path config and is computed once per roster run. This check does not fetch data or load definitions. If the fingerprint matches, retain the existing per-character report when its HTML fingerprint matches; otherwise copy the matching export HTML. A stale cache entry, missing or mismatched export, or `--refresh` takes the normal quick path.
 - When any character needs the normal path, load client data and definitions once for the roster run, share them with each snapshot, and close them after the run. Single-character runs keep their existing per-run loading behavior.
@@ -86,6 +88,7 @@ Columns:
 - Non-zero issue counts are red, non-zero warning counts are orange, and counts of 4 or more are bold; zero counts stay plain. Use CSS classes, not inline styles.
 - Rows with status "not found", "not run" or "failed" keep the name and armory link and show the status and reason in the Issues list column (marked gray italic); other cells empty.
 - Header line: realm, run time, number of characters, how many came from cache.
+- If rate limits occurred, include the number of rate-limit waits and final request spacing.
 - Professions are not shown (owner).
 
 ## Structure
