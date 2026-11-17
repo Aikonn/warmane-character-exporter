@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import re
 import tempfile
 import time
 import unittest
@@ -314,9 +315,10 @@ class SummaryRenderingTests(unittest.TestCase):
     def test_pve_html_for_synthetic_fixture_is_unchanged(self):
         report = json.loads((FIXTURES / "synthetic" / "roster-report-synthetic.json").read_text(encoding="utf-8"))
         html = render_pve_html(build_pve_report(report))
+        html_without_style = re.sub(r"<style>.*?</style>", "<style></style>", html, count=1, flags=re.DOTALL)
         self.assertEqual(
-            hashlib.sha256(html.encode("utf-8")).hexdigest(),
-            "dbb583c307daccd736379b0541b2fe5315702b16f3260451448b623838452e77",
+            hashlib.sha256(html_without_style.encode("utf-8")).hexdigest(),
+            "5b05c3cb067f48bc492272ae347291f54db947db99365ccb0a735e5283b087f7",
         )
 
     def test_relative_age_keeps_fallback_and_epoch_sort_value(self):

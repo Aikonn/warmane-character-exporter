@@ -25,6 +25,11 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-17 · Issue · Windows system theme check pending
+Module: character PvE report tests
+
+The full suite passes (315 tests), and the quick/full fixture HTML is unchanged outside `<style>`. Both reports rendered with expected light and dark colors in browser `prefers-color-scheme` emulation. Windows' global appearance setting was not toggled, so task G's point 4 remains unverified.
+
 ### 2026-11-17 · Task · G: Dark and light theme for character reports
 Module: pve_report.py (CSS only), tests
 

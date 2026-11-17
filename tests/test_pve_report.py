@@ -1,3 +1,4 @@
+import re
 import unittest
 
 from warmane_exporter.pve_report import build_pve_report, build_progression, parse_progress_row, render_html
@@ -108,6 +109,15 @@ class HtmlTests(unittest.TestCase):
     def test_minimal_report_does_not_crash(self):
         html = render_html(build_pve_report({"identity": {"name": "X", "realm": "Icecrown"}, "missing_sections": ["statistics"]}))
         self.assertIn("Missing sections", html)
+
+    def test_theme_css_uses_system_color_scheme_and_variables(self):
+        html = render_html(build_pve_report(self.report))
+        css = html.partition("<style>")[2].partition("</style>")[0]
+        self.assertIn("prefers-color-scheme:dark", css)
+        root_blocks = re.findall(r":root\{[^{}]*\}", css)
+        self.assertEqual(len(root_blocks), 2)
+        css_without_root_blocks = re.sub(r":root\{[^{}]*\}", "", css)
+        self.assertNotRegex(css_without_root_blocks, r"#[0-9a-fA-F]{3,8}\b")
 
 
 if __name__ == "__main__":

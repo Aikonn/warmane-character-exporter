@@ -178,13 +178,16 @@ def build_pve_report(report: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------- HTML
 
 CSS = """
-.finding{color:#b00020}
-body{font-family:Segoe UI,Arial,sans-serif;max-width:1100px;margin:1.5em auto;padding:0 1em;color:#111;line-height:1.4}
-h1{border-bottom:2px solid #444;padding-bottom:.2em} h2{margin-top:1.8em;border-bottom:1px solid #999}
-table{border-collapse:collapse;margin:.6em 0;font-size:.92em} th,td{border:1px solid #bbb;padding:.25em .6em;text-align:left;vertical-align:top}
-th{background:#eee} td.n{text-align:right} .muted{color:#555} .off{color:#888} .note{background:#f6f6f0;border-left:4px solid #aa8;padding:.4em .8em}
-.warn{background:#fde8e8;border:1px solid #c33;border-left:6px solid #b00;color:#600;padding:.5em .9em;margin:.6em 0}
-details{margin:.4em 0} details.big{margin-top:1.8em;border-bottom:1px solid #999} details.big>summary{list-style-position:inside} details.big>summary>h2{display:inline;margin:0;border:0} summary{cursor:pointer}
+:root{--bg:#ffffff;--fg:#111;--muted:#555;--off:#888;--border:#bbb;--head:#eee;--link:#0b57d0;--finding:#b00020;--h1-line:#444;--h2-line:#999;--note-bg:#f6f6f0;--note-line:#aa8;--warn-bg:#fde8e8;--warn-border:#c33;--warn-line:#b00;--warn-fg:#600;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#16181d;--fg:#e4e6ea;--muted:#a8adb5;--off:#7d838b;--border:#383d46;--head:#22262d;--link:#8ab4f8;--finding:#ff6b7f;--h1-line:#5a606a;--h2-line:#454b55;--note-bg:#23241e;--note-line:#8a8a5c;--warn-bg:#3a1d22;--warn-border:#a3333f;--warn-line:#e05561;--warn-fg:#ffb3bd;color-scheme:dark}}
+.finding{color:var(--finding)}
+body{font-family:Segoe UI,Arial,sans-serif;max-width:1100px;margin:1.5em auto;padding:0 1em;background:var(--bg);color:var(--fg);line-height:1.4}
+a{color:var(--link)}
+h1{border-bottom:2px solid var(--h1-line);padding-bottom:.2em} h2{margin-top:1.8em;border-bottom:1px solid var(--h2-line)}
+table{border-collapse:collapse;margin:.6em 0;font-size:.92em} th,td{border:1px solid var(--border);padding:.25em .6em;text-align:left;vertical-align:top}
+th{background:var(--head)} td.n{text-align:right} .muted{color:var(--muted)} .off{color:var(--off)} .note{background:var(--note-bg);border-left:4px solid var(--note-line);padding:.4em .8em}
+.warn{background:var(--warn-bg);border:1px solid var(--warn-border);border-left:6px solid var(--warn-line);color:var(--warn-fg);padding:.5em .9em;margin:.6em 0}
+details{margin:.4em 0} details.big{margin-top:1.8em;border-bottom:1px solid var(--h2-line)} details.big>summary{list-style-position:inside} details.big>summary>h2{display:inline;margin:0;border:0} summary{cursor:pointer}
 """
 
 
