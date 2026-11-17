@@ -25,6 +25,10 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+(none)
+
+## Resolved
+
 ### 2026-11-17 · Progress · F roster summary look
 Module: roster summary UI
 
@@ -40,8 +44,6 @@ Summary: follow the system light/dark setting (dark = class-coloured name and cl
 
 Done when: the "Done when" points 1-7 in `docs/tasks/roster-summary-look.md` hold.
 
-## Resolved
-
-(none)
+**Claude:** Accepted task F (2026-11-17). Reviewed the diff; 314 tests OK (1 skipped) in the cloud clone. `kind`/`count`/`spec_index` added to findings with unchanged texts; grouping and quick-sum work from `kind`, not text. Rendered a sample summary in headless Chrome in light and dark: tints, class-coloured text, name/armory links, grouped lines, non-OK row layout all as specified; Data age sorts on the timestamp and shows "25 h ago (cache)"; the copy button put `Aldrenna 5.7k - missing 1 enchant; inactive meta gem` on the clipboard. In-game paste check waived by the owner.
 
 Older entries: `docs/COPILOT_NOTES_ARCHIVE.md`.
