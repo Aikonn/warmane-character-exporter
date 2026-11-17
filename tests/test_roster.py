@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import tempfile
@@ -25,8 +26,10 @@ from warmane_exporter.roster import (
     OK,
     RosterRow,
     build_row,
+    group_issues,
     parse_names,
     placeholder_row,
+    quick_sum,
     render_summary,
     run_roster,
     sort_rows,
@@ -93,11 +96,8 @@ class RosterRowTests(unittest.TestCase):
         self.assertEqual(row.issues, len(pve["checks"]["issues"]))
         self.assertEqual(row.warnings, len(pve["checks"]["warnings"]))
         self.assertEqual(
-            row.issue_texts,
-            [
-                f"{issue['slot']}: {issue['text']}" if issue.get("slot") is not None else issue["text"]
-                for issue in pve["checks"]["issues"]
-            ],
+            row.issue_findings,
+            pve["checks"]["issues"],
         )
         self.assertEqual(row.data_time, self.report["snapshot_time"])
         self.assertTrue(row.from_cache)
@@ -114,17 +114,24 @@ class RosterRowTests(unittest.TestCase):
         html = render_summary([row], "Onyxia", datetime(2026, 11, 15, 10, 30))
 
         self.assertEqual(row.main_trees, ["Shadow", "-"])
-        self.assertIn('<td data-sort="shadow / -">Shadow / -</td>', html)
+        self.assertIn('<td class="spec" data-sort="shadow / -">Shadow / -</td>', html)
 
-    def test_build_row_keeps_all_issue_texts_in_check_order(self):
-        issues = [{"text": "first"}, {"text": "second"}, {"text": "third"}]
+    def test_build_row_keeps_structured_issue_findings_in_check_order(self):
+        issues = [
+            {"kind": "unknown", "slot": "Head", "text": "first"},
+            {"kind": "unknown", "text": "second"},
+            {"kind": "unknown", "text": "third"},
+        ]
         with mock.patch("warmane_exporter.roster.run_checks", return_value={
             "issues": issues,
             "warnings": [],
         }):
             row = build_row(self.report, "Mélora-Onyxia-quick-pve.html", from_cache=False)
 
-        self.assertEqual(row.issue_texts, ["first", "second", "third"])
+        self.assertEqual(row.issue_findings, issues)
+        self.assertEqual(group_issues(row.issue_findings), [
+            ("Head:", "first"), ("", "second"), ("", "third"),
+        ])
 
     def test_build_row_prefixes_gear_issue_but_not_spec_issue(self):
         report = json.loads(json.dumps(self.report))
@@ -132,10 +139,10 @@ class RosterRowTests(unittest.TestCase):
 
         row = build_row(report, "Mélora-Onyxia-quick-pve.html", from_cache=False)
 
-        self.assertEqual(row.issue_texts, [
-            "Head: No enchant.",
-            "2 unspent talent point(s) (69 of 71 spent).",
-        ])
+        self.assertEqual(row.issue_findings[0]["slot"], "Head")
+        self.assertEqual(row.issue_findings[0]["kind"], "enchant")
+        self.assertEqual(row.issue_findings[1]["kind"], "talents")
+        self.assertEqual(row.issue_findings[1]["spec_index"], 0)
 
     def test_placeholder_rows_keep_identity_and_armory_link_only(self):
         for status in (NOT_FOUND, NOT_RUN, FAILED):
@@ -153,56 +160,140 @@ class RosterRowTests(unittest.TestCase):
         self.assertEqual([row.name for row in sort_rows(rows)], ["Alice", "bOb", "zara"])
 
 
+class IssueGroupingTests(unittest.TestCase):
+    def test_groups_findings_by_kind_in_required_order(self):
+        issues = [
+            {"kind": "unknown", "slot": "Waist", "text": "Other issue."},
+            {"kind": "glyphs", "count": 3, "spec_index": 0, "text": "glyphs"},
+            {"kind": "sockets", "slot": "Chest", "count": 2, "text": "sockets"},
+            {"kind": "enchant", "slot": "Chest", "text": "enchant"},
+            {"kind": "meta", "slot": "Head", "text": "meta"},
+            {"kind": "buckle", "slot": "Waist", "text": "buckle"},
+            {"kind": "talents", "count": 5, "spec_index": 0, "text": "talents"},
+            {"kind": "ring_enchant", "slot": "Finger 1", "text": "ring"},
+            {"kind": "sockets", "slot": "Head", "count": 1, "text": "sockets"},
+            {"kind": "enchant", "slot": "Head", "text": "enchant"},
+            {"kind": "meta", "slot": "Head", "text": "meta"},
+            {"kind": "sockets", "slot": "Chest", "count": 1, "text": "sockets"},
+            {"kind": "glyphs", "count": 2, "spec_index": 1, "text": "glyphs"},
+            {"kind": "talents", "count": 3, "spec_index": 1, "text": "talents"},
+            {"kind": "ring_enchant", "slot": "Finger 2", "text": "ring"},
+            {"kind": "meta", "slot": "Feet", "text": "meta"},
+        ]
+
+        self.assertEqual(group_issues(issues), [
+            ("No enchant (2):", "Chest, Head"),
+            ("No ring enchant (Enchanter) (2):", "Finger 1, Finger 2"),
+            ("Empty sockets (4):", "Chest 3, Head 1"),
+            ("Meta gem not active:", "Head, Feet"),
+            ("Belt buckle missing", ""),
+            ("Unspent talent points:", "Spec1 5, Spec2 3"),
+            ("Major glyphs empty:", "Spec1 3, Spec2 2"),
+            ("Waist:", "Other issue."),
+        ])
+
+
+class QuickSumTests(unittest.TestCase):
+    def row(self, findings, name="Name", score=5766, status=OK):
+        return RosterRow(
+            name=name, realm="Onyxia", status=status, gearscore=score,
+            issues=len(findings), issue_findings=findings,
+        )
+
+    def test_examples_and_rounding_down(self):
+        ravenik = self.row([
+            {"kind": "enchant"} for _ in range(10)
+        ] + [{"kind": "sockets", "count": 11}, {"kind": "buckle"}], "Ravenik", 4872)
+        aldrenna = self.row([
+            {"kind": "buckle"}, {"kind": "glyphs", "count": 3},
+        ], "Aldrenna", 5766)
+
+        self.assertEqual(quick_sum(ravenik), "Ravenik 4.8k - missing 10 enchants, 11 gems, buckle")
+        self.assertEqual(quick_sum(aldrenna), "Aldrenna 5.7k - missing buckle, 3 glyphs")
+        self.assertEqual(quick_sum(self.row([{"kind": "enchant"}], score=6090)), "Name 6.0k - missing 1 enchant")
+
+    def test_singular_other_only_and_no_issue_cases(self):
+        one_each = self.row([
+            {"kind": "enchant"}, {"kind": "sockets", "count": 1},
+            {"kind": "glyphs", "count": 1}, {"kind": "talents", "count": 1},
+        ], score=5000)
+        meta_only = self.row([{"kind": "meta"}], score=5500)
+        self.assertEqual(
+            quick_sum(one_each),
+            "Name 5.0k - missing 1 enchant, 1 gem, 1 glyph; 1 unspent talent",
+        )
+        self.assertEqual(quick_sum(meta_only), "Name 5.5k - inactive meta gem")
+        self.assertEqual(
+            quick_sum(self.row([{"kind": "custom"}], score=5500)),
+            "Name 5.5k - 1 other",
+        )
+        self.assertIsNone(quick_sum(self.row([])))
+        self.assertIsNone(quick_sum(self.row([{"kind": "buckle"}], status=NOT_FOUND)))
+
+    def test_message_stays_under_wow_chat_limit(self):
+        findings = (
+            [{"kind": "enchant"} for _ in range(8)]
+            + [{"kind": "sockets", "count": 3} for _ in range(19)]
+            + [{"kind": "buckle"}]
+            + [{"kind": "glyphs", "count": 3} for _ in range(2)]
+            + [{"kind": "talents", "count": 71} for _ in range(2)]
+            + [{"kind": "custom"} for _ in range(20)]
+        )
+        self.assertLessEqual(len(quick_sum(self.row(findings, "Abcdefghijkl", 6000))), 255)
+
+
 class SummaryRenderingTests(unittest.TestCase):
     def test_summary_file_name_uses_local_timestamp(self):
         self.assertEqual(summary_file_name(datetime(2026, 11, 15, 9, 7)), "raid-2026-11-15-0907.html")
 
-    def test_render_summary_escapes_each_issue_in_the_list(self):
+    def test_summary_escapes_text_and_uses_nine_cells(self):
         row = RosterRow(
             name="A<b>",
             realm="Onyxia",
             status=OK,
             class_name="Priest",
-            main_trees=["Holy"],
-            gearscore=123,
-            average_item_level=200,
+            main_trees=["Holy", "-"],
+            gearscore=4800,
+            average_item_level=245.5,
             issues=2,
             warnings=0,
-            issue_texts=["<Head &>: Missing <enchant>", "Second & final"],
+            issue_findings=[
+                {"kind": "custom", "slot": "<Head &>", "text": "Missing <enchant>"},
+                {"kind": "custom", "text": "Second & final"},
+            ],
             report_file="A-b-Onyxia-quick-pve.html",
             armory_url="https://armory.warmane.com/character/A%3Cb%3E/Onyxia/summary",
             from_cache=False,
         )
         not_found = placeholder_row("Absent", "Onyxia", NOT_FOUND)
         html = render_summary([row, not_found], "Onyxia", datetime(2026, 11, 15, 10, 30))
-        not_found_html = next(line for line in html.splitlines() if 'data-sort="absent">Absent</td>' in line)
+        not_found_html = next(line for line in html.splitlines() if 'data-sort="absent"' in line)
 
         self.assertIn("A&lt;b&gt;", html)
-        self.assertIn("&lt;Head &amp;&gt;: Missing &lt;enchant&gt;", html)
-        self.assertIn("Missing &lt;enchant&gt;", html)
-        self.assertIn(
-            '<div class="issues"><div>&lt;Head &amp;&gt;: Missing &lt;enchant&gt;</div>'
-            '<div>Second &amp; final</div></div>',
-            html,
-        )
+        self.assertIn('<span class="lbl">&lt;Head &amp;&gt;:</span> Missing &lt;enchant&gt;', html)
+        self.assertIn('data-quick-sum="A&lt;b&gt; 4.8k - 2 other"', html)
         self.assertNotIn("A<b>", html)
         self.assertNotIn("Missing <enchant>", html)
-        self.assertNotIn("<ul", html)
-        self.assertNotIn("<li", html)
         self.assertIn("characters: 2; from cache: 0; not OK: 1", html)
         self.assertIn('href="A-b-Onyxia-quick-pve.html"', html)
-        self.assertIn("https://armory.warmane.com/character/A%3Cb%3E/Onyxia/summary", html)
+        self.assertIn(
+            'href="https://armory.warmane.com/character/A%3Cb%3E/Onyxia/summary" title="Armory" '
+            'aria-label="Armory for A&lt;b&gt;" target="_blank" rel="noopener"',
+            html,
+        )
         self.assertIn("<th>Issues list</th>", html)
         self.assertEqual(html.count("<script>"), 1)
         self.assertEqual(html.count("</script>"), 1)
-        pve_html = render_pve_html(build_pve_report({"identity": {"name": "X", "realm": "Onyxia"}}))
-        self.assertEqual(pve_html.count("<script"), 0)
-        self.assertEqual(not_found_html.count("<td"), 11)
-        self.assertEqual(not_found_html.count("<td></td>"), 1)
-        self.assertIn('<tr class="not-ok"><td data-sort="absent">Absent</td>', not_found_html)
+        self.assertEqual(not_found_html.count("<td"), 9)
+        self.assertIn('<tr class="not-ok"><td class="name-cell" data-sort="absent">Absent', not_found_html)
         self.assertIn('<span class="status">not found: not found</span>', not_found_html)
-        self.assertIn(".status{color:#666;font-style:italic}", html)
-        self.assertIn('<a href="https://armory.warmane.com/character/Absent/Onyxia/summary">Armory</a>', not_found_html)
+        self.assertIn(
+            '<a class="armory" href="https://armory.warmane.com/character/Absent/Onyxia/summary"',
+            not_found_html,
+        )
+        for heading in ("Report", "Armory", "Main trees"):
+            self.assertNotIn(f"<th>{heading}</th>", html)
+        self.assertNotIn("cls-", render_pve_html(build_pve_report({"identity": {"name": "X", "realm": "Onyxia"}})))
 
     def test_summary_header_includes_rate_limit_wait_count_and_final_spacing(self):
         html = render_summary(
@@ -215,12 +306,20 @@ class SummaryRenderingTests(unittest.TestCase):
         report = build_pve_report({"identity": {"name": "X", "realm": "Onyxia"}})
         fingerprint = "a" * 64
         report["report"]["fingerprint"] = fingerprint
+        self.assertIn(
+            f'<meta name="warmane-fingerprint" content="{fingerprint}">',
+            render_pve_html(report),
+        )
 
-        html = render_pve_html(report)
+    def test_pve_html_for_synthetic_fixture_is_unchanged(self):
+        report = json.loads((FIXTURES / "synthetic" / "roster-report-synthetic.json").read_text(encoding="utf-8"))
+        html = render_pve_html(build_pve_report(report))
+        self.assertEqual(
+            hashlib.sha256(html.encode("utf-8")).hexdigest(),
+            "dbb583c307daccd736379b0541b2fe5315702b16f3260451448b623838452e77",
+        )
 
-        self.assertIn(f'<meta name="warmane-fingerprint" content="{fingerprint}">', html)
-
-    def test_data_age_format_is_zero_padded_for_cached_and_fresh_rows(self):
+    def test_relative_age_keeps_fallback_and_epoch_sort_value(self):
         rows = [
             RosterRow(name="Cached", realm="Onyxia", status=OK, data_time=1234567890, from_cache=True),
             RosterRow(name="Fresh", realm="Onyxia", status=OK, data_time=1234567890, from_cache=False),
@@ -229,11 +328,22 @@ class SummaryRenderingTests(unittest.TestCase):
             local_datetime.fromtimestamp.return_value = datetime(2026, 1, 6, 9, 4)
             html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
 
-        self.assertIn('data-sort="1234567890">2026-01-06 09:04 (from cache)</td>', html)
-        self.assertIn('data-sort="1234567890">2026-01-06 09:04 (fresh)</td>', html)
+        self.assertIn(
+            'class="age" data-sort="1234567890" data-age="1234567890" data-state="cache" '
+            'title="2026-01-06 09:04 (from cache)">2026-01-06 09:04 (from cache)</td>',
+            html,
+        )
+        self.assertIn(
+            'data-state="fresh" title="2026-01-06 09:04 (fresh)">2026-01-06 09:04 (fresh)</td>',
+            html,
+        )
+        self.assertIn('if (age < 90) text = "just now"', html)
+        self.assertIn("min ago", html)
+        self.assertIn("h ago", html)
+        self.assertIn("d ago", html)
         self.assertEqual(local_datetime.fromtimestamp.call_count, 2)
 
-    def test_sortable_cells_have_text_numeric_and_epoch_sort_keys(self):
+    def test_nine_columns_sort_keys_and_armory_report_links(self):
         row = RosterRow(
             name="Alpha",
             realm="Onyxia",
@@ -242,9 +352,9 @@ class SummaryRenderingTests(unittest.TestCase):
             main_trees=["Holy", "Discipline"],
             gearscore=4800,
             average_item_level=245.5,
-            issues=2,
+            issues=1,
             warnings=3,
-            issue_texts=["An issue"],
+            issue_findings=[{"kind": "buckle", "text": "Buckle missing"}],
             report_file="Alpha-Onyxia-quick-pve.html",
             armory_url="https://armory.warmane.com/character/Alpha/Onyxia/summary",
             data_time=1234567890,
@@ -252,33 +362,31 @@ class SummaryRenderingTests(unittest.TestCase):
         )
         html = render_summary([row], "Onyxia", datetime(2026, 11, 15, 10, 30))
 
-        self.assertIn(
-            '<td data-sort="alpha">Alpha</td><td class="cls-priest" data-sort="priest">Priest</td>'
-            '<td data-sort="holy / discipline">Holy / Discipline</td>'
-            '<td data-sort="4800">4800</td><td data-sort="245.5">245.5</td>'
-            '<td data-sort="2"><span class="count-issue">2</span></td>'
-            '<td data-sort="3"><span class="count-warn">3</span></td>',
-            html,
-        )
-        self.assertIn('<td data-sort="1234567890">', html)
-        for heading in ("Issues list", "Report", "Armory"):
-            self.assertIn(f"<th>{heading}</th>", html)
-            self.assertNotIn(f'<th class="sortable" data-type="text">{heading}</th>', html)
-            self.assertNotIn(f'<th class="sortable" data-type="num">{heading}</th>', html)
-        self.assertIn(".sortable{cursor:pointer}", html)
+        self.assertIn('<td class="name-cell" data-sort="alpha"><a class="name" href="Alpha-Onyxia-quick-pve.html">Alpha</a>', html)
+        self.assertIn('<td class="cls" data-sort="priest"><span class="cls-label">Priest</span></td>', html)
+        self.assertIn('<td class="spec" data-sort="holy / discipline">Holy / Discipline</td>', html)
+        self.assertIn('<td class="num" data-sort="4800">4800</td><td class="num" data-sort="245.5">245.5</td>', html)
+        self.assertIn('<td class="num" data-sort="1"><button type="button" class="copy"', html)
+        self.assertIn('<td class="num" data-sort="3"><span class="count-warn">3</span></td>', html)
+        self.assertIn('<th class="sortable" data-type="text">Spec1 / Spec2</th>', html)
+        self.assertEqual(html.count("<th ") + html.count("<th>"), 9)
+        self.assertIn("sortRows(header.cellIndex, header.dataset.type, descending)", html)
+        self.assertIn('await navigator.clipboard.writeText(text)', html)
+        self.assertIn('document.execCommand("copy")', html)
+        self.assertIn('button.title = copied ? "Copied" : "Copy failed"', html)
 
-    def test_class_colors_use_the_wotlk_335_palette(self):
+    def test_theme_and_class_tints_match_the_specification(self):
         palette = {
-            "Death Knight": ("cls-death-knight", "#C41F3B", "#fff"),
-            "Druid": ("cls-druid", "#FF7D0A", "#111"),
-            "Hunter": ("cls-hunter", "#ABD473", "#111"),
-            "Mage": ("cls-mage", "#69CCF0", "#111"),
-            "Paladin": ("cls-paladin", "#F58CBA", "#111"),
-            "Priest": ("cls-priest", "#FFFFFF", "#111"),
-            "Rogue": ("cls-rogue", "#FFF569", "#111"),
-            "Shaman": ("cls-shaman", "#0070DE", "#fff"),
-            "Warlock": ("cls-warlock", "#9482C9", "#111"),
-            "Warrior": ("cls-warrior", "#C79C6E", "#111"),
+            "Death Knight": ("c-death-knight", "#C41F3B", "#F2CED4"),
+            "Druid": ("c-druid", "#FF7D0A", "#FFE2C9"),
+            "Hunter": ("c-hunter", "#ABD473", "#EDF6E0"),
+            "Mage": ("c-mage", "#69CCF0", "#DEF4FC"),
+            "Paladin": ("c-paladin", "#F58CBA", "#FDE6F0"),
+            "Priest": ("c-priest", "#FFFFFF", "#EDEDED"),
+            "Rogue": ("c-rogue", "#FFF569", "#FFFDDE"),
+            "Shaman": ("c-shaman", "#0070DE", "#C7E0F8"),
+            "Warlock": ("c-warlock", "#9482C9", "#E7E4F3"),
+            "Warrior": ("c-warrior", "#C79C6E", "#F3E9DF"),
         }
         rows = [
             RosterRow(name=name, realm="Onyxia", status=OK, class_name=name)
@@ -286,61 +394,48 @@ class SummaryRenderingTests(unittest.TestCase):
         ]
         html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
 
-        for class_name, (css_class, background, foreground) in palette.items():
+        self.assertIn("prefers-color-scheme:dark", html)
+        self.assertIn("color-scheme:light", html)
+        self.assertIn("color-scheme:dark", html)
+        self.assertIn("--bg:#ffffff;--fg:#111111;--muted:#666666;--border:#c4c4c4;--head:#eeeeee", html)
+        self.assertIn("--bg:#16181d;--fg:#e4e6ea;--muted:#9aa0a6;--border:#383d46;--head:#22262d", html)
+        for class_name, (css_class, color, tint) in palette.items():
             with self.subTest(class_name=class_name):
-                self.assertIn(
-                    f'<td class="{css_class}" data-sort="{class_name.casefold()}">{class_name}</td>',
-                    html,
-                )
-                self.assertIn(
-                    f".{css_class}{{background:{background};color:{foreground}}}",
-                    html,
-                )
-                self.assertEqual(html.count(f".{css_class}{{"), 1)
+                self.assertIn(f'<tr class="{css_class}">', html)
+                self.assertIn(f".{css_class}{{--class-color:{color};--class-tint:{tint}}}", html)
+        self.assertIn("tr.c-hunter td", html)
+        self.assertIn("{background:var(--class-tint)}", html)
+        self.assertIn("tr.c-hunter .name,tr.c-hunter .cls-label", html)
 
-        pve_html = render_pve_html(build_pve_report({"identity": {"name": "X", "realm": "Onyxia"}}))
-        self.assertNotIn("cls-", pve_html)
-
-    def test_unknown_or_missing_class_has_no_color_class(self):
+    def test_unknown_class_and_issue_free_rows_have_no_class_or_copy_button(self):
         rows = [
-            RosterRow(name="Unknown", realm="Onyxia", status=OK, class_name="Evoker"),
-            RosterRow(name="Missing", realm="Onyxia", status=OK),
+            RosterRow(name="Unknown", realm="Onyxia", status=OK, class_name="Evoker", issues=0),
+            RosterRow(name="Missing", realm="Onyxia", status=OK, issues=0),
         ]
         html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
-        unknown_row = next(line for line in html.splitlines() if 'data-sort="unknown">Unknown' in line)
-        missing_row = next(line for line in html.splitlines() if 'data-sort="missing">Missing' in line)
+        unknown_row = next(line for line in html.splitlines() if 'data-sort="unknown"' in line)
+        missing_row = next(line for line in html.splitlines() if 'data-sort="missing"' in line)
+        self.assertIn('<td class="cls" data-sort="evoker"><span class="cls-label">Evoker</span></td>', unknown_row)
+        self.assertIn('<td class="cls" data-sort=""></td>', missing_row)
+        self.assertNotIn('<tr class="c-', unknown_row)
+        self.assertNotIn('<tr class="c-', missing_row)
+        self.assertNotIn('<button type="button" class="copy"', html)
+        self.assertIn('<td class="num" data-sort="0">0</td><td class="num" data-sort="">', unknown_row)
 
-        self.assertIn('<td data-sort="evoker">Evoker</td>', unknown_row)
-        self.assertIn('<td data-sort=""></td>', missing_row)
-        self.assertNotIn('class="cls-', unknown_row)
-        self.assertNotIn('class="cls-', missing_row)
-
-    def test_count_classes_for_zero_low_and_high_counts(self):
+    def test_count_classes_and_pve_report_remains_script_free(self):
         rows = [
             RosterRow(name="Zero", realm="Onyxia", status=OK, issues=0, warnings=0),
             RosterRow(name="Low", realm="Onyxia", status=OK, issues=1, warnings=3),
             RosterRow(name="High", realm="Onyxia", status=OK, issues=4, warnings=4),
         ]
         html = render_summary(rows, "Onyxia", datetime(2026, 11, 15, 10, 30))
-
-        self.assertIn(
-            '<td data-sort="0">0</td><td data-sort="0">0</td><td></td>',
-            html,
-        )
-        self.assertIn(
-            '<td data-sort="1"><span class="count-issue">1</span></td>'
-            '<td data-sort="3"><span class="count-warn">3</span></td><td></td>',
-            html,
-        )
-        self.assertIn(
-            '<td data-sort="4"><span class="count-issue count-high">4</span></td>'
-            '<td data-sort="4"><span class="count-warn count-high">4</span></td><td></td>',
-            html,
-        )
-        self.assertIn(".count-issue{color:#b00020}", html)
-        self.assertIn(".count-warn{color:#a65a00}", html)
+        self.assertIn('<td class="num" data-sort="1"><span class="count-issue">1</span></td>', html)
+        self.assertIn('<td class="num" data-sort="4"><span class="count-issue count-high">4</span></td>', html)
+        self.assertIn(".count-issue{color:var(--issue)}", html)
+        self.assertIn(".count-warn{color:var(--warn)}", html)
         self.assertIn(".count-high{font-weight:700}", html)
-        self.assertIn(".issues{font-size:.8em;margin:.1em 0}", html)
+        report = json.loads((FIXTURES / "synthetic" / "roster-report-synthetic.json").read_text(encoding="utf-8"))
+        self.assertNotIn("<script", render_pve_html(build_pve_report(report)))
 
 
 class RosterRunTests(unittest.TestCase):

@@ -88,3 +88,43 @@ class SpecChecks(unittest.TestCase):
     def test_both_specs_checked_the_same(self):
         bad = {"label": "Spec 2", "split": [30, 10, 0], "glyphs": [{"category": "major"}]}
         self.assertEqual(len(run_checks(report([], specs=[bad]))["issues"]), 2)
+
+    def test_findings_include_kinds_counts_and_spec_indices(self):
+        specs = [
+            {"label": "Spec 1", "split": [50, 19, 0], "glyphs": [{"category": "major"}] * 2},
+            {"label": "Spec 2", "split": [50, 20, 0], "glyphs": [{"category": "major"}]},
+            {"label": "Spec 3", "split": [0, 0, 0], "glyphs": []},
+        ]
+        equipment = [
+            item(
+                "Head", "head", enchant_id=None, enchant=None, sockets_empty=2,
+                gem_details=[{"text": "Meta"}], gem_states=["inactive"],
+            ),
+            item("Finger 1", "finger", enchant_id=None, enchant=None),
+            item("Waist", "waist", sockets=["Blue"], buckle=False),
+            item("Chest", item_subclass=2),
+        ]
+
+        result = run_checks(report(
+            equipment, professions=["Enchanting"], specs=specs,
+        ))
+        all_findings = result["issues"] + result["warnings"]
+        self.assertTrue(all("kind" in finding for finding in all_findings))
+        by_kind = {finding["kind"]: finding for finding in all_findings}
+        self.assertEqual(by_kind["enchant"]["slot"], "Head")
+        self.assertEqual(by_kind["ring_enchant"]["slot"], "Finger 1")
+        self.assertEqual((by_kind["sockets"]["count"], by_kind["sockets"]["slot"]), (2, "Head"))
+        self.assertEqual(by_kind["meta"]["slot"], "Head")
+        self.assertEqual(by_kind["buckle"]["slot"], "Waist")
+        self.assertEqual(by_kind["armor"]["level"], "warning")
+        self.assertEqual(
+            [(finding["count"], finding["spec_index"]) for finding in result["issues"]
+             if finding["kind"] == "talents"],
+            [(2, 0), (1, 1)],
+        )
+        self.assertEqual(
+            [(finding["count"], finding["spec_index"]) for finding in result["issues"]
+             if finding["kind"] == "glyphs"],
+            [(1, 0), (2, 1)],
+        )
+        self.assertEqual(by_kind["no_talents"]["spec_index"], 2)

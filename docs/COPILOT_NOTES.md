@@ -25,6 +25,12 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-17 · Progress · F roster summary look
+Module: roster summary UI
+
+Implemented the theme-aware table, grouped findings, quick-sum copy, relative data age and related documentation. `$env:PYTHONPATH="src"; python -m unittest discover -s tests` passed all 314 tests; the synthetic PvE HTML fixture hash is unchanged. The manual PC check was not run and is waived by the owner.
+Owner response for Claude: "Lets skip that check. It is really low risk. As long as plain text is clipboard, it will work. If there is issue, i will report it later."
+
 ### 2026-11-17 · Task · F: Roster summary look (theme, grouped issues, quick-sum copy)
 Module: roster.py, checks.py, tests, docs/tasks/raid-roster.md
 

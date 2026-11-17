@@ -39,16 +39,16 @@ ARMORY_URL = "https://armory.warmane.com/character/{name}/{realm}/summary"
 STOP_NOTE = "Stopped roster: access block, rate limit, or request budget exhausted."
 USER_STOP_NOTE = "stopped by user"
 CLASS_STYLES = {
-    "death knight": ("cls-death-knight", "#C41F3B", "#fff"),
-    "druid": ("cls-druid", "#FF7D0A", "#111"),
-    "hunter": ("cls-hunter", "#ABD473", "#111"),
-    "mage": ("cls-mage", "#69CCF0", "#111"),
-    "paladin": ("cls-paladin", "#F58CBA", "#111"),
-    "priest": ("cls-priest", "#FFFFFF", "#111"),
-    "rogue": ("cls-rogue", "#FFF569", "#111"),
-    "shaman": ("cls-shaman", "#0070DE", "#fff"),
-    "warlock": ("cls-warlock", "#9482C9", "#111"),
-    "warrior": ("cls-warrior", "#C79C6E", "#111"),
+    "death knight": ("c-death-knight", "#C41F3B"),
+    "druid": ("c-druid", "#FF7D0A"),
+    "hunter": ("c-hunter", "#ABD473"),
+    "mage": ("c-mage", "#69CCF0"),
+    "paladin": ("c-paladin", "#F58CBA"),
+    "priest": ("c-priest", "#FFFFFF"),
+    "rogue": ("c-rogue", "#FFF569"),
+    "shaman": ("c-shaman", "#0070DE"),
+    "warlock": ("c-warlock", "#9482C9"),
+    "warrior": ("c-warrior", "#C79C6E"),
 }
 
 # Row status values.
@@ -77,7 +77,7 @@ class RosterRow:
     average_item_level: float | None = None
     issues: int | None = None
     warnings: int | None = None
-    issue_texts: list[str] = field(default_factory=list)
+    issue_findings: list[dict[str, Any]] = field(default_factory=list)
     report_file: str | None = None      # file name relative to the output folder
     armory_url: str = ""
     data_time: float | None = None      # snapshot_time of the export (epoch seconds)
@@ -153,8 +153,8 @@ def build_row(report: dict[str, Any], report_file: str, from_cache: bool) -> Ros
     character's own page: ``gearscore.character_score(report["equipment"], class)`` and
     ``checks.run_checks(report)``. Main tree per specialization is the named tree with the
     most reported points, otherwise "-"; when per-tree names are unavailable, fall back to
-    the specialization label. Pad to two entries when fewer specs are present. issue_texts
-    contains all issue texts in ``run_checks`` order, with a slot prefix for gear findings.
+    the specialization label. Pad to two entries when fewer specs are present. Keep the
+    structured issue findings from ``run_checks`` for grouped display and quick-sum copying.
     """
     identity = report["identity"]
     name = identity["name"]
@@ -197,15 +197,162 @@ def build_row(report: dict[str, Any], report_file: str, from_cache: bool) -> Ros
         average_item_level=score["average_item_level"],
         issues=len(issues),
         warnings=len(findings["warnings"]),
-        issue_texts=[
-            f"{issue['slot']}: {issue['text']}" if issue.get("slot") is not None else issue["text"]
-            for issue in issues
-        ],
+        issue_findings=issues,
         report_file=report_file,
         armory_url=_armory_url(name, realm),
         data_time=data_time,
         from_cache=from_cache,
     )
+
+
+def group_issues(issues: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    """Return grouped issue-label/detail lines, preserving equipment and spec order."""
+    grouped: list[tuple[str, str]] = []
+    consumed: set[int] = set()
+
+    def collect_slots(kind: str) -> list[tuple[int, dict[str, Any]]]:
+        return [
+            (index, issue)
+            for index, issue in enumerate(issues)
+            if issue.get("kind") == kind and issue.get("slot") is not None
+        ]
+
+    def append_slot_group(kind: str, label: str) -> None:
+        selected = collect_slots(kind)
+        if not selected:
+            return
+        slots = [str(issue["slot"]) for _, issue in selected]
+        count = len(selected)
+        grouped.append((f"{label} ({count}):", ", ".join(slots)))
+        consumed.update(index for index, _ in selected)
+
+    append_slot_group("enchant", "No enchant")
+    append_slot_group("ring_enchant", "No ring enchant (Enchanter)")
+
+    socket_counts: dict[str, int] = {}
+    socket_indices: list[int] = []
+    for index, issue in collect_slots("sockets"):
+        count = issue.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+            continue
+        slot = str(issue["slot"])
+        socket_counts[slot] = socket_counts.get(slot, 0) + count
+        socket_indices.append(index)
+    if socket_indices:
+        socket_total = sum(socket_counts.values())
+        socket_details = ", ".join(
+            f"{slot} {count}" for slot, count in socket_counts.items()
+        )
+        grouped.append((f"Empty sockets ({socket_total}):", socket_details))
+        consumed.update(socket_indices)
+
+    meta_slots: list[str] = []
+    meta_indices: list[int] = []
+    for index, issue in collect_slots("meta"):
+        slot = str(issue["slot"])
+        if slot not in meta_slots:
+            meta_slots.append(slot)
+        meta_indices.append(index)
+    if meta_indices:
+        grouped.append(("Meta gem not active:", ", ".join(meta_slots)))
+        consumed.update(meta_indices)
+
+    buckle_indices = [
+        index for index, issue in enumerate(issues) if issue.get("kind") == "buckle"
+    ]
+    if buckle_indices:
+        grouped.append(("Belt buckle missing", ""))
+        consumed.update(buckle_indices)
+
+    def append_spec_group(kind: str, label: str) -> None:
+        totals: dict[int, int] = {}
+        selected_indices: list[int] = []
+        for index, issue in enumerate(issues):
+            spec_index = issue.get("spec_index")
+            count = issue.get("count")
+            if (
+                issue.get("kind") == kind
+                and isinstance(spec_index, int) and not isinstance(spec_index, bool) and spec_index >= 0
+                and isinstance(count, int) and not isinstance(count, bool) and count > 0
+            ):
+                totals[spec_index] = totals.get(spec_index, 0) + count
+                selected_indices.append(index)
+        if totals:
+            details = ", ".join(
+                f"Spec{spec_index + 1} {count}" for spec_index, count in sorted(totals.items())
+            )
+            grouped.append((label, details))
+            consumed.update(selected_indices)
+
+    append_spec_group("talents", "Unspent talent points:")
+    append_spec_group("glyphs", "Major glyphs empty:")
+
+    for index, issue in enumerate(issues):
+        if index in consumed:
+            continue
+        text = str(issue.get("text") or "")
+        slot = issue.get("slot")
+        grouped.append((f"{slot}:" if slot is not None else "", text))
+    return grouped
+
+
+def quick_sum(row: RosterRow) -> str | None:
+    """Return one chat line for an OK row with issues, otherwise None."""
+    if row.status != OK or not row.issue_findings:
+        return None
+
+    enchant_count = sum(issue.get("kind") in ("enchant", "ring_enchant") for issue in row.issue_findings)
+    gem_count = 0
+    glyph_count = 0
+    talent_count = 0
+    for issue in row.issue_findings:
+        count = issue.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+            continue
+        if issue.get("kind") == "sockets":
+            gem_count += count
+        elif issue.get("kind") == "glyphs":
+            glyph_count += count
+        elif issue.get("kind") == "talents":
+            talent_count += count
+
+    missing: list[str] = []
+    if enchant_count:
+        missing.append(f"{enchant_count} enchant{'s' if enchant_count != 1 else ''}")
+    if gem_count:
+        missing.append(f"{gem_count} gem{'s' if gem_count != 1 else ''}")
+    if any(issue.get("kind") == "buckle" for issue in row.issue_findings):
+        missing.append("buckle")
+    if glyph_count:
+        missing.append(f"{glyph_count} glyph{'s' if glyph_count != 1 else ''}")
+
+    known_kinds = {"enchant", "ring_enchant", "sockets", "buckle", "glyphs", "talents", "meta"}
+    other_count = 0
+    for issue in row.issue_findings:
+        kind = issue.get("kind")
+        count = issue.get("count")
+        has_count = isinstance(count, int) and not isinstance(count, bool) and count > 0
+        if kind not in known_kinds or (kind in ("sockets", "glyphs", "talents") and not has_count):
+            other_count += 1
+    other: list[str] = []
+    if talent_count:
+        other.append(f"{talent_count} unspent talent{'s' if talent_count != 1 else ''}")
+    if any(issue.get("kind") == "meta" for issue in row.issue_findings):
+        other.append("inactive meta gem")
+    if other_count:
+        other.append(f"{other_count} other")
+
+    score = "?" if row.gearscore is None else f"{row.gearscore // 100 / 10:.1f}k"
+    prefix = f"{row.name} {score}"
+    if missing:
+        message = f"{prefix} - missing {', '.join(missing)}"
+        if other:
+            message += f"; {', '.join(other)}"
+    elif other:
+        message = f"{prefix} - {', '.join(other)}"
+    else:
+        message = prefix
+    return message
 
 
 def placeholder_row(name: str, realm: str, status: str, note: str | None = None) -> RosterRow:
@@ -273,22 +420,13 @@ def render_summary(
     rate_limit_waits: int = 0,
     final_spacing_seconds: float = 1.0,
 ) -> str:
-    """Render a self-contained HTML roster summary with client-side sortable columns.
-
-    Header: realm, run time, number of characters, cache count, non-OK count, and rate-limit
-    waits/final spacing when a rate limit occurred. Table columns, in order: Name, Class, Main trees ("Holy / Discipline"),
-    GearScore, Avg item level, Issues, Warnings, Issues list, Report (relative link),
-    Armory (link), Data age. The first seven columns and Data age sort on click; other
-    columns are not sortable. Non-OK rows stay at the bottom in name order when sorting.
-    Without JavaScript, rows remain in name order. Every armory-derived text is HTML-escaped.
-    """
+    """Render a self-contained, system-themed HTML roster summary."""
     cached_count = sum(row.from_cache is True for row in rows)
     not_ok_count = sum(row.status != OK for row in rows)
     headings = (
-        ("Name", "text"), ("Class", "text"), ("Main trees", "text"),
+        ("Name", "text"), ("Class", "text"), ("Spec1 / Spec2", "text"),
         ("GearScore", "num"), ("Avg item level", "num"), ("Issues", "num"),
-        ("Warnings", "num"), ("Issues list", None), ("Report", None),
-        ("Armory", None), ("Data age", "num"),
+        ("Warnings", "num"), ("Issues list", None), ("Data age", "num"),
     )
 
     def count_cell(value: int | None, color_class: str) -> str:
@@ -305,78 +443,131 @@ def render_summary(
         class_attr = f' class="{cell_class}"' if cell_class else ""
         return f'<td{class_attr} data-sort="{escape(sort_key, quote=True)}">{content}</td>'
 
+    def armory_link(row: RosterRow) -> str:
+        if not row.armory_url:
+            return ""
+        aria_label = escape(f"Armory for {row.name}", quote=True)
+        return (
+            f'<a class="armory" href="{escape(row.armory_url, quote=True)}" title="Armory" '
+            f'aria-label="{aria_label}" target="_blank" rel="noopener">'
+            '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">'
+            '<path d="M9 2h5v5M14 2 7 9M12 9v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h4" '
+            'fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+            "</svg></a>"
+        )
+
+    def class_tint(color: str) -> str:
+        if color == "#FFFFFF":
+            return "#EDEDED"
+        channels = [int(color[index:index + 2], 16) for index in (1, 3, 5)]
+        return "#" + "".join(
+            f"{round(255 - (255 - channel) * 0.22):02X}" for channel in channels
+        )
+
     table_rows: list[str] = []
     for row in sort_rows(rows):
-        armory = (
-            f'<a href="{escape(row.armory_url, quote=True)}">Armory</a>'
-            if row.armory_url else ""
-        )
+        name_sort = row.name.casefold()
+        armory = armory_link(row)
         if row.status != OK:
             reason = row.note or row.status
             status_note = f'<span class="status">{escape(row.status)}: {escape(reason)}</span>'
-            cells = [
-                sortable_cell(escape(row.name), row.name.casefold()),
-                *(sortable_cell("", "") for _ in range(6)),
-                f"<td>{status_note}</td>",
-                "<td></td>",
-                f"<td>{armory}</td>",
-                sortable_cell("", ""),
-            ]
+            name_cell = (
+                f'<td class="name-cell" data-sort="{escape(name_sort, quote=True)}">'
+                f'{escape(row.name)}{armory}</td>'
+            )
+            cells = [name_cell, *(sortable_cell("", "") for _ in range(6)),
+                     f"<td>{status_note}</td>", sortable_cell("", "")]
+            row_class = "not-ok"
         else:
-            report_link = (
-                f'<a href="{escape(row.report_file, quote=True)}">Open</a>'
-                if row.report_file else ""
+            name = (
+                f'<a class="name" href="{escape(row.report_file, quote=True)}">{escape(row.name)}</a>'
+                if row.report_file else escape(row.name)
             )
             class_style = CLASS_STYLES.get((row.class_name or "").casefold())
+            class_name = escape(row.class_name or "")
             data_age = ""
+            age_title = ""
+            age_attrs = ""
             if row.data_time is not None and row.from_cache is not None:
                 timestamp = datetime.fromtimestamp(row.data_time).strftime("%Y-%m-%d %H:%M")
+                state = "cache" if row.from_cache else "fresh"
                 freshness = "from cache" if row.from_cache else "fresh"
                 data_age = f"{timestamp} ({freshness})"
+                age_title = f' title="{escape(data_age, quote=True)}"'
+                age_attrs = (
+                    f' data-age="{escape(str(row.data_time), quote=True)}"'
+                    f' data-state="{state}"'
+                )
             issue_list = ""
-            if row.issue_texts:
+            grouped = group_issues(row.issue_findings)
+            if grouped:
                 issue_list = (
                     '<div class="issues">'
-                    + "".join(f"<div>{escape(text)}</div>" for text in row.issue_texts)
+                    + "".join(
+                        "<div>"
+                        + (f'<span class="lbl">{escape(label)}</span>' if label else "")
+                        + (f" {escape(detail)}" if label and detail else escape(detail))
+                        + "</div>"
+                        for label, detail in grouped
+                    )
                     + "</div>"
                 )
+            quick_message = quick_sum(row)
+            issue_count = count_cell(row.issues, "count-issue")
+            if quick_message is not None:
+                button = (
+                    '<button type="button" class="copy" title="Copy quick-sum message" '
+                    f'aria-label="Copy quick-sum message for {escape(row.name, quote=True)}" '
+                    f'data-quick-sum="{escape(quick_message, quote=True)}">'
+                    '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">'
+                    '<rect x="5" y="5" width="9" height="9" rx="1.5" fill="none" '
+                    'stroke="currentColor" stroke-width="1.5"/>'
+                    '<path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" '
+                    'fill="none" stroke="currentColor" stroke-width="1.5"/>'
+                    "</svg></button>"
+                )
+                issue_count = button + issue_count
+            row_class = class_style[0] if class_style else ""
+            row_class_attr = f' class="{row_class}"' if row_class else ""
             cells = [
-                sortable_cell(escape(row.name), row.name.casefold()),
+                f'<td class="name-cell" data-sort="{escape(name_sort, quote=True)}">'
+                f'{name}{armory}</td>',
                 sortable_cell(
-                    escape(row.class_name or ""),
+                    f'<span class="cls-label">{class_name}</span>' if class_name else "",
                     (row.class_name or "").casefold(),
-                    class_style[0] if class_style else None,
+                    "cls",
                 ),
                 sortable_cell(
                     escape(" / ".join(row.main_trees)),
                     " / ".join(row.main_trees).casefold(),
+                    "spec",
                 ),
                 sortable_cell(
                     "" if row.gearscore is None else str(row.gearscore),
                     "" if row.gearscore is None else str(row.gearscore),
+                    "num",
                 ),
                 sortable_cell(
                     "" if row.average_item_level is None else f"{row.average_item_level:g}",
                     "" if row.average_item_level is None else str(row.average_item_level),
+                    "num",
                 ),
                 sortable_cell(
-                    count_cell(row.issues, "count-issue"),
+                    issue_count,
                     "" if row.issues is None else str(row.issues),
+                    "num",
                 ),
                 sortable_cell(
                     count_cell(row.warnings, "count-warn"),
                     "" if row.warnings is None else str(row.warnings),
+                    "num",
                 ),
                 f"<td>{issue_list}</td>",
-                f"<td>{report_link}</td>",
-                f"<td>{armory}</td>",
-                sortable_cell(
-                    escape(data_age),
-                    "" if not data_age else str(row.data_time),
-                ),
+                f'<td class="age" data-sort="{escape("" if not data_age else str(row.data_time), quote=True)}"'
+                f'{age_attrs}{age_title}>{escape(data_age)}</td>',
             ]
-        row_class = ' class="not-ok"' if row.status != OK else ""
-        table_rows.append(f"<tr{row_class}>" + "".join(cells) + "</tr>")
+        row_class_attr = ' class="not-ok"' if row.status != OK else row_class_attr
+        table_rows.append(f"<tr{row_class_attr}>" + "".join(cells) + "</tr>")
 
     table_head = "".join(
         f'<th class="sortable" data-type="{sort_type}">{heading}</th>'
@@ -384,8 +575,14 @@ def render_summary(
         for heading, sort_type in headings
     )
     class_style_rules = "".join(
-        f".{css_class}{{background:{background};color:{foreground}}}"
-        for css_class, background, foreground in CLASS_STYLES.values()
+        f".{css_class}{{--class-color:{color};--class-tint:{class_tint(color)}}}"
+        for css_class, color in CLASS_STYLES.values()
+    )
+    class_cells = ",".join(f"tr.{css_class} td" for css_class, _ in CLASS_STYLES.values())
+    class_labels = ",".join(
+        selector
+        for css_class, _ in CLASS_STYLES.values()
+        for selector in (f"tr.{css_class} .name", f"tr.{css_class} .cls-label")
     )
     rate_limit_summary = (
         f"; rate-limit waits: {rate_limit_waits}, spacing {final_spacing_seconds:g} s"
@@ -428,24 +625,87 @@ headers.forEach(header => header.addEventListener("click", () => {
   marker.textContent = descending ? " ▼" : " ▲";
   header.appendChild(marker);
 }));
+const viewedAt = Date.now() / 1000;
+document.querySelectorAll("td.age[data-age]").forEach(cell => {
+  const age = Math.max(0, viewedAt - Number(cell.dataset.age));
+  let text;
+  if (age < 90) text = "just now";
+  else if (age < 3600) text = `${Math.floor(age / 60)} min ago`;
+  else if (age < 36 * 3600) text = `${Math.floor(age / 3600)} h ago`;
+  else text = `${Math.floor(age / 86400)} d ago`;
+  if (cell.dataset.state === "cache") text += " (cache)";
+  cell.textContent = text;
+});
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (error) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    try {
+      document.body.appendChild(textarea);
+      textarea.select();
+      return document.execCommand("copy");
+    } catch (fallbackError) {
+      return false;
+    } finally {
+      textarea.remove();
+    }
+  }
+}
+document.querySelectorAll("button.copy").forEach(button => {
+  let resetTimer;
+  button.addEventListener("click", async () => {
+    const copied = await copyText(button.dataset.quickSum || "");
+    button.classList.toggle("copied", copied);
+    button.title = copied ? "Copied" : "Copy failed";
+    window.clearTimeout(resetTimer);
+    resetTimer = window.setTimeout(() => {
+      button.classList.remove("copied");
+      button.title = "Copy quick-sum message";
+    }, 1500);
+  });
+});
 </script>"""
     return (
         "<!doctype html>\n<html lang=\"en\">\n<head>\n"
         '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>Raid roster - {escape(realm)}</title>\n"
         "<style>"
-        "body{font-family:Segoe UI,Arial,sans-serif;max-width:1400px;margin:1.5em auto;padding:0 1em;color:#111;line-height:1.4}"
-        "h1{border-bottom:2px solid #444;padding-bottom:.2em}"
+        ":root{--bg:#ffffff;--fg:#111111;--muted:#666666;--border:#c4c4c4;--head:#eeeeee;"
+        "--link:#0b57d0;--issue:#b00020;--warn:#a65a00;--lbl:#555555;"
+        "--copied:#2e9d4f;color-scheme:light}"
+        "@media(prefers-color-scheme:dark){:root{--bg:#16181d;--fg:#e4e6ea;--muted:#9aa0a6;"
+        "--border:#383d46;--head:#22262d;--link:#8ab4f8;--issue:#ff6b7f;--warn:#f0a24a;"
+        "--lbl:#a8adb5;--copied:#2e9d4f;color-scheme:dark}}"
+        "body{font-family:Segoe UI,Arial,sans-serif;max-width:1400px;margin:1.5em auto;padding:0 1em;"
+        "background:var(--bg);color:var(--fg);line-height:1.4}"
+        "a{color:var(--link)}h1{border-bottom:2px solid var(--border);padding-bottom:.2em}"
+        ".meta{color:var(--muted)}.name{color:var(--fg)}"
         "table{border-collapse:collapse;width:100%;margin:.6em 0;font-size:.92em}"
-        "th,td{border:1px solid #bbb;padding:.35em .6em;text-align:left;vertical-align:top}"
-        "th{background:#eee}.sortable{cursor:pointer}"
-        ".status{color:#666;font-style:italic}"
-        ".issues{font-size:.8em;margin:.1em 0}"
-        ".count-issue{color:#b00020}.count-warn{color:#a65a00}.count-high{font-weight:700}"
+        "th,td{border:1px solid var(--border);padding:.35em .6em;text-align:left;vertical-align:top}"
+        "th{background:var(--head)}.sortable{cursor:pointer;user-select:none}.num{text-align:right}"
+        ".status{color:var(--muted);font-style:italic}.issues{font-size:.85em}"
+        ".issues .lbl{color:var(--lbl);font-weight:600}"
+        ".count-issue{color:var(--issue)}.count-warn{color:var(--warn)}.count-high{font-weight:700}"
+        ".name-cell,.cls,.spec{white-space:nowrap}.name{font-weight:600;text-decoration:none}"
+        ".name:hover{text-decoration:underline}.armory{margin-left:.45em;color:var(--muted);vertical-align:-1px}"
+        ".armory:hover{color:var(--link)}.age{white-space:nowrap;color:var(--muted)}"
         + class_style_rules
+        + class_cells + "{background:var(--class-tint)}"
+        + "@media(prefers-color-scheme:dark){"
+        + class_cells + "{background:none}"
+        + class_labels + "{color:var(--class-color)}}"
+        + "button.copy{float:left;padding:0 .2em;margin-right:.4em;border:1px solid transparent;"
+        "background:none;color:var(--muted);line-height:1;vertical-align:middle;cursor:pointer}"
+        "button.copy:hover{border-color:var(--border);color:var(--link)}"
+        "button.copy.copied{color:var(--copied);border-color:var(--copied)}"
         + "</style>\n</head>\n<body>\n"
         f"<h1>Raid roster - {escape(realm)}</h1>\n"
-        f"<p>Run time: {escape(run_time.strftime('%Y-%m-%d %H:%M'))}; "
+        f'<p class="meta">Run time: {escape(run_time.strftime("%Y-%m-%d %H:%M"))}; '
         f"characters: {len(rows)}; from cache: {cached_count}; not OK: {not_ok_count}"
         f"{rate_limit_summary}.</p>\n"
         "<table>\n<thead><tr>" + table_head + "</tr></thead>\n<tbody>\n"

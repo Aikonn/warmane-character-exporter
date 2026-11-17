@@ -45,48 +45,56 @@ When assembling a raid, paste a list of character names, choose the realm, and g
 
 Same style as the other reports: one self-contained HTML file, inline CSS, all armory text HTML-escaped, no external files. Exception (owner, 2026-11-16): the roster summary carries one small inline script for click-to-sort columns; character reports stay script-free.
 
-Columns:
-1. Name
-2. Class
-3. Main tree per specialization: the named talent tree with the most points, for example "Holy / Discipline"; "-" for a specialization with no points or when a second specialization is not exposed (owner: tree names, no point numbers)
-4. GearScore
-5. Average item level
-6. Issues (count)
-7. Warnings (count)
-8. Issues list: all issue texts in `run_checks` order, with gear findings prefixed by slot
-   (for example `Chest: No enchant.`), one plain line per issue, HTML-escaped
-9. Report: relative link to the local quick report file
-10. Armory: link to https://armory.warmane.com/character/NAME/REALM/summary
-11. Data age (`YYYY-MM-DD HH:MM (from cache)` or `YYYY-MM-DD HH:MM (fresh)`, local time)
+Columns: Name, Class, Spec1 / Spec2, GearScore, Average item level, Issues, Warnings,
+Issues list, Data age. Spec1 / Spec2 remains the named talent tree with the most points
+per specialization (for example "Holy / Discipline"); "-" means no points or an unavailable
+second specialization. The name links to the local quick report when present, with a small
+external-link icon for https://armory.warmane.com/character/NAME/REALM/summary beside it.
+Non-OK rows show a plain name and the Armory icon. The Name, Class and Spec1 / Spec2 cells
+do not wrap.
+
+- Class styling follows the operating system light/dark setting. Light mode tints every cell
+  in an OK row with the class tint; dark mode uses the class color for the name and class
+  text without tinting the row. Unknown classes and non-OK rows have no class styling.
+
+| Class | WotLK color | Light tint |
+|---|---|---|
+| Death Knight | `#C41F3B` | `#F2CED4` |
+| Druid | `#FF7D0A` | `#FFE2C9` |
+| Hunter | `#ABD473` | `#EDF6E0` |
+| Mage | `#69CCF0` | `#DEF4FC` |
+| Paladin | `#F58CBA` | `#FDE6F0` |
+| Priest | `#FFFFFF` | `#EDEDED` |
+| Rogue | `#FFF569` | `#FFFDDE` |
+| Shaman | `#0070DE` | `#C7E0F8` |
+| Warlock | `#9482C9` | `#E7E4F3` |
+| Warrior | `#C79C6E` | `#F3E9DF` |
+
+- Issues count remains the number of findings. The Issues list groups findings by kind,
+  retaining slot order: missing enchants, Enchanter ring enchants, empty sockets (total and
+  per-slot count), inactive meta gems, belt buckle, unspent talent points per spec, empty
+  major glyphs per spec, then other issue text (with a slot prefix when available). Group
+  labels are visually distinguished and all source text is HTML-escaped.
+- An OK row with issues has a copy icon in the Issues count cell. It copies one chat line:
+  missing enchant, gem, buckle and glyph totals, followed by unspent talents, inactive meta
+  and other issues. Clipboard API use falls back to a hidden textarea for local `file://`
+  pages; the icon briefly confirms a successful copy.
+- Data age shows `YYYY-MM-DD HH:MM (from cache)` or `YYYY-MM-DD HH:MM (fresh)` without
+  JavaScript, and relative age (`just now`, minutes, hours or days ago) with JavaScript.
+  Cached relative ages include `(cache)`. The original text remains in the cell's title and
+  the sortable value remains the snapshot epoch.
 
 - Without JavaScript, rows are sorted by name (owner).
-- In the summary only, Name, Class, Main trees, GearScore, Avg item level, Issues, Warnings
-  and Data age are clickable sort columns. Each click sorts ascending; clicking the active
+- In the summary only, Name, Class, Spec1 / Spec2, GearScore, Avg item level, Issues,
+  Warnings and Data age are clickable sort columns. Each click sorts ascending; clicking the active
   column again sorts descending. The active heading shows ▲ or ▼, text compares
   case-insensitively, numeric values compare numerically, and empty values stay last.
 - When JavaScript is enabled, non-OK rows stay at the bottom in name order regardless of
   the selected sort. Sortable headers use a pointer cursor. The page has one small inline
   script at the end of `<body>` and makes no network requests; character reports remain
   script-free.
-- Class cells use the WotLK 3.3.5 class color as their background, with dark text except
-  for Death Knight and Shaman, which use white text. The Priest cell keeps its table border;
-  unknown or missing classes get no color class. These styles affect only the roster summary.
-
-| Class | Background |
-|---|---|
-| Death Knight | `#C41F3B` |
-| Druid | `#FF7D0A` |
-| Hunter | `#ABD473` |
-| Mage | `#69CCF0` |
-| Paladin | `#F58CBA` |
-| Priest | `#FFFFFF` |
-| Rogue | `#FFF569` |
-| Shaman | `#0070DE` |
-| Warlock | `#9482C9` |
-| Warrior | `#C79C6E` |
-- OK rows show issue texts as compact plain lines in the Issues list column (no bullets or left padding); it is empty when there are no issues. Gear issue lines include the equipment slot name; spec issue lines do not.
 - Non-zero issue counts are red, non-zero warning counts are orange, and counts of 4 or more are bold; zero counts stay plain. Use CSS classes, not inline styles.
-- Rows with status "not found", "not run" or "failed" keep the name and armory link and show the status and reason in the Issues list column (marked gray italic); other cells empty.
+- Rows with status "not found", "not run" or "failed" keep the name and armory icon and show the status and reason in the Issues list column (marked muted italic); other cells empty.
 - Header line: realm, run time, number of characters, how many came from cache.
 - If rate limits occurred, include the number of rate-limit waits and final request spacing.
 - Professions are not shown (owner).

@@ -1,6 +1,8 @@
 """Raid readiness checks for the PvE report (tier 1: objective facts, no stat caps, no best-in-slot lists).
 
-Every finding is {"level": "issue" | "warning", "area": str, "text": str}.
+Every finding has ``level``, ``area``, ``text`` and machine-readable ``kind`` fields;
+socket, talent and glyph findings also include ``count``, and spec findings include
+``spec_index``. The PvE report renders the unchanged ``text`` field.
 Issues are things that are almost certainly wrong; warnings may be intentional.
 The checks assume a level 80 character; below level 80 the talent point maximum is level - 9 and glyph checks are skipped.
 """
@@ -24,12 +26,32 @@ def _label(item: dict[str, Any]) -> str:
     return f"{item.get('slot')} ({item.get('name') or item.get('item_id') or '?'})"
 
 
-def _finding(level: str, area: str, text: str) -> dict[str, str]:
-    return {"level": level, "area": area, "text": text}
+def _finding(
+    level: str,
+    area: str,
+    text: str,
+    kind: str,
+    *,
+    count: int | None = None,
+    spec_index: int | None = None,
+) -> dict[str, Any]:
+    finding: dict[str, Any] = {"level": level, "area": area, "text": text, "kind": kind}
+    if count is not None:
+        finding["count"] = count
+    if spec_index is not None:
+        finding["spec_index"] = spec_index
+    return finding
 
 
-def _gear_finding(level: str, item: dict[str, Any], text: str) -> dict[str, Any]:
-    finding = _finding(level, _label(item), text)
+def _gear_finding(
+    level: str,
+    item: dict[str, Any],
+    text: str,
+    kind: str,
+    *,
+    count: int | None = None,
+) -> dict[str, Any]:
+    finding = _finding(level, _label(item), text, kind, count=count)
     finding["slot"] = item.get("slot")
     return finding
 
@@ -54,39 +76,64 @@ def check_gear(report: dict[str, Any]) -> list[dict[str, Any]]:
             needs = enchanting
         if needs and not item.get("enchant_id") and not item.get("enchant"):
             why = " (the character is an Enchanter)" if slot in ("Finger 1", "Finger 2") else ""
-            out.append(_gear_finding("issue", item, f"No enchant{why}."))
+            enchant_kind = "ring_enchant" if slot in ("Finger 1", "Finger 2") else "enchant"
+            out.append(_gear_finding("issue", item, f"No enchant{why}.", enchant_kind))
         if item.get("sockets_empty"):
-            out.append(_gear_finding("issue", item, f"{item['sockets_empty']} empty gem socket(s)."))
+            out.append(_gear_finding(
+                "issue", item, f"{item['sockets_empty']} empty gem socket(s).", "sockets",
+                count=item["sockets_empty"],
+            ))
         for gem, state in zip(item.get("gem_details") or [], item.get("gem_states") or []):
             if state == "inactive":
-                out.append(_gear_finding("issue", item, f"Meta gem is not active: {gem.get('text') or 'meta gem'}."))
+                out.append(_gear_finding(
+                    "issue", item, f"Meta gem is not active: {gem.get('text') or 'meta gem'}.", "meta",
+                ))
         if slot == "Waist" and item.get("sockets") is not None and not item.get("buckle"):
-            out.append(_gear_finding("issue", item, f"{BUCKLE_NAME} missing (extra gem socket on the belt)."))
+            out.append(_gear_finding(
+                "issue", item, f"{BUCKLE_NAME} missing (extra gem socket on the belt).", "buckle",
+            ))
         best = BEST_ARMOR.get(cls or "")
         sub = item.get("item_subclass")
         if best and slot in ARMOR_SLOTS and item.get("item_class") == 4 and sub in ARMOR_NAMES and sub < best:
-            out.append(_gear_finding("warning", item, f"{ARMOR_NAMES[sub].capitalize()} armor; a {cls} can wear {ARMOR_NAMES[best]}."))
+            out.append(_gear_finding(
+                "warning", item,
+                f"{ARMOR_NAMES[sub].capitalize()} armor; a {cls} can wear {ARMOR_NAMES[best]}.",
+                "armor",
+            ))
     return out
 
 
-def check_specs(report: dict[str, Any]) -> list[dict[str, str]]:
-    out: list[dict[str, str]] = []
+def check_specs(report: dict[str, Any]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
     level = (report.get("identity") or {}).get("level")
     level = level if isinstance(level, int) else 80
     max_points = max(level - 9, 0)
-    for spec in report.get("specializations") or []:
+    for spec_index, spec in enumerate(report.get("specializations") or []):
         label = spec.get("label") or "Specialization"
         spent = sum(x for x in spec.get("split") or [] if isinstance(x, int))
         if spent == 0:
-            out.append(_finding("warning", label, "No talent points spent: dual specialization is probably not purchased, so this "
-                                                 "specialization was not checked."))
+            out.append(_finding(
+                "warning", label,
+                "No talent points spent: dual specialization is probably not purchased, so this "
+                "specialization was not checked.",
+                "no_talents", spec_index=spec_index,
+            ))
             continue
         if spent < max_points:
-            out.append(_finding("issue", label, f"{max_points - spent} unspent talent point(s) ({spent} of {max_points} spent)."))
+            unspent = max_points - spent
+            out.append(_finding(
+                "issue", label, f"{unspent} unspent talent point(s) ({spent} of {max_points} spent).",
+                "talents", count=unspent, spec_index=spec_index,
+            ))
         if level >= 80:
             major = sum(1 for g in spec.get("glyphs") or [] if g.get("category") == "major")
             if major < MAX_MAJOR_GLYPHS:
-                out.append(_finding("issue", label, f"{MAX_MAJOR_GLYPHS - major} major glyph slot(s) empty ({major} of {MAX_MAJOR_GLYPHS} filled)."))
+                empty = MAX_MAJOR_GLYPHS - major
+                out.append(_finding(
+                    "issue", label,
+                    f"{empty} major glyph slot(s) empty ({major} of {MAX_MAJOR_GLYPHS} filled).",
+                    "glyphs", count=empty, spec_index=spec_index,
+                ))
     return out
 
 

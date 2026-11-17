@@ -1,6 +1,6 @@
 # Task F: roster summary look (dark/light theme, grouped issues, quick-sum copy)
 
-Status: open (owner decisions 2026-11-17). Applies to the roster summary page only (`roster.render_summary` and `build_row`); character reports are unchanged.
+Status: done (manual Windows/chat check waived by owner). Applies to the roster summary page only (`roster.render_summary` and `build_row`); character reports are unchanged.
 
 Reference mockup: [`roster-summary-mockup.html`](roster-summary-mockup.html), built from a real roster with invented names. Its dashed "Mockup only" theme switch at the top is **not** part of the product; the real page follows the system setting only.
 
