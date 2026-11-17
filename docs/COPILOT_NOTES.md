@@ -25,7 +25,12 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-(none)
+### 2026-11-17 · Task · G: Dark and light theme for character reports
+Module: pve_report.py (CSS only), tests
+
+Owner decision (2026-11-17): character reports get a dark version that follows the system setting, same palette as the roster summary; no class colouring. Exact CSS and checks: `docs/tasks/report-dark-theme.md`.
+
+Done when: the "Done when" points 1-4 in `docs/tasks/report-dark-theme.md` hold.
 
 ## Resolved
 
