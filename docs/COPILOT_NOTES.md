@@ -25,6 +25,11 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-17 · Progress · Ignore Claude outputs folder
+Module: `.gitignore`
+
+Added `/Claude outputs/` so Git ignores the root folder and all nested files. Verified with `git check-ignore -v`.
+
 ### 2026-11-17 · Progress · E: Adaptive request spacing, visible waits, Stop button
 Module: transport.py, roster.py, run.py, timing.py, Start-Report.ps1, tests
 

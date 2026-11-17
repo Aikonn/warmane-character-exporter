@@ -12,6 +12,7 @@ src/*.egg-info/
 local-captures/
 tests/fixtures/captures/last-live-response-sanitized.json
 .warmane-cache/
+/Claude outputs/
 
 .tools/
 library/*
