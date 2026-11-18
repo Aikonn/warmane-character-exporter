@@ -25,7 +25,12 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
-(none)
+### 2026-11-19 · Task · H: Gem quality check and spec-aware major glyph check
+Module: checks.py, roster.py, pve_report.py (one text line), tests
+
+Owner decisions (2026-11-19): common-quality gems are an issue; uncommon gems in item level 251+ gear are a warning; meta gems are excluded. Missing major glyphs are an issue only when no spec has all 3; once one spec has all 3, other specs with talent points and fewer than 3 major glyphs get a warning. Full spec: `docs/tasks/gem-quality-and-glyphs.md`.
+
+Done when: the "Done when" points 1-4 in `docs/tasks/gem-quality-and-glyphs.md` hold.
 
 ## Resolved
 
