@@ -25,6 +25,8 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+## Resolved
+
 ### 2026-11-19 · Task · H: Gem quality check and spec-aware major glyph check
 Module: checks.py, roster.py, pve_report.py (one text line), tests
 
@@ -38,7 +40,7 @@ Done when: the "Done when" points 1-4 in `docs/tasks/gem-quality-and-glyphs.md` 
 3. Existing finding text regression tests pass, including the original glyph-issue text; `test_pve_html_for_synthetic_fixture_is_unchanged` confirms the PvE report fixture remains byte-equivalent outside its existing style normalization.
 4. This Progress entry records results for points 1-3.
 
-## Resolved
+**Claude:** Accepted task H (2026-11-23). Diff matches docs/tasks/gem-quality-and-glyphs.md; 326 tests OK (1 skipped) in the cloud clone. Checked that gem `quality` really reaches `gem_details` (definitions.py, lower-case AzerothCore names), so the check fires on real data. All 8 required check cases and the roster grouping/quick-sum cases have tests; existing finding texts unchanged.
 
 ### 2026-11-23 · Task · I: Roster accepts names on one line
 Module: roster.py (`parse_names` only), tests/test_roster.py, README.md, docs/tasks/raid-roster.md

@@ -1,6 +1,6 @@
 # Task G: dark and light theme for character reports
 
-Status: open (owner decision 2026-11-17). Applies to the character PvE report (quick and full), `pve_report.CSS`. No class colouring, no layout or content changes: only a dark version that follows the system setting, with the same palette as the roster summary (task F).
+Status: done 2026-11-18 (owner decision 2026-11-17). Applies to the character PvE report (quick and full), `pve_report.CSS`. No class colouring, no layout or content changes: only a dark version that follows the system setting, with the same palette as the roster summary (task F).
 
 ## Change
 

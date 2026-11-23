@@ -1,6 +1,6 @@
 # Task H: gem quality check and spec-aware major glyph check
 
-Status: open (owner decision 2026-11-19). Applies to `src/warmane_exporter/checks.py` (character PvE report findings) and the roster summary in `src/warmane_exporter/roster.py`.
+Status: done 2026-11-23 (owner decision 2026-11-19). Applies to `src/warmane_exporter/checks.py` (character PvE report findings) and the roster summary in `src/warmane_exporter/roster.py`.
 
 ## 1. Gem quality (new, in `check_gear`)
 
