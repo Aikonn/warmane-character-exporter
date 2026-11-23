@@ -99,15 +99,15 @@ def _armory_url(name: str, realm: str) -> str:
 def parse_names(text: str, realm: str) -> RosterInput:
     """Clean the pasted list. Pure function, no I/O.
 
-    - One name per line; trim spaces; ignore blank lines.
+    - Split each line on whitespace and commas; ignore blank lines.
     - "Name-Realm" is accepted; a realm part that differs from ``realm`` (case-insensitive)
-      is an error for that line.
+      is an error for that part.
     - Names must be letters only (accented letters allowed, as WotLK allows them);
-      anything else is an error for that line.
+      anything else is an error for that part.
     - Normalize to Warmane style: first letter upper case, the rest lower case.
     - Drop duplicates (case-insensitive), keep the first occurrence and input order.
     - More than MAX_NAMES distinct names is an error (names stay empty in that case).
-    Errors name the line number and the offending text.
+    Errors name the line number and the offending part.
     """
     canonical_realm = _canonical_realm(realm)
     if canonical_realm is None:
@@ -117,31 +117,30 @@ def parse_names(text: str, realm: str) -> RosterInput:
     errors: list[str] = []
     seen: set[str] = set()
     for line_number, raw_line in enumerate(text.splitlines(), start=1):
-        line = raw_line.strip()
-        if not line:
-            continue
+        for part in raw_line.replace(",", " ").split():
+            name = part
+            if "-" in part:
+                name, suffix = part.rsplit("-", 1)
+                if suffix.casefold() != canonical_realm.casefold():
+                    errors.append(
+                        f"Line {line_number}: {part!r} specifies a different realm; expected {canonical_realm}."
+                    )
+                    continue
 
-        name = line
-        if "-" in line:
-            name, suffix = line.rsplit("-", 1)
-            if suffix.strip().casefold() != canonical_realm.casefold():
-                errors.append(f"Line {line_number}: {line!r} specifies a different realm; expected {canonical_realm}.")
+            name = normalize("NFC", name)
+            if not name or not name.isalpha():
+                errors.append(f"Line {line_number}: {part!r} must contain letters only.")
                 continue
 
-        name = normalize("NFC", name.strip())
-        if not name or not name.isalpha():
-            errors.append(f"Line {line_number}: {line!r} must contain letters only.")
-            continue
-
-        normalized = name[0].upper() + name[1:].lower()
-        key = normalized.casefold()
-        if key not in seen:
-            names.append(normalized)
-            seen.add(key)
-            if len(names) > MAX_NAMES:
-                return RosterInput(errors=[
-                    f"Line {line_number}: {line!r} exceeds the limit of {MAX_NAMES} distinct names."
-                ])
+            normalized = name[0].upper() + name[1:].lower()
+            key = normalized.casefold()
+            if key not in seen:
+                names.append(normalized)
+                seen.add(key)
+                if len(names) > MAX_NAMES:
+                    return RosterInput(errors=[
+                        f"Line {line_number}: {part!r} exceeds the limit of {MAX_NAMES} distinct names."
+                    ])
 
     return RosterInput(names=names, errors=errors)
 

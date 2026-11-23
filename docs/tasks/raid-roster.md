@@ -9,7 +9,7 @@ When assembling a raid, paste a list of character names, choose the realm, and g
 ## Launcher (Start-Report.ps1)
 
 - First dialog gets a third choice: "Raid roster: quick report for a list of characters".
-- Roster dialog: multi-line text box (one name per line), realm drop-down (Onyxia, Icecrown; last used is the default, remembered in .warmane-cache/launcher-realm.txt), "Refresh all" checkbox (unchecked by default), output folder chooser (last used folder remembered in .warmane-cache/launcher-roster-folder.txt; default Downloads).
+- Roster dialog: multi-line text box (names separated by whitespace or commas; one per line also works), realm drop-down (Onyxia, Icecrown; last used is the default, remembered in .warmane-cache/launcher-realm.txt), "Refresh all" checkbox (unchecked by default), output folder chooser (last used folder remembered in .warmane-cache/launcher-roster-folder.txt; default Downloads).
 - The progress window shows "Character N of M: Name" and the existing step progress.
 - A Stop button writes `.warmane-cache/stop-request`; the roster checks it before each character and during transport waits. Stopping keeps completed rows, marks the rest `not run` with note "stopped by user", writes and opens the partial summary. The launcher kills the process if it has not ended within 15 seconds.
 - When done, the summary page opens in the browser.

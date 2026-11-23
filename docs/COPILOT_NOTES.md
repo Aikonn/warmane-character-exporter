@@ -25,6 +25,15 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-19 · Task · H: Gem quality check and spec-aware major glyph check
+Module: checks.py, roster.py, pve_report.py (one text line), tests
+
+Owner decisions (2026-11-19): common-quality gems are an issue; uncommon gems in item level 251+ gear are a warning; meta gems are excluded. Missing major glyphs are an issue only when no spec has all 3; once one spec has all 3, other specs with talent points and fewer than 3 major glyphs get a warning. Full spec: `docs/tasks/gem-quality-and-glyphs.md`.
+
+Done when: the "Done when" points 1-4 in `docs/tasks/gem-quality-and-glyphs.md` hold.
+
+## Resolved
+
 ### 2026-11-23 · Task · I: Roster accepts names on one line
 Module: roster.py (`parse_names` only), tests/test_roster.py, README.md, docs/tasks/raid-roster.md
 
@@ -36,14 +45,11 @@ Done when:
 3. The docstring, README.md and docs/tasks/raid-roster.md no longer say "one name per line" only.
 4. `PYTHONPATH=src python -m unittest discover -s tests` passes.
 
-### 2026-11-19 · Task · H: Gem quality check and spec-aware major glyph check
-Module: checks.py, roster.py, pve_report.py (one text line), tests
-
-Owner decisions (2026-11-19): common-quality gems are an issue; uncommon gems in item level 251+ gear are a warning; meta gems are excluded. Missing major glyphs are an issue only when no spec has all 3; once one spec has all 3, other specs with talent points and fewer than 3 major glyphs get a warning. Full spec: `docs/tasks/gem-quality-and-glyphs.md`.
-
-Done when: the "Done when" points 1-4 in `docs/tasks/gem-quality-and-glyphs.md` hold.
-
-## Resolved
+**Progress (2026-11-23):**
+1. `parse_names` accepts the specified ten-name single line with 30 trailing spaces, returning all 10 names without errors; `test_accepts_names_separated_by_whitespace_and_commas` covers mixed spaces, comma, tab, `Name-Onyxia`, and a case-insensitive duplicate.
+2. The invalid-name test now uses `"Two_Words"`.
+3. The docstring, README and roster task document whitespace/comma-separated names while retaining one-name-per-line compatibility.
+4. `PYTHONPATH=src python -m unittest discover -s tests`: 317 tests ran in 24.594s; OK.
 
 ### 2026-11-17 · Issue · Windows system theme check pending
 Module: character PvE report tests

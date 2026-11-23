@@ -50,6 +50,21 @@ class ParseNamesTests(unittest.TestCase):
         self.assertEqual(result.names, ["Alice", "Bob"])
         self.assertEqual(result.errors, [])
 
+    def test_accepts_names_separated_by_whitespace_and_commas(self):
+        result = parse_names("Alice, Bob\tCara-Onyxia alice", "Onyxia")
+        self.assertEqual(result.names, ["Alice", "Bob", "Cara"])
+        self.assertEqual(result.errors, [])
+
+    def test_accepts_ten_names_on_one_line_with_trailing_spaces(self):
+        names = "Hyacinthus Uzbudu Nitkov Renoster Dutchflower Madoxx Denerriss Ypestis Sofla Aikka"
+        result = parse_names(names + " " * 30, "Onyxia")
+        self.assertEqual(
+            result.names,
+            ["Hyacinthus", "Uzbudu", "Nitkov", "Renoster", "Dutchflower",
+             "Madoxx", "Denerriss", "Ypestis", "Sofla", "Aikka"],
+        )
+        self.assertEqual(result.errors, [])
+
     def test_accepts_matching_realm_suffix_and_rejects_other_realm(self):
         result = parse_names("Alice-ONYXIA\nBob-Icecrown\nCara", "Onyxia")
         self.assertEqual(result.names, ["Alice", "Cara"])
@@ -58,7 +73,7 @@ class ParseNamesTests(unittest.TestCase):
         self.assertIn("Bob-Icecrown", result.errors[0])
 
     def test_rejects_nonletter_names_but_accepts_accented_letters(self):
-        result = parse_names("Qzx1\nTwo Words\nÉLODIE\ne\u0301lodie", "Onyxia")
+        result = parse_names("Qzx1\nTwo_Words\nÉLODIE\ne\u0301lodie", "Onyxia")
         self.assertEqual(result.names, ["Élodie"])
         self.assertEqual(len(result.errors), 2)
 
