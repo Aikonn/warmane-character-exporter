@@ -69,7 +69,7 @@ New order (9 columns): Name, Class, **Spec1 / Spec2**, GearScore, Avg item level
 
 The label part (up to and including the colon) is in a `<span class="lbl">` (semi-bold, label colour). All text stays HTML-escaped. The Issues count column still counts findings exactly as today (Ravenik in the mockup: 18 findings, 3 lines).
 
-Classify findings by a machine-readable field, not by parsing English text: add `"kind"` to every finding in `checks.py` (`enchant`, `ring_enchant`, `sockets` (+ `"count"`), `meta`, `buckle`, `armor`, `talents` (+ `"count"`), `glyphs` (+ `"count"`), `no_talents`) and `"spec_index"` (0-based) to spec findings. The PvE report keeps using `text`; its output must not change.
+Classify findings by a machine-readable field, not by parsing English text: add `"kind"` to every finding in `checks.py` (`enchant`, `ring_enchant`, `sockets` (+ `"count"`), `gem_common` (+ `"count"`), `gem_uncommon` (+ `"count"`), `meta`, `buckle`, `armor`, `talents` (+ `"count"`), `glyphs` (+ `"count"`), `no_talents`) and `"spec_index"` (0-based) to spec findings. The PvE report keeps using `text`; its output must not change.
 
 Suggested pure functions in `roster.py`:
 

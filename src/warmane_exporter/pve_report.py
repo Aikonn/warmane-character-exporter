@@ -448,7 +448,7 @@ def _checks_section(checks: dict[str, Any]) -> str:
     parts = ['<h2 id="checks">Raid readiness</h2>',
              f"<p><b>{len(issues)} issue(s), {len(warnings)} warning(s).</b> Issues are almost certainly wrong; warnings may be intentional.</p>"]
     if not issues and not warnings:
-        parts.append("<p>No problems found by these checks (enchants, gems, meta gem, belt buckle, glyphs, talent points, armor type).</p>")
+        parts.append("<p>No problems found by these checks (enchants, gems, gem quality, meta gem, belt buckle, glyphs, talent points, armor type).</p>")
     for title, rows in (("Issues", issues), ("Warnings", warnings)):
         if rows:
             parts.append(f"<h3>{title}</h3><ul>" + "".join(f'<li class="finding">{_e(r["area"])}: {_e(r["text"])}</li>' for r in rows) + "</ul>")

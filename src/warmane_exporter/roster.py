@@ -245,6 +245,23 @@ def group_issues(issues: list[dict[str, Any]]) -> list[tuple[str, str]]:
         grouped.append((f"Empty sockets ({socket_total}):", socket_details))
         consumed.update(socket_indices)
 
+    common_gem_counts: dict[str, int] = {}
+    common_gem_indices: list[int] = []
+    for index, issue in collect_slots("gem_common"):
+        count = issue.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+            continue
+        slot = str(issue["slot"])
+        common_gem_counts[slot] = common_gem_counts.get(slot, 0) + count
+        common_gem_indices.append(index)
+    if common_gem_indices:
+        common_gem_total = sum(common_gem_counts.values())
+        common_gem_details = ", ".join(
+            f"{slot} {count}" for slot, count in common_gem_counts.items()
+        )
+        grouped.append((f"Common gems ({common_gem_total}):", common_gem_details))
+        consumed.update(common_gem_indices)
+
     meta_slots: list[str] = []
     meta_indices: list[int] = []
     for index, issue in collect_slots("meta"):
@@ -304,12 +321,15 @@ def quick_sum(row: RosterRow) -> str | None:
     gem_count = 0
     glyph_count = 0
     talent_count = 0
+    common_gem_count = 0
     for issue in row.issue_findings:
         count = issue.get("count")
         if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
             continue
         if issue.get("kind") == "sockets":
             gem_count += count
+        elif issue.get("kind") == "gem_common":
+            common_gem_count += count
         elif issue.get("kind") == "glyphs":
             glyph_count += count
         elif issue.get("kind") == "talents":
@@ -325,17 +345,19 @@ def quick_sum(row: RosterRow) -> str | None:
     if glyph_count:
         missing.append(f"{glyph_count} glyph{'s' if glyph_count != 1 else ''}")
 
-    known_kinds = {"enchant", "ring_enchant", "sockets", "buckle", "glyphs", "talents", "meta"}
+    known_kinds = {"enchant", "ring_enchant", "sockets", "gem_common", "buckle", "glyphs", "talents", "meta"}
     other_count = 0
     for issue in row.issue_findings:
         kind = issue.get("kind")
         count = issue.get("count")
         has_count = isinstance(count, int) and not isinstance(count, bool) and count > 0
-        if kind not in known_kinds or (kind in ("sockets", "glyphs", "talents") and not has_count):
+        if kind not in known_kinds or (kind in ("sockets", "gem_common", "glyphs", "talents") and not has_count):
             other_count += 1
     other: list[str] = []
     if talent_count:
         other.append(f"{talent_count} unspent talent{'s' if talent_count != 1 else ''}")
+    if common_gem_count:
+        other.append(f"{common_gem_count} common gem{'s' if common_gem_count != 1 else ''}")
     if any(issue.get("kind") == "meta" for issue in row.issue_findings):
         other.append("inactive meta gem")
     if other_count:

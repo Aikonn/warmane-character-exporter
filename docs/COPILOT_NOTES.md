@@ -32,6 +32,12 @@ Owner decisions (2026-11-19): common-quality gems are an issue; uncommon gems in
 
 Done when: the "Done when" points 1-4 in `docs/tasks/gem-quality-and-glyphs.md` hold.
 
+**Progress (2026-11-23):**
+1. Added per-item common/poor gem issues and uncommon-gem warnings for item level 251+, skipping meta, empty, and unknown-quality gems; missing glyphs are warnings only when another talented spec has all 3. `tests/test_checks.py` covers the requested cases, including unknown item level. Full suite: `PYTHONPATH=src python -m unittest discover -s tests` ran 326 tests; OK.
+2. `gem_common` appears in grouped issues with per-slot counts and in quick-sum as singular/plural before inactive meta. `tests/test_roster.py` checks grouping and quick-sum, and verifies glyph warnings do not enter either.
+3. Existing finding text regression tests pass, including the original glyph-issue text; `test_pve_html_for_synthetic_fixture_is_unchanged` confirms the PvE report fixture remains byte-equivalent outside its existing style normalization.
+4. This Progress entry records results for points 1-3.
+
 ## Resolved
 
 ### 2026-11-23 · Task · I: Roster accepts names on one line

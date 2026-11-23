@@ -70,6 +70,48 @@ class GearChecks(unittest.TestCase):
         self.assertIn("Leather armor; a Warrior can wear plate", r["warnings"][0]["text"])
         self.assertEqual(r["warnings"][0]["slot"], "Chest")
 
+    def test_common_quality_gems_are_one_issue_per_item(self):
+        gems = [
+            {"id": 1, "quality": "common", "color": "red", "text": "Weak Ruby"},
+            {"id": 2, "quality": "poor", "color": "blue", "text": "Rough Sapphire"},
+            {"id": 3, "quality": "poor", "color": "yellow"},
+        ]
+        result = run_checks(report([item("Head", gem_details=gems)]))
+
+        self.assertEqual(len(result["issues"]), 1)
+        finding = result["issues"][0]
+        self.assertEqual((finding["kind"], finding["count"], finding["slot"]), ("gem_common", 3, "Head"))
+        self.assertEqual(finding["text"], "3 common-quality gem(s): Weak Ruby; Rough Sapphire; gem.")
+
+    def test_uncommon_gem_in_icc_gear_is_a_warning(self):
+        gem = {"id": 1, "quality": "uncommon", "color": "red", "text": "Uncommon Ruby"}
+        result = run_checks(report([item("Head", item_level=251, gem_details=[gem])]))
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(len(result["warnings"]), 1)
+        finding = result["warnings"][0]
+        self.assertEqual((finding["kind"], finding["count"]), ("gem_uncommon", 1))
+        self.assertEqual(
+            finding["text"],
+            "1 uncommon-quality gem(s) in item level 251 gear: Uncommon Ruby.",
+        )
+
+    def test_uncommon_gem_below_icc_level_has_no_finding(self):
+        gem = {"id": 1, "quality": "uncommon", "color": "red", "text": "Uncommon Ruby"}
+        for item_level in (245, None):
+            with self.subTest(item_level=item_level):
+                result = run_checks(report([item("Head", item_level=item_level, gem_details=[gem])]))
+                self.assertEqual((result["issues"], result["warnings"]), ([], []))
+
+    def test_uncommon_meta_gem_and_unknown_quality_have_no_finding(self):
+        gems = [
+            {"id": 1, "quality": "uncommon", "color": "meta", "text": "Uncommon Meta"},
+            {"id": 2, "quality": None, "color": "red", "text": "Unknown Quality"},
+            {"id": 0, "empty": True, "quality": "common", "color": "red", "text": "Empty socket"},
+        ]
+        result = run_checks(report([item("Head", item_level=264, gem_details=gems)]))
+        self.assertEqual((result["issues"], result["warnings"]), ([], []))
+
 
 class SpecChecks(unittest.TestCase):
     def test_unspent_points_and_missing_major_glyph(self):
@@ -88,6 +130,44 @@ class SpecChecks(unittest.TestCase):
     def test_both_specs_checked_the_same(self):
         bad = {"label": "Spec 2", "split": [30, 10, 0], "glyphs": [{"category": "major"}]}
         self.assertEqual(len(run_checks(report([], specs=[bad]))["issues"]), 2)
+
+    def test_missing_glyphs_are_warnings_when_another_spec_is_fully_glyphed(self):
+        complete = {"label": "Spec 1", "split": [50, 21, 0], "glyphs": [{"category": "major"}] * 3}
+        incomplete = {"label": "Spec 2", "split": [50, 21, 0], "glyphs": [{"category": "major"}] * 2}
+
+        result = run_checks(report([], specs=[complete, incomplete]))
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            [(finding["kind"], finding["count"], finding["spec_index"], finding["text"])
+             for finding in result["warnings"]],
+            [("glyphs", 1, 1, "1 major glyph slot(s) empty (2 of 3 filled); another specialization has all 3.")],
+        )
+
+    def test_missing_glyphs_are_issues_when_no_spec_is_fully_glyphed(self):
+        specs = [
+            {"label": "Spec 1", "split": [50, 21, 0], "glyphs": [{"category": "major"}] * 2},
+            {"label": "Spec 2", "split": [50, 21, 0], "glyphs": [{"category": "major"}] * 2},
+        ]
+
+        result = run_checks(report([], specs=specs))
+
+        self.assertEqual(result["warnings"], [])
+        self.assertEqual(
+            [(finding["level"], finding["kind"], finding["count"], finding["spec_index"], finding["text"])
+             for finding in result["issues"]],
+            [
+                ("issue", "glyphs", 1, 0, "1 major glyph slot(s) empty (2 of 3 filled)."),
+                ("issue", "glyphs", 1, 1, "1 major glyph slot(s) empty (2 of 3 filled)."),
+            ],
+        )
+
+    def test_spec_without_talents_only_gets_no_talents_warning(self):
+        empty = {"label": "Spec 1", "split": [0, 0, 0], "glyphs": [{"category": "major"}] * 2}
+        result = run_checks(report([], specs=[empty]))
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual([finding["kind"] for finding in result["warnings"]], ["no_talents"])
 
     def test_findings_include_kinds_counts_and_spec_indices(self):
         specs = [

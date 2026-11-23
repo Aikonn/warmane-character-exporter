@@ -149,6 +149,27 @@ class RosterRowTests(unittest.TestCase):
             ("Head:", "first"), ("", "second"), ("", "third"),
         ])
 
+    def test_build_row_groups_common_gems_but_excludes_glyph_warnings(self):
+        issues = [
+            {"kind": "gem_common", "slot": "Head", "count": 2, "text": "2 common-quality gem(s): gem; gem."},
+            {"kind": "gem_common", "slot": "Chest", "count": 1, "text": "1 common-quality gem(s): gem."},
+        ]
+        warning = {"kind": "glyphs", "count": 1, "spec_index": 1, "text": "glyph warning"}
+        with mock.patch("warmane_exporter.roster.run_checks", return_value={
+            "issues": issues,
+            "warnings": [warning],
+        }):
+            row = build_row(self.report, "Mélora-Onyxia-quick-pve.html", from_cache=False)
+
+        self.assertEqual(row.warnings, 1)
+        self.assertEqual(
+            group_issues(row.issue_findings),
+            [("Common gems (3):", "Head 2, Chest 1")],
+        )
+        self.assertIn("3 common gems", quick_sum(row))
+        self.assertNotIn("glyph", str(group_issues(row.issue_findings)))
+        self.assertNotIn("glyph", quick_sum(row))
+
     def test_build_row_prefixes_gear_issue_but_not_spec_issue(self):
         report = json.loads(json.dumps(self.report))
         report["specializations"][0]["split"] = [57, 12, 0]
@@ -182,12 +203,14 @@ class IssueGroupingTests(unittest.TestCase):
             {"kind": "unknown", "slot": "Waist", "text": "Other issue."},
             {"kind": "glyphs", "count": 3, "spec_index": 0, "text": "glyphs"},
             {"kind": "sockets", "slot": "Chest", "count": 2, "text": "sockets"},
+            {"kind": "gem_common", "slot": "Head", "count": 2, "text": "gems"},
             {"kind": "enchant", "slot": "Chest", "text": "enchant"},
             {"kind": "meta", "slot": "Head", "text": "meta"},
             {"kind": "buckle", "slot": "Waist", "text": "buckle"},
             {"kind": "talents", "count": 5, "spec_index": 0, "text": "talents"},
             {"kind": "ring_enchant", "slot": "Finger 1", "text": "ring"},
             {"kind": "sockets", "slot": "Head", "count": 1, "text": "sockets"},
+            {"kind": "gem_common", "slot": "Chest", "count": 1, "text": "gems"},
             {"kind": "enchant", "slot": "Head", "text": "enchant"},
             {"kind": "meta", "slot": "Head", "text": "meta"},
             {"kind": "sockets", "slot": "Chest", "count": 1, "text": "sockets"},
@@ -201,6 +224,7 @@ class IssueGroupingTests(unittest.TestCase):
             ("No enchant (2):", "Chest, Head"),
             ("No ring enchant (Enchanter) (2):", "Finger 1, Finger 2"),
             ("Empty sockets (4):", "Chest 3, Head 1"),
+            ("Common gems (3):", "Head 2, Chest 1"),
             ("Meta gem not active:", "Head, Feet"),
             ("Belt buckle missing", ""),
             ("Unspent talent points:", "Spec1 5, Spec2 3"),
@@ -245,6 +269,25 @@ class QuickSumTests(unittest.TestCase):
         )
         self.assertIsNone(quick_sum(self.row([])))
         self.assertIsNone(quick_sum(self.row([{"kind": "buckle"}], status=NOT_FOUND)))
+
+    def test_common_gem_count_is_singular_or_plural_before_meta(self):
+        self.assertEqual(
+            quick_sum(self.row([
+                {"kind": "enchant"},
+                {"kind": "gem_common", "count": 1},
+                {"kind": "meta"},
+            ])),
+            "Name 5.7k - missing 1 enchant; 1 common gem, inactive meta gem",
+        )
+        self.assertEqual(
+            quick_sum(self.row([
+                {"kind": "enchant"},
+                {"kind": "gem_common", "count": 1},
+                {"kind": "gem_common", "count": 2},
+                {"kind": "meta"},
+            ])),
+            "Name 5.7k - missing 1 enchant; 3 common gems, inactive meta gem",
+        )
 
     def test_message_stays_under_wow_chat_limit(self):
         findings = (

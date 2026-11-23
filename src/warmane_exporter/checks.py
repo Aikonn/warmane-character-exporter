@@ -1,10 +1,13 @@
 """Raid readiness checks for the PvE report (tier 1: objective facts, no stat caps, no best-in-slot lists).
 
 Every finding has ``level``, ``area``, ``text`` and machine-readable ``kind`` fields;
-socket, talent and glyph findings also include ``count``, and spec findings include
-``spec_index``. The PvE report renders the unchanged ``text`` field.
+socket, gem-quality, talent and glyph findings also include ``count``, and spec
+findings include ``spec_index``. The PvE report renders the unchanged ``text`` field.
 Issues are things that are almost certainly wrong; warnings may be intentional.
-The checks assume a level 80 character; below level 80 the talent point maximum is level - 9 and glyph checks are skipped.
+Common-quality gems are issues, and uncommon gems in item level 251+ gear are warnings.
+Missing major glyphs are issues only when no spec with talents has all three.
+The checks assume a level 80 character; below level 80 the talent point maximum is
+level - 9 and glyph checks are skipped.
 """
 from __future__ import annotations
 
@@ -19,6 +22,7 @@ ARMOR_NAMES = {1: "cloth", 2: "leather", 3: "mail", 4: "plate"}
 BEST_ARMOR = {"Priest": 1, "Mage": 1, "Warlock": 1, "Rogue": 2, "Druid": 2, "Hunter": 3, "Shaman": 3,
               "Warrior": 4, "Paladin": 4, "Death Knight": 4}
 MAX_MAJOR_GLYPHS = 3
+ICC_ITEM_LEVEL = 251
 BUCKLE_NAME = "Eternal Belt Buckle"
 
 
@@ -88,6 +92,37 @@ def check_gear(report: dict[str, Any]) -> list[dict[str, Any]]:
                 out.append(_gear_finding(
                     "issue", item, f"Meta gem is not active: {gem.get('text') or 'meta gem'}.", "meta",
                 ))
+        common_gems = []
+        uncommon_gems = []
+        for gem in item.get("gem_details") or []:
+            if not isinstance(gem, dict) or gem.get("empty") or gem.get("id") == 0:
+                continue
+            color = gem.get("color")
+            if isinstance(color, str) and color.lower() == "meta":
+                continue
+            quality = gem.get("quality")
+            quality = quality.lower() if isinstance(quality, str) else None
+            if quality in ("common", "poor"):
+                common_gems.append(gem.get("text") or "gem")
+            elif quality == "uncommon":
+                uncommon_gems.append(gem.get("text") or "gem")
+        if common_gems:
+            out.append(_gear_finding(
+                "issue", item,
+                f"{len(common_gems)} common-quality gem(s): {'; '.join(common_gems)}.",
+                "gem_common", count=len(common_gems),
+            ))
+        item_level = item.get("item_level")
+        if (
+            uncommon_gems and isinstance(item_level, int) and not isinstance(item_level, bool)
+            and item_level >= ICC_ITEM_LEVEL
+        ):
+            out.append(_gear_finding(
+                "warning", item,
+                f"{len(uncommon_gems)} uncommon-quality gem(s) in item level {item_level} gear: "
+                f"{'; '.join(uncommon_gems)}.",
+                "gem_uncommon", count=len(uncommon_gems),
+            ))
         if slot == "Waist" and item.get("sockets") is not None and not item.get("buckle"):
             out.append(_gear_finding(
                 "issue", item, f"{BUCKLE_NAME} missing (extra gem socket on the belt).", "buckle",
@@ -108,7 +143,17 @@ def check_specs(report: dict[str, Any]) -> list[dict[str, Any]]:
     level = (report.get("identity") or {}).get("level")
     level = level if isinstance(level, int) else 80
     max_points = max(level - 9, 0)
-    for spec_index, spec in enumerate(report.get("specializations") or []):
+    specs = report.get("specializations") or []
+    major_counts = [
+        sum(1 for glyph in spec.get("glyphs") or [] if glyph.get("category") == "major")
+        for spec in specs
+    ] if level >= 80 else []
+    has_fully_glyphed_spec = level >= 80 and any(
+        sum(points for points in spec.get("split") or [] if isinstance(points, int)) > 0
+        and major_counts[spec_index] >= MAX_MAJOR_GLYPHS
+        for spec_index, spec in enumerate(specs)
+    )
+    for spec_index, spec in enumerate(specs):
         label = spec.get("label") or "Specialization"
         spent = sum(x for x in spec.get("split") or [] if isinstance(x, int))
         if spent == 0:
@@ -126,12 +171,18 @@ def check_specs(report: dict[str, Any]) -> list[dict[str, Any]]:
                 "talents", count=unspent, spec_index=spec_index,
             ))
         if level >= 80:
-            major = sum(1 for g in spec.get("glyphs") or [] if g.get("category") == "major")
+            major = major_counts[spec_index]
             if major < MAX_MAJOR_GLYPHS:
                 empty = MAX_MAJOR_GLYPHS - major
+                level_name = "warning" if has_fully_glyphed_spec else "issue"
+                text = (
+                    f"{empty} major glyph slot(s) empty ({major} of {MAX_MAJOR_GLYPHS} filled); "
+                    "another specialization has all 3."
+                    if has_fully_glyphed_spec else
+                    f"{empty} major glyph slot(s) empty ({major} of {MAX_MAJOR_GLYPHS} filled)."
+                )
                 out.append(_finding(
-                    "issue", label,
-                    f"{empty} major glyph slot(s) empty ({major} of {MAX_MAJOR_GLYPHS} filled).",
+                    level_name, label, text,
                     "glyphs", count=empty, spec_index=spec_index,
                 ))
     return out
