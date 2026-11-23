@@ -51,18 +51,6 @@ Done when:
 3. The docstring, README and roster task document whitespace/comma-separated names while retaining one-name-per-line compatibility.
 4. `PYTHONPATH=src python -m unittest discover -s tests`: 317 tests ran in 24.594s; OK.
 
-### 2026-11-17 · Issue · Windows system theme check pending
-Module: character PvE report tests
-
-The full suite passes (315 tests), and the quick/full fixture HTML is unchanged outside `<style>`. Both reports rendered with expected light and dark colors in browser `prefers-color-scheme` emulation. Windows' global appearance setting was not toggled, so task G's point 4 remains unverified.
-
-### 2026-11-17 · Task · G: Dark and light theme for character reports
-Module: pve_report.py (CSS only), tests
-
-Owner decision (2026-11-17): character reports get a dark version that follows the system setting, same palette as the roster summary; no class colouring. Exact CSS and checks: `docs/tasks/report-dark-theme.md`.
-
-Done when: the "Done when" points 1-4 in `docs/tasks/report-dark-theme.md` hold.
-
-**Claude:** Accepted task G (2026-11-18). 315 tests OK (1 skipped) in the cloud clone. The owner checked the character reports with the Windows light/dark setting and they work as wished, so point 4 holds.
+**Claude:** Accepted task I (2026-11-23). Diff matches the task; 317 tests OK (1 skipped) in the cloud clone; the owner's example line returns the 10 names with no errors, and other-realm and non-letter parts still give per-part errors with the line number.
 
 Older entries: `docs/COPILOT_NOTES_ARCHIVE.md`.

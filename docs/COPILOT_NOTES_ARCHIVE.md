@@ -2,6 +2,20 @@
 
 Resolved entries moved out of `COPILOT_NOTES.md` to keep it short. Newest first. Read only when an old decision is needed.
 
+### 2026-11-17 · Issue · Windows system theme check pending
+Module: character PvE report tests
+
+The full suite passes (315 tests), and the quick/full fixture HTML is unchanged outside `<style>`. Both reports rendered with expected light and dark colors in browser `prefers-color-scheme` emulation. Windows' global appearance setting was not toggled, so task G's point 4 remains unverified.
+
+### 2026-11-17 · Task · G: Dark and light theme for character reports
+Module: pve_report.py (CSS only), tests
+
+Owner decision (2026-11-17): character reports get a dark version that follows the system setting, same palette as the roster summary; no class colouring. Exact CSS and checks: `docs/tasks/report-dark-theme.md`.
+
+Done when: the "Done when" points 1-4 in `docs/tasks/report-dark-theme.md` hold.
+
+**Claude:** Accepted task G (2026-11-18). 315 tests OK (1 skipped) in the cloud clone. The owner checked the character reports with the Windows light/dark setting and they work as wished, so point 4 holds.
+
 ### 2026-11-17 · Progress · F roster summary look
 Module: roster summary UI
 
