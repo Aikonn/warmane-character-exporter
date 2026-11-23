@@ -25,6 +25,17 @@ Claude replies under the entry with a line starting `**Claude:**`, then moves th
 
 ## Open
 
+### 2026-11-23 · Task · I: Roster accepts names on one line
+Module: roster.py (`parse_names` only), tests/test_roster.py, README.md, docs/tasks/raid-roster.md
+
+Owner request (2026-11-23): the roster input must also accept all names on one line separated by spaces, with any extra spaces or tabs at the end, e.g. `Hyacinthus Uzbudu Nitkov Renoster Dutchflower Madoxx Denerriss Ypestis Sofla Aikka   `. Split each line on whitespace and commas (`raw_line.replace(",", " ").split()`) and run every part through the existing checks (realm suffix, letters only, case normalisation, de-duplication, 40-name limit). Error messages keep the line number. One name per line must keep working. Known trade-off: `Alice - Onyxia` (spaces around the dash) now gives errors; `Alice-Onyxia` still works.
+
+Done when:
+1. `parse_names` accepts the example line above (30 trailing spaces included) and returns the 10 names with no errors; a mixed input with spaces, a comma, a tab, a `Name-Onyxia` part and a duplicate is covered by a new test.
+2. The existing test that used `"Two Words"` as a bad name uses a still-invalid name such as `"Two_Words"`.
+3. The docstring, README.md and docs/tasks/raid-roster.md no longer say "one name per line" only.
+4. `PYTHONPATH=src python -m unittest discover -s tests` passes.
+
 ### 2026-11-19 · Task · H: Gem quality check and spec-aware major glyph check
 Module: checks.py, roster.py, pve_report.py (one text line), tests
 
